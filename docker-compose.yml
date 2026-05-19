@@ -1,453 +1,211 @@
 services:
-  # PostgreSQL Database (Local - Commented out, using RDS instead)
-  # Uncomment this section if you want to use local PostgreSQL for development
-  # postgres:
-  #   image: postgres:15-alpine
-  #   container_name: evalai-postgres
-  #   environment:
-  #     POSTGRES_USER: ${POSTGRES_USER:-root}
-  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-root}
-  #     POSTGRES_DB: ${POSTGRES_DB:-eval_ai_dev}
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-root}"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-
-  # Consul for Service Discovery
-  consul:
-    image: hashicorp/consul:1.16
-    container_name: evalai-consul
+  postgres:
+    image: postgres:15-alpine
+    container_name: rev-eval-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-root}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-root}
+      POSTGRES_DB: ${POSTGRES_DB:-eval_ai_dev}
     ports:
-      - "8500:8500"
-      - "8600:8600/udp"
-    command: agent -server -ui -bootstrap-expect=1 -client=0.0.0.0
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "consul", "members"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-root}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo:
+    image: mongo:7
+    container_name: rev-eval-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:-admin}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-evalai}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand({ ping: 1 })"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
 
-  # User Service
+  minio:
+    image: minio/minio:latest
+    container_name: rev-eval-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  nginx:
+    image: nginx:alpine
+    container_name: rev-eval-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+
   user-service:
     build:
       context: ./services/user-service
       dockerfile: Dockerfile
-    container_name: evalai-user-service
+    container_name: rev-eval-user-service
+    restart: unless-stopped
     environment:
-      # Database (RDS)
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${USER_DB_NAME}
-
-      # Service
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${POSTGRES_USER:-root}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-root}
+      DB_NAME: ${POSTGRES_DB:-eval_ai_dev}
       SERVICE_NAME: user-service
       PORT: 8002
-      SERVICE_HOSTNAME: user-service
-
-      # Consul
-      CONSUL_HOST: consul
-      CONSUL_PORT: 8500
-
-      # WorkOS
-      WORKOS_API_KEY: ${WORKOS_API_KEY}
-      WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID}
-      WORKOS_DEFAULT_ORG: ${WORKOS_DEFAULT_ORG}
-      WORKOS_INVITE_URL: ${WORKOS_INVITE_URL:-https://therapeutic-arch-47-staging.authkit.app/invite}
-
-      # CORS
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_EXPIRY_MINUTES: ${JWT_EXPIRY_MINUTES:-60}
       ALLOW_ORIGINS: http://localhost:3000
     ports:
       - "8002:8002"
     depends_on:
-      consul:
+      postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
-  # Notification Service
-  notification-service:
-    build:
-      context: ./services/notification-service
-      dockerfile: Dockerfile
-    container_name: evalai-notification-service
-    environment:
-      # Database (RDS)
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-
-      # Service
-      SERVICE_NAME: notification-service
-      PORT: 8004
-      SERVICE_HOSTNAME: notification-service
-
-      # Consul
-      CONSUL_HOST: consul
-      CONSUL_PORT: 8500
-
-      # AWS SES
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      SES_SENDER_EMAIL: ${SES_SENDER_EMAIL:-noreply@revature.com}
-      SES_SENDER_NAME: ${SES_SENDER_NAME:-Rev EvalAI}
-
-      # Application
-      FRONTEND_URL: http://localhost:3000
-      INVITE_TOKEN_SECRET: ${INVITE_TOKEN_SECRET:-change-me-in-production}
-      INVITE_TOKEN_EXPIRY_DAYS: ${INVITE_TOKEN_EXPIRY_DAYS:-7}
-
-      # CORS
-      ALLOW_ORIGINS: http://localhost:3000
-    ports:
-      - "8004:8004"
-    depends_on:
-      consul:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Test Management Service
-  test-management-service:
-    build:
-      context: ./services/test-management-service
-      dockerfile: Dockerfile
-    container_name: evalai-test-management
-    environment:
-      # Database (RDS)
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-
-      # Service
-      SERVICE_NAME: test-management-service
-      PORT: 8001
-      SERVICE_HOSTNAME: test-management-service
-
-      # Consul
-      CONSUL_HOST: consul
-      CONSUL_PORT: 8500
-
-      # Service-to-Service Communication
-      USER_SERVICE_URL: http://user-service:8002
-      NOTIFICATION_SERVICE_URL: http://notification-service:8004
-
-      # CORS
-      ALLOW_ORIGINS: http://localhost:3000
-    ports:
-      - "8001:8001"
-    depends_on:
-      consul:
-        condition: service_healthy
-      user-service:
-        condition: service_healthy
-      notification-service:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Question Management Service
   question-management-service:
     build:
       context: ./services/question-management-service
       dockerfile: Dockerfile
-    container_name: evalai-question-management
+    container_name: rev-eval-question-management
+    restart: unless-stopped
     environment:
-      # MongoDB (Atlas Cluster)
-      MONGO_USER: ${MONGO_USER}
-      MONGODB_PASSWORD: ${MONGODB_PASSWORD}
-      MONGO_CLUSTER: ${MONGO_CLUSTER}
-      MONGO_APPNAME: ${MONGO_APPNAME}
-      MONGO_DB: ${MONGO_DB}
-
-      # Service
+      MONGO_URI: mongodb://${MONGO_USER:-admin}:${MONGODB_PASSWORD:-admin}@mongo:27017/${MONGO_DB:-evalai}?authSource=admin
+      MONGO_DB: ${MONGO_DB:-evalai}
+      MONGO_APPNAME: rev-eval
       SERVICE_NAME: question-management-service
       PORT: 8003
-      SERVICE_HOSTNAME: question-management-service
-
-      # Consul
-      CONSUL_HOST: consul
-      CONSUL_PORT: 8500
-
-      # CORS
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-question-images}
       ALLOW_ORIGINS: http://localhost:3000
     ports:
       - "8003:8003"
     depends_on:
-      consul:
+      mongo:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
-  # AI Quiz Service
-  ai-quiz-service:
+  test-management-service:
     build:
-      context: ./services/ai-quiz-service
+      context: ./services/test-management-service
       dockerfile: Dockerfile
-    container_name: evalai-ai-quiz-service
+    container_name: rev-eval-test-management
+    restart: unless-stopped
     environment:
-      # MongoDB (Atlas Cluster)
-      MONGO_USER: ${MONGO_USER}
-      MONGODB_PASSWORD: ${MONGODB_PASSWORD}
-      MONGO_CLUSTER: ${MONGO_CLUSTER}
-      MONGO_APPNAME: ${MONGO_APPNAME:-EvalAI}
-      MONGO_DB: ${MONGO_DB}
-
-      # Service
-      SERVICE_NAME: ai-quiz-service
-      PORT: 8005
-      SERVICE_HOSTNAME: ai-quiz-service
-
-      # Consul
-      CONSUL_HOST: consul
-      CONSUL_PORT: 8500
-
-      # External Services
-      TEST_SERVICE_URL: http://test-management-service:8001
-
-      # AWS Bedrock
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_REGION: ${AWS_REGION:-us-west-1}
-      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-anthropic.claude-3-5-sonnet-20241022-v2:0}
-      BEDROCK_MAX_TOKENS: ${BEDROCK_MAX_TOKENS:-2048}
-      BEDROCK_TEMPERATURE: ${BEDROCK_TEMPERATURE:-0.7}
-
-      # MongoDB Connection Settings (Optional)
-      MONGO_TIMEOUT_MS: ${MONGO_TIMEOUT_MS:-5000}
-      MONGO_MAX_POOL_SIZE: ${MONGO_MAX_POOL_SIZE:-10}
-      MONGO_MIN_POOL_SIZE: ${MONGO_MIN_POOL_SIZE:-1}
-
-      # AWS SQS Configuration (disabled for local dev - using local lambda instead)
-      SQS_QUEUE_URL: ${SQS_QUEUE_URL:-}
-      SQS_ENABLED: ${SQS_ENABLED:-false}
-      LAMBDA_URL: ${LAMBDA_URL:-http://quiz-evaluation-lambda:9000}
-
-      # LangSmith Configuration (disabled for local dev)
-      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
-      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
-
-      # CORS
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${POSTGRES_USER:-root}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-root}
+      DB_NAME: ${POSTGRES_DB:-eval_ai_dev}
+      SERVICE_NAME: test-management-service
+      PORT: 8001
+      SERVICE_HOSTNAME: test-management-service
+      USER_SERVICE_URL: http://user-service:8002
       ALLOW_ORIGINS: http://localhost:3000
     ports:
-      - "8005:8005"
+      - "8001:8001"
     depends_on:
-      consul:
+      postgres:
         condition: service_healthy
-      test-management-service:
+      user-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
-  # AI Interview Service
-  ai-interview-service:
-    build:
-      context: ./services/ai-interview-service
-      dockerfile: Dockerfile
-    container_name: evalai-ai-interview-service
-    environment:
-      # MongoDB (Atlas Cluster)
-      MONGO_USER: ${MONGO_USER}
-      MONGODB_PASSWORD: ${MONGODB_PASSWORD}
-      MONGO_CLUSTER: ${MONGO_CLUSTER}
-      MONGO_APPNAME: ${MONGO_APPNAME:-EvalAI}
-      MONGO_DB: ${MONGO_DB}
-
-      # Service
-      SERVICE_NAME: ai-interview-service
-      PORT: 8009
-      SERVICE_HOSTNAME: ai-interview-service
-
-      # Consul
-      CONSUL_HOST: consul
-      CONSUL_PORT: 8500
-
-      # External Services
-      TEST_SERVICE_URL: http://test-management-service:8001
-
-      # AWS Bedrock
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_REGION: ${AWS_REGION:-us-west-1}
-      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-anthropic.claude-3-5-sonnet-20241022-v2:0}
-      BEDROCK_MAX_TOKENS: ${BEDROCK_MAX_TOKENS:-2048}
-      BEDROCK_TEMPERATURE: ${BEDROCK_TEMPERATURE:-0.7}
-
-      # Session Configuration
-      MAX_SESSION_DURATION: ${MAX_SESSION_DURATION:-3600}
-      MAX_MESSAGE_HISTORY: ${MAX_MESSAGE_HISTORY:-50}
-
-      # MongoDB Connection Settings (Optional)
-      MONGO_TIMEOUT_MS: ${MONGO_TIMEOUT_MS:-5000}
-      MONGO_MAX_POOL_SIZE: ${MONGO_MAX_POOL_SIZE:-10}
-      MONGO_MIN_POOL_SIZE: ${MONGO_MIN_POOL_SIZE:-1}
-
-      # LangSmith Configuration (disabled for local dev)
-      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
-      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-eval-ai-interview}
-      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
-      LANGSMITH_ENDPOINT: ${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
-
-      # CORS
-      ALLOW_ORIGINS: '["http://localhost:3000","http://localhost:8000"]'
-    ports:
-      - "8009:8009"
-    depends_on:
-      consul:
-        condition: service_healthy
-      test-management-service:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8009/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # API Gateway
   api-gateway:
     build:
       context: ./services/api-gateway-service
       dockerfile: Dockerfile
-    container_name: evalai-api-gateway
+    container_name: rev-eval-api-gateway
+    restart: unless-stopped
     environment:
-      # Service
       SERVICE_NAME: api-gateway
       PORT: 8000
-      SERVICE_HOSTNAME: api-gateway
-
-      # Consul
-      CONSUL_HOST: consul
-      CONSUL_PORT: 8500
-
-      # WorkOS
-      WORKOS_API_KEY: ${WORKOS_API_KEY}
-      WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID}
-
-      # CORS
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ALLOW_ORIGINS: http://localhost:3000
     ports:
       - "8000:8000"
     depends_on:
-      consul:
-        condition: service_healthy
       user-service:
         condition: service_healthy
       test-management-service:
         condition: service_healthy
       question-management-service:
         condition: service_healthy
-      ai-quiz-service:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
-  # Quiz Evaluation Lambda (Local Development)
-  quiz-evaluation-lambda:
-    build:
-      context: ./lambda/quiz-evaluation-handler
-      dockerfile: Dockerfile
-    container_name: evalai-quiz-evaluation-lambda
-    environment:
-      # MongoDB (same as other services)
-      MONGO_USER: ${MONGO_USER}
-      MONGODB_PASSWORD: ${MONGODB_PASSWORD}
-      MONGO_CLUSTER: ${MONGO_CLUSTER}
-      MONGO_APPNAME: ${MONGO_APPNAME:-EvalAI}
-      MONGO_DB: ${MONGO_DB}
-      
-      # Build MONGO_URI from components (same format as other services)
-      MONGO_URI: "mongodb+srv://${MONGO_USER}:${MONGODB_PASSWORD}@${MONGO_CLUSTER}/${MONGO_DB}?retryWrites=true&w=majority&appName=${MONGO_APPNAME:-EvalAI}"
-      
-      # PostgreSQL (same as other services)
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT:-5432}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      
-      # Test Management Service (use Docker service name for internal communication)
-      TEST_SERVICE_URL: http://test-management-service:8001
-      
-      # Logging
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-    ports:
-      - "9000:9000"  # HTTP trigger endpoint for local testing
-    depends_on:
-      test-management-service:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Frontend (Next.js)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: production  # Production build
-    container_name: evalai-frontend
+      target: development
+    container_name: rev-eval-frontend
+    restart: unless-stopped
     environment:
-      # WorkOS
-      WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID}
-      WORKOS_API_KEY: ${WORKOS_API_KEY}
-      NEXT_PUBLIC_WORKOS_REDIRECT_URI: http://localhost:3000/api/auth/callback
-      WORKOS_DEFAULT_ORG: ${WORKOS_DEFAULT_ORG}
-      WORKOS_COOKIE_PASSWORD: ${WORKOS_COOKIE_PASSWORD}
-
-      # ElevenLabs (server-side only)
-      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY}
-      ELEVENLABS_VOICE_ID: ${ELEVENLABS_VOICE_ID:-s3TPKV1kjDlVtZbl4Ksh}
-
-      # API Gateway (internal Docker network - for server-side BFF routes)
       API_GATEWAY_URL: http://api-gateway:8000
-      # Public API URL (for browser requests - not used in BFF, but available if needed)
       NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:8000
-
-      # Interview WebSocket (for browser)
-      NEXT_PUBLIC_INTERVIEW_WS_URL: ws://localhost:8009
-
-      # Production mode
-      NODE_ENV: production
+      NODE_ENV: development
     ports:
       - "3000:3000"
-    # Optional: Uncomment volumes below for hot reload (live code changes without rebuild)
-    # volumes:
-    #   - ./frontend:/app
-    #   - /app/node_modules  # Prevent overwriting node_modules
-    #   - /app/.next  # Prevent overwriting .next build cache
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
     depends_on:
       - api-gateway
 
-# volumes:
-  # postgres_data:  # Commented out - using RDS instead of local PostgreSQL
+volumes:
+  postgres_data:
+  mongo_data:
+  minio_data:
