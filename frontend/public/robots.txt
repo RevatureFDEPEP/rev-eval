@@ -1,0 +1,5 @@
+# Disallow all bots from indexing
+# This is a private application
+
+User-agent: *
+Disallow: /

@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-dotenv
+email-validator
+psycopg2-binary
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
+pymongo[srv]
+beanie
+motor
+python-consul

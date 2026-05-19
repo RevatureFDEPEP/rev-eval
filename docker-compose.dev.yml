@@ -1,0 +1,20 @@
+# Docker Compose override for development mode with hot-reload
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+      - frontend-cache:/app/.next/cache  # Persist build cache
+    # Turbopack enabled by default in package.json dev script
+
+volumes:
+  frontend-cache:
