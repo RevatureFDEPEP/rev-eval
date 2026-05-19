@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from dotenv import load_dotenv
 
+from src.v1.routes.auth_route import router as auth_router
 from src.v1.routes.user_route import router as user_router
 from src.db.session import init_db
 from src.config.settings import settings
@@ -29,6 +30,7 @@ app.add_middleware(
 )
 
 # ---- Routes ----
+app.include_router(auth_router, prefix="/v1/api")
 app.include_router(user_router, prefix="/v1/api")
 
 # ---- Health Endpoint ----

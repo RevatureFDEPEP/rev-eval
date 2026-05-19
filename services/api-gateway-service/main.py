@@ -41,6 +41,7 @@ SERVICE_PORTS = {
 # ===== SERVICE ROUTING CONFIGURATION =====
 # Map endpoint patterns to services
 ROUTES = [
+    {"pattern": r"^/v1/api/auth(/.*)?$", "service": "user-service"},
     {"pattern": r"^/v1/api/users(/.*)?$", "service": "user-service"},
     {"pattern": r"^/v1/api/dashboard(/.*)?$", "service": "test-management-service"},
     {"pattern": r"^/v1/api/tests(/.*)?$", "service": "test-management-service"},
@@ -48,6 +49,12 @@ ROUTES = [
     {"pattern": r"^/v1/api/skills(/.*)?$", "service": "test-management-service"},
     {"pattern": r"^/v1/api/questions(/.*)?$", "service": "question-management-service"},
 ]
+
+# Paths that bypass JWT verification (login, register).
+PUBLIC_PATH_PREFIXES = (
+    "/v1/api/auth/login",
+    "/v1/api/auth/register",
+)
 
 
 # Compile patterns for performance
@@ -104,6 +111,44 @@ def list_routes():
             for r in ROUTES
         ]
     }
+
+# ===== PUBLIC AUTH PASS-THROUGH (no JWT required) =====
+@app.api_route(
+    "/v1/api/auth/{auth_path:path}",
+    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+)
+async def public_auth_proxy(auth_path: str, request: Request):
+    """Forward /v1/api/auth/* to user-service without JWT verification.
+
+    login + register need to issue tokens; other /auth/* paths (e.g. /me)
+    still need a Bearer header and are forwarded as-is — user-service
+    enforces its own auth there.
+    """
+    full_path = f"/v1/api/auth/{auth_path}"
+    logger.info(f"🔓 Public auth proxy: {request.method} {full_path}")
+
+    target_url = f"{get_service_url('user-service')}{full_path}"
+    if request.url.query:
+        target_url = f"{target_url}?{request.url.query}"
+
+    body = await request.body() if request.method not in ("GET", "HEAD") else None
+    headers = dict(request.headers)
+    for h in ("host", "content-length", "x-forwarded-proto", "x-forwarded-scheme"):
+        headers.pop(h, None)
+
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        resp = await client.request(
+            request.method, target_url, content=body, headers=headers, timeout=30.0,
+        )
+
+    if resp.headers.get("content-type", "").startswith("application/json"):
+        return JSONResponse(content=resp.json(), status_code=resp.status_code)
+    return Response(
+        content=resp.content,
+        status_code=resp.status_code,
+        media_type=resp.headers.get("content-type"),
+    )
+
 
 # ===== SMART ROUTING (NO SERVICE NAME IN URL) =====
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
