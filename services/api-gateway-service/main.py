@@ -31,18 +31,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# AWS Cloud Map configuration
-# Services are discovered via DNS in the format: service-name.namespace
-CLOUD_MAP_NAMESPACE = getenv("CLOUD_MAP_NAMESPACE", "evalai.local")
-
-# Service name to port mapping (for Cloud Map DNS-based discovery)
+# Service name to port mapping (compose-internal DNS)
 SERVICE_PORTS = {
     "user-service": 8002,
     "test-management-service": 8001,
     "question-management-service": 8003,
-    "notification-service": 8004,
-    "ai-quiz-service": 8005,
-    "ai-interview-service": 8009,
 }
 
 # ===== SERVICE ROUTING CONFIGURATION =====
@@ -54,12 +47,6 @@ ROUTES = [
     {"pattern": r"^/v1/api/submissions(/.*)?$", "service": "test-management-service"},
     {"pattern": r"^/v1/api/skills(/.*)?$", "service": "test-management-service"},
     {"pattern": r"^/v1/api/questions(/.*)?$", "service": "question-management-service"},
-    {"pattern": r"^/v1/api/test-sessions(/.*)?$", "service": "ai-quiz-service"},
-    {"pattern": r"^/v1/api/notifications(/.*)?$", "service": "notification-service"},
-    # AI Interview Service routes (HTTP endpoints)
-    # Note: WebSocket endpoint ws://ai-interview-service:8009/ws/{session_id} should connect directly
-    # Gateway doesn't currently support WebSocket proxying - use direct connection for interviews
-    {"pattern": r"^/v1/api/interview(/.*)?$", "service": "ai-interview-service"},
 ]
 
 
@@ -81,17 +68,11 @@ def find_service_for_path(path: str) -> Optional[str]:
 
 
 def get_service_url(service_name: str) -> str:
-    """
-    Get service URL using AWS Cloud Map DNS-based service discovery.
-    Services are accessible via DNS: service-name.namespace:port
-    """
+    """Get service URL via compose-internal DNS (service-name:port)."""
     port = SERVICE_PORTS.get(service_name)
     if not port:
         raise ValueError(f"Unknown service: {service_name}")
-
-    # Use DNS name from Cloud Map
-    dns_name = f"{service_name}.{CLOUD_MAP_NAMESPACE}"
-    return f"http://{dns_name}:{port}"
+    return f"http://{service_name}:{port}"
 
 
 async def sync_user_with_user_service(user_context: Dict[str, str]):
@@ -102,7 +83,6 @@ async def sync_user_with_user_service(user_context: Dict[str, str]):
     before routing requests to other services.
     """
     try:
-        # Get user-service URL via Cloud Map DNS
         user_service_url = get_service_url("user-service")
         user_sync_url = f"{user_service_url}/v1/api/users/sync"
 
@@ -144,8 +124,7 @@ def on_startup():
     service_name = getenv('SERVICE_NAME', 'api-gateway')
     service_port = int(getenv('PORT', '8000'))
     logger.info(f"✅ {service_name} starting on port {service_port}")
-    logger.info(f"🌐 Using Cloud Map namespace: {CLOUD_MAP_NAMESPACE}")
-    logger.info(f"📍 Service discovery: DNS-based (AWS Cloud Map)")
+    logger.info(f"📍 Service discovery: compose-internal DNS")
 
 @app.on_event("shutdown")
 def on_shutdown():
@@ -202,7 +181,6 @@ async def smart_gateway(
     logger.info(f"📍 Matched service: {service_name}")
 
     try:
-        # Get service URL via Cloud Map DNS
         service_base_url = get_service_url(service_name)
         target_url = f"{service_base_url}/{path}"
 
@@ -296,7 +274,6 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
     logger.info("=" * 80)
 
     try:
-        # Get service URL via Cloud Map DNS
         service_base_url = get_service_url(service_name)
         target_url = f"{service_base_url}/{path}"
 
