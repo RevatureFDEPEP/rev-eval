@@ -19,15 +19,6 @@ class Settings(BaseSettings):
 
     # Service-to-Service Communication
     USER_SERVICE_URL: str = "http://localhost:8003"
-    NOTIFICATION_SERVICE_URL: str = "http://localhost:8004"
-    INTERVIEW_SERVICE_URL: str = "http://localhost:8006"
-
-    # AWS SQS Configuration
-    AWS_REGION: str = "us-west-1"
-    AWS_ACCESS_KEY_ID: str = ""
-    AWS_SECRET_ACCESS_KEY: str = ""
-    SQS_QUEUE_URL: str = ""
-    SQS_ENABLED: bool = True
 
     @property
     def SQLALCHEMY_DATABASE_URL(self) -> str:

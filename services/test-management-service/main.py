@@ -13,7 +13,6 @@ from src.v1.routes.skill_route import router as skill_router
 from src.v1.routes.test_submission_route import router as test_submission_router
 from src.db.session import init_db
 from src.config.settings import settings
-from src.utils.sqs_client import sqs_client
 
 load_dotenv()
 
@@ -48,40 +47,11 @@ app.include_router(test_submission_router, prefix="/v1/api")
 def health_check():
     return {"status": "ok"}
 
-@app.get("/health/sqs", tags=["health"])
-def sqs_health_check():
-    """Check SQS connectivity and configuration"""
-    try:
-        is_connected = sqs_client.verify_connection()
-        queue_type = "FIFO" if sqs_client._is_fifo_queue else "Standard"
-        return {
-            "sqs_enabled": settings.SQS_ENABLED,
-            "sqs_configured": bool(settings.SQS_QUEUE_URL),
-            "sqs_connected": is_connected,
-            "queue_type": queue_type,
-            "queue_url": settings.SQS_QUEUE_URL[:50] + "..." if settings.SQS_QUEUE_URL and len(settings.SQS_QUEUE_URL) > 50 else settings.SQS_QUEUE_URL or "NOT_SET",
-            "aws_region": settings.AWS_REGION
-        }
-    except Exception as e:
-        return {
-            "sqs_enabled": settings.SQS_ENABLED,
-            "sqs_configured": bool(settings.SQS_QUEUE_URL),
-            "sqs_connected": False,
-            "error": str(e)
-        }
-
 # ---- DB Init + Consul ----
 @app.on_event("startup")
 async def on_startup():
     await init_db()
     register_with_consul()
-
-    # Verify SQS connection on startup
-    print("\n" + "="*60)
-    print("🔍 Verifying SQS Configuration on Startup")
-    print("="*60)
-    sqs_client.verify_connection()
-    print("="*60 + "\n")
 
 @app.on_event("shutdown")
 def on_shutdown():

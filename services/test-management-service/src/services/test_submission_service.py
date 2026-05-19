@@ -17,7 +17,6 @@ from src.schemas.test_submission_schema import (
     TrainerReviewResponse,
     SubmissionStatus
 )
-from src.utils.sqs_client import sqs_client
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -177,7 +176,6 @@ class TestSubmissionService:
         1. Check if user exists (via user-service)
         2. If not, create user and send invite (via user-service)
         3. Create test submission in ASSIGNED status
-        4. Publish TEST_ASSIGNED event to SQS
 
         Args:
             db: Database session
@@ -190,7 +188,7 @@ class TestSubmissionService:
         failure_count = 0
         submission_ids = []
 
-        # Fetch test details first (needed for notifications and SQS events)
+        # Fetch test details first
         test = await TestService.get_test_by_id(db, request.test_id)
         if not test:
             raise ValueError(f"Test with ID {request.test_id} not found")
@@ -248,42 +246,6 @@ class TestSubmissionService:
                     created_submissions.append(submission_out)
                     submission_ids.append(submission.id)
                     success_count += 1
-
-                    # Publish TEST_ASSIGNED event to SQS (individual event for each participant)
-                    try:
-                        test_skills = [ts.name for ts in test.skills] if test.skills else []
-                        duration_minutes = int(test.duration_seconds / 60) if test.duration_seconds else 60
-
-                        logger.info(f"📤 Publishing TEST_ASSIGNED event for {email} (submission_id: {submission.id})")
-
-                        sqs_success = await sqs_client.publish_test_assigned_event(
-                            test_id=test.id,
-                            test_name=test.name,
-                            user_id=user_id,
-                            user_email=email,
-                            assigned_by_id=current_user["id"],
-                            submission_id=submission.id,
-                            assigned_at=submission.assigned_at,  # When the test was assigned
-                            due_date=request.due_date,
-                            duration_minutes=duration_minutes,
-                            skills=test_skills,
-                            test_details={
-                                "role": test.role,
-                                "curriculum": test.curriculum,
-                                "active": test.active
-                            }
-                        )
-
-                        if sqs_success:
-                            logger.info(f"✅ TEST_ASSIGNED event published successfully for {email}")
-                        else:
-                            logger.warning(f"⚠️ TEST_ASSIGNED event publishing returned False for {email}")
-
-                    except Exception as sqs_error:
-                        # Don't fail the assignment if SQS publishing fails
-                        logger.error(f"❌ Exception while publishing TEST_ASSIGNED event for {email}: {str(sqs_error)}")
-                        import traceback
-                        logger.error(traceback.format_exc())
 
                 except httpx.RequestError as e:
                     errors.append({
