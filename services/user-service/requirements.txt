@@ -7,5 +7,5 @@ pydantic-settings
 python-dotenv
 email-validator
 httpx
-workos
 pyjwt
+passlib[bcrypt]

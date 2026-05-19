@@ -18,8 +18,8 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    """Schema for creating a new user"""
-    workos_user_id: Optional[str] = Field(None, max_length=255)
+    """Schema for creating a new user (admin-side, with plaintext password)."""
+    password: str = Field(..., min_length=8, max_length=128)
 
 
 class UserUpdate(BaseModel):
@@ -34,7 +34,6 @@ class UserUpdate(BaseModel):
 class UserOut(UserBase):
     """Schema for user response"""
     id: int
-    workos_user_id: Optional[str]
     full_name: Optional[str]
     is_active: bool
     organization_id: Optional[str]
@@ -46,19 +45,12 @@ class UserOut(UserBase):
         from_attributes = True
 
 
-class UserSyncRequest(BaseModel):
-    """Schema for syncing user from WorkOS (sent via headers)"""
-    # Note: This is extracted from headers in the route
-    # Keeping this schema for documentation purposes
-    pass
-
-
 class InviteUserRequest(BaseModel):
     """Schema for inviting a new user"""
     email: EmailStr
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    role: Optional[UserRole] = UserRole.PARTICIPANT  # Default to participant
+    role: Optional[UserRole] = UserRole.PARTICIPANT
 
 
 class InviteUserResponse(BaseModel):

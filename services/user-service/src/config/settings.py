@@ -1,6 +1,6 @@
 # src/config/settings.py
-from typing import Optional
 from pydantic_settings import BaseSettings
+
 
 class Settings(BaseSettings):
     # Database (PostgreSQL)
@@ -14,12 +14,12 @@ class Settings(BaseSettings):
     ALLOW_ORIGINS: str = "*"
     SERVICE_NAME: str = "user-service"
     PORT: int = 8002
-
     SERVICE_HOSTNAME: str = "user-service"
 
-    # WorkOS
-    WORKOS_API_KEY: Optional[str] = None
-    WORKOS_CLIENT_ID: Optional[str] = None
+    # JWT
+    JWT_SECRET: str = "change-me-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRY_MINUTES: int = 60
 
     @property
     def SQLALCHEMY_DATABASE_URL(self) -> str:
@@ -30,5 +30,6 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+
 
 settings = Settings()
