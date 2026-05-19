@@ -1,17 +1,15 @@
 import { redirect } from 'next/navigation';
-import { withAuth } from '@workos-inc/authkit-nextjs';
+import { getSession, normalizeRole } from '@/lib/session';
 
 export default async function DashboardPage() {
-  const { user } = await withAuth();
-  
-  if (!user) {
-    redirect('/auth/login');
+  const session = await getSession();
+  if (!session) {
+    redirect('/');
   }
- 
-  console.log('user', user);
-  
-  // The middleware will handle the role-based routing automatically
-  // This page should never be reached because middleware redirects based on role
-  // But if it is reached, redirect to associate dashboard as fallback
+
+  const role = normalizeRole(session.role);
+  if (role === 'trainer' || role === 'admin') {
+    redirect('/trainer/dashboard');
+  }
   redirect('/participant/dashboard');
 }

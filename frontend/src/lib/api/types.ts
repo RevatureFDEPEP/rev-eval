@@ -45,17 +45,16 @@ export interface User {
   first_name?: string;
   last_name?: string;
   role: UserRole;
-  workos_id?: string;
   created_at: string;
   updated_at: string;
 }
 
 export interface UserCreate {
   email: string;
+  password: string;
   first_name?: string;
   last_name?: string;
   role: UserRole;
-  workos_id?: string;
 }
 
 // ===== QUESTION =====

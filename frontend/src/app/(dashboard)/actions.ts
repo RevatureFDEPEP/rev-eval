@@ -1,11 +1,17 @@
 'use server';
 
-import { signOut } from '@workos-inc/authkit-nextjs';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { AUTH_COOKIE } from '@/lib/session';
 
-/**
- * Server action for signing out
- * Can be used in client components
- */
 export async function handleSignOut() {
-  await signOut();
+  const jar = await cookies();
+  jar.set(AUTH_COOKIE, '', {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 0,
+  });
+  redirect('/');
 }

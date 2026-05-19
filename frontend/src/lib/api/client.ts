@@ -2,11 +2,10 @@
  * Base API Client
  *
  * Handles all HTTP requests to Next.js API routes (BFF pattern).
- * The BFF extracts the WorkOS access token and forwards to API Gateway.
  *
  * Architecture:
  * - Client calls Next.js API routes (browser automatically includes cookies)
- * - BFF (API routes) extracts JWT from WorkOS session using withAuth()
+ * - BFF (API routes) reads the JWT from the auth cookie via getSession()
  * - BFF forwards request to API Gateway with Bearer token
  */
 

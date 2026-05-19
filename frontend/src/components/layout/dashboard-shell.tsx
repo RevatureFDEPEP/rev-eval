@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAuth } from "@workos-inc/authkit-nextjs/components";
+import { useAuth } from "@/lib/auth/useAuth";
 import {
   DropdownMenu,
   DropdownMenuContent,

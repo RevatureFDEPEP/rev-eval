@@ -15,10 +15,10 @@ export async function getCurrentUser(): Promise<User> {
 }
 
 /**
- * Get user by WorkOS ID
+ * Get user by database id.
  */
-export async function getUserByWorkosId(workosId: string): Promise<User> {
-  return api.get<User>(`/v1/api/users/${workosId}`);
+export async function getUserById(userId: number): Promise<User> {
+  return api.get<User>(`/v1/api/users/${userId}`);
 }
 
 /**

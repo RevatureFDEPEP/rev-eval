@@ -1,113 +1,81 @@
-import { authkitMiddleware, authkit } from '@workos-inc/authkit-nextjs';
 import { NextResponse } from 'next/server';
-import type { NextRequest, NextFetchEvent } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { decodeJwt } from 'jose';
 
-const AUTH_MODE = process.env.AUTH_MODE === 'OFF' ? false : true;
-const ORG_ID = process.env.WORKOS_DEFAULT_ORG || 'org_L0C4L';
+const AUTH_COOKIE = 'auth_token';
 
-// Define role-protected routes
+const PUBLIC_PATHS = new Set<string>([
+  '/',
+  '/unauthorized',
+]);
+
+const PUBLIC_PATH_PREFIXES = ['/api/auth/'];
+
 const roleProtectedRoutes: Record<string, string[]> = {
-  '/trainer': ['org-trainer', 'trainer', 'org-admin', 'admin'],
-  '/participant': ['org-participant', 'participant', 'member'],
-  '/dashboard': ['org-trainer', 'trainer', 'org-admin', 'admin', 'org-participant', 'participant', 'member'],
+  '/trainer': ['TRAINER', 'ADMIN'],
+  '/participant': ['PARTICIPANT'],
+  '/dashboard': ['TRAINER', 'PARTICIPANT', 'ADMIN'],
 };
 
-const baseAuthMiddleware = authkitMiddleware({
-  middlewareAuth: {
-    enabled: AUTH_MODE,
-    unauthenticatedPaths: [
-      '/',
-      '/auth/login',
-      '/auth/logout',
-      '/api/auth/callback',
-      '/api/auth/login',
-      '/api/auth/logout',
-      '/unauthorized',
-    ],
-  },
-  redirectUri: process.env['NEXT_PUBLIC_WORKOS_REDIRECT_URI'],
-});
+function isPublic(pathname: string): boolean {
+  if (PUBLIC_PATHS.has(pathname)) return true;
+  return PUBLIC_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
 
-export async function middleware(request: NextRequest, event: NextFetchEvent) {
+interface DecodedSession {
+  userId: string;
+  role: string;
+  expired: boolean;
+}
+
+function decodeSession(token: string | undefined): DecodedSession | null {
+  if (!token) return null;
+  try {
+    const claims = decodeJwt(token);
+    if (!claims.sub) return null;
+    const role = typeof claims.role === 'string' ? claims.role.toUpperCase() : '';
+    const expired = typeof claims.exp === 'number' ? claims.exp * 1000 < Date.now() : false;
+    return { userId: String(claims.sub), role, expired };
+  } catch {
+    return null;
+  }
+}
+
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const authResponse = await baseAuthMiddleware(request, event);
-
-  if (authResponse && authResponse.headers.has('location')) {
-    console.log('location header present:', authResponse.headers.get('location'));
-    if (new URL(authResponse.headers.get('location')!, request.url).pathname !== pathname) {
-      return authResponse;
-    }
+  if (isPublic(pathname)) {
+    return NextResponse.next();
   }
 
-  // Handle dashboard routing based on role
+  const token = request.cookies.get(AUTH_COOKIE)?.value;
+  const session = decodeSession(token);
+
+  if (!session || session.expired) {
+    const loginUrl = new URL('/', request.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Dashboard auto-redirect by role
   if (pathname === '/dashboard') {
-    const { role, organizationId } = AUTH_MODE 
-      ? (await authkit(request, { debug: true })).session 
-      : { role: 'member', organizationId: ORG_ID };
-
-    console.log('Dashboard routing - User role:', role);
-    console.log('Dashboard routing - Organization ID:', organizationId);
-
-    // Check organization membership
-    if (organizationId !== ORG_ID) {
-      console.log(`Unauthorized access attempt to ${pathname}. Invalid organization ID: ${organizationId}`);
-      const unauthorizedRedirectUrl = new URL("/unauthorized", request.url);
-      return NextResponse.redirect(unauthorizedRedirectUrl);
-    }
-
-    // Redirect based on role
-    if (role === 'org-trainer' || role === 'trainer') {
-      console.log('Redirecting trainer to trainer dashboard');
+    if (session.role === 'TRAINER' || session.role === 'ADMIN') {
       return NextResponse.redirect(new URL('/trainer/dashboard', request.url));
-    } else if (role === 'org-admin' || role === 'admin') {
-      console.log('Redirecting admin to admin dashboard');
-      return NextResponse.redirect(new URL('/dashboard', request.url));
-    } else {
-      console.log('Redirecting to participant dashboard');
-      return NextResponse.redirect(new URL('/participant/dashboard', request.url));
+    }
+    return NextResponse.redirect(new URL('/participant/dashboard', request.url));
+  }
+
+  // Role-protected prefixes
+  const protectedEntry = Object.entries(roleProtectedRoutes).find(
+    ([prefix]) => pathname.startsWith(prefix),
+  );
+  if (protectedEntry) {
+    const [, allowedRoles] = protectedEntry;
+    if (!allowedRoles.includes(session.role)) {
+      return NextResponse.redirect(new URL('/unauthorized', request.url));
     }
   }
 
-  // Check if route requires role protection
-  const requiredRolesForRoute = Object.entries(roleProtectedRoutes).find(
-    ([routePrefix]) => pathname.startsWith(routePrefix)
-  )?.[1];
-
-  console.log('Required roles for route:', requiredRolesForRoute);
-
-  if (!requiredRolesForRoute) {
-    console.log(`No role protection for ${pathname}.`);
-    return authResponse || NextResponse.next();
-  }
-
-  // Get user session with role information
-  const { role, organizationId } = AUTH_MODE 
-    ? (await authkit(request, { debug: true })).session 
-    : { role: 'member', organizationId: ORG_ID };
-
-  console.log('User role:', role);
-  console.log('User organization ID:', organizationId);
-  console.log('Default org id:', ORG_ID);
-
-  // Check organization membership
-  if (organizationId !== ORG_ID) {
-    console.log(`Unauthorized access attempt to ${pathname}. Invalid organization ID: ${organizationId}`);
-    const unauthorizedRedirectUrl = new URL("/unauthorized", request.url);
-    return NextResponse.redirect(unauthorizedRedirectUrl);
-  }
-
-  // Check if user has required role
-  const hasRequiredRole = requiredRolesForRoute.some(requiredRole => role === requiredRole);
-  console.log(`User role: ${role}, Required roles: [${requiredRolesForRoute.join(', ')}], Has required role: ${hasRequiredRole}`);
-
-  if (!hasRequiredRole) {
-    console.log(`Unauthorized access attempt to ${pathname}. User roles: ${role}, Required roles: [${requiredRolesForRoute.join(', ')}]`);
-    const unauthorizedRedirectUrl = new URL("/unauthorized", request.url);
-    return NextResponse.redirect(unauthorizedRedirectUrl);
-  }
-
-  return authResponse || NextResponse.next();
+  return NextResponse.next();
 }
 
 export const config = {

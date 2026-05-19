@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAuth } from '@workos-inc/authkit-nextjs/components';
+import { useAuth } from '@/lib/auth/useAuth';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrainerCharts } from '@/components/trainer/TrainerCharts';

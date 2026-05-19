@@ -1,5 +1,17 @@
-import { handleAuth } from '@workos-inc/authkit-nextjs';
+import { NextResponse } from 'next/server';
+import { AUTH_COOKIE } from '@/lib/session';
 
-// Redirect the user to `/` after successful sign in
-// The redirect can be customized: `handleAuth({ returnPathname: '/foo' })`
-export const GET = handleAuth();
+async function handle() {
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set(AUTH_COOKIE, '', {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 0,
+  });
+  return response;
+}
+
+export const GET = handle;
+export const POST = handle;
