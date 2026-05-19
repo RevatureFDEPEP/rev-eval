@@ -7,8 +7,35 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { AssignedTestInfo, TestSession, GradedQuizQuestion } from '@/lib/api/types';
-import { getInterviewTranscript, type InterviewTranscript } from '@/lib/api/interview';
 import { getTestSessionBySubmission } from '@/lib/api/quiz-sessions';
+
+// Interview-transcript surface was removed in the PEP brownfield strip
+// (ai-interview-service is Phase 2). Candidates rebuild this on W3 D13–D14.
+interface InterviewTranscriptMessage {
+  speaker?: string;
+  text?: string;
+  timestamp?: string;
+}
+
+interface InterviewTranscriptEvaluation {
+  overall_score: number;
+  score_breakdown: Record<string, number>;
+  skill_breakdown: Record<string, { score?: number }>;
+  feedback?: string;
+  strengths?: string[];
+  improvements?: string[];
+  evaluated_at?: string;
+  evaluated_by?: string;
+}
+
+interface InterviewTranscript {
+  messages: InterviewTranscriptMessage[];
+  lambda_evaluation?: InterviewTranscriptEvaluation;
+}
+
+async function getInterviewTranscript(_submissionId: number): Promise<InterviewTranscript> {
+  throw new Error('Interview transcripts not available — candidate-built on W3 D13.');
+}
 import { formatTableDate } from '@/lib/utils/date';
 import { Award, CalendarDays, CheckCircle2, Clock, FileText, MessageSquare, TrendingUp, CheckCircle, XCircle } from 'lucide-react';
 

@@ -11,4 +11,3 @@ export * from './skills';
 export * from './questions';
 export * from './quiz-sessions';
 export * from './users';
-export * from './interview';
