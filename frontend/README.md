@@ -36,7 +36,6 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
 ## Deployment
-This application is deployed on AWS ECS with GitHub Actions for CI/CD.
 
-**Production URL:** https://aibuilderdemo.evolvtalent.ai
-
+PEP cohort runs this app locally via the repo-root `docker-compose.yml`
+(see `../README.md`). No cloud deploy target is configured.

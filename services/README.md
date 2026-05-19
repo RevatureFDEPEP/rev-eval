@@ -93,7 +93,7 @@ pip install -r requirements.txt
 
 ### **3️⃣ Setup Database**
 
-Ensure PostgreSQL (or RDS) is running and the credentials match `.env`.
+Ensure PostgreSQL is running (the `postgres` service in `docker-compose.yml` or a local install) and the credentials match `.env`.
 
 Initialize database tables:
 
@@ -120,7 +120,7 @@ uvicorn src.main:app --reload
 | ----------- | ------------------------- |
 | Framework   | FastAPI                   |
 | ORM         | SQLAlchemy (2.x)          |
-| Database    | PostgreSQL / AWS RDS      |
+| Database    | PostgreSQL 15             |
 | Validation  | Pydantic                  |
 | Task Queue  | (Optional) Celery + Redis |
 | HTTP Client | httpx (async)             |

@@ -1,888 +1,254 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for working on this repository with Claude Code (claude.ai/code).
 
 ## Project Overview
 
-**Rev EvalAI** is a Revature AI-powered interview and assessment platform. It uses a microservices architecture with a unified Next.js frontend for conducting and evaluating technical interviews, MCQ tests, and speech-based assessments.
+**rev-eval** is the PEP cohort brownfield substrate — a local-first
+multi-service assessment platform derived from `Revature/rev-eval-ai`
+by stripping the Phase 2 AI surface.
 
-**Key Capabilities:**
-- AI-powered interview evaluation and scoring
-- Speech-to-speech interview simulations
-- MCQ and text-based assessments
-- Role-based access (trainers create/score tests, associates take tests)
-- Real-time malpractice detection
-- Automated transcript generation and summarization
+**What candidates build on:**
+
+- A trimmed Next.js + FastAPI substrate with auth, tests, questions,
+  and submissions wired end-to-end.
+- A docker-compose stack that brings everything up with `docker compose
+  up --build` against Postgres + Mongo + MinIO + Nginx + 4 backends +
+  the frontend.
+- A CI pipeline (`.github/workflows/ci-pipeline.yml`) seeded with five
+  realistic failures that candidates diagnose on W1 D3 and fix on W1 D4.
+
+**What's deliberately missing** (candidate work, per `PEP_4Week_DailyTopics_v3.md`):
+
+- Image upload endpoint on question-management (MinIO is wired, the
+  endpoint is not — W2 D8)
+- Nginx routing (config returns 502 stub — W2 D6)
+- `reporting-and-analytics-service/` is empty (W2 D10)
+- Test-taking pages (MCQ on W3 D13–D14; results view on W4 D17)
+- Admin reports (W4 D19)
+- Trivy + Ruff in CI (W2 D7)
 
 ## Architecture
 
-### Monorepo Structure
+### Monorepo
 
 ```
-rev-eval-ai/
-├── frontend/                    # Next.js 16 application (port 3000)
-└── services/                    # Python FastAPI microservices
-    ├── api-gateway-service/     # Service routing & discovery (port 8000)
-    ├── test-management-service/ # Test & participant CRUD (port 8001)
-    ├── question-management-service/
-    ├── ai-evaluation-service/   # (Planned)
-    ├── notification-service/    # (Planned)
-    └── reporting-and-analytics-service/ # (Planned)
+rev-eval/
+├── frontend/                          # Next.js 16 (port 3000)
+├── services/
+│   ├── api-gateway-service/           # JWT verify + routing (port 8000)
+│   ├── user-service/                  # Auth + users (port 8002, Postgres)
+│   ├── question-management-service/   # Questions (port 8003, Mongo, MinIO)
+│   ├── test-management-service/       # Tests + submissions (port 8001, Postgres)
+│   └── reporting-and-analytics-service/  # Empty — candidates build
+├── nginx/nginx.conf                   # Reverse-proxy stub (W2 D6 target)
+├── docker-compose.yml                 # Local-first stack
+└── .github/workflows/ci-pipeline.yml  # Build + test (no deploy)
 ```
 
 ### Technology Stack
 
-**Frontend:**
-- Next.js 16.0.0 (App Router)
-- React 19.2.0 with TypeScript 5
-- Tailwind CSS 4 + shadcn/ui components
-- WorkOS AuthKit for authentication (@workos-inc/authkit-nextjs)
-- Package manager: pnpm
+**Backend:** Python 3.11 + FastAPI + Uvicorn + Pydantic. SQLAlchemy
+(sync) for user-service; SQLAlchemy async + asyncpg for
+test-management. PyMongo + Beanie + Motor for question-management.
 
-**Backend:**
-- FastAPI with Uvicorn
-- PostgreSQL (SQLAlchemy ORM) + MongoDB
-- HashiCorp Consul for service discovery
-- Pydantic for validation
-- httpx for async HTTP requests
+**Frontend:** Next.js 16 (App Router) + React 19 + TypeScript +
+Tailwind + shadcn/ui (Radix primitives). pnpm package manager.
 
-**Planned Integrations:**
-- ElevenLabs for voice synthesis
-- AWS services (S3, CloudWatch, SNS, SQS)
+**Auth:** HS256 JWT via `pyjwt`; password hashing via `passlib[bcrypt]`.
+Frontend stores the token in an httpOnly cookie named `auth_token`
+(no `localStorage`). The frontend uses `jose` for Edge-runtime-safe
+JWT decoding in middleware. **The frontend never crypto-verifies** —
+the gateway is the source of truth on every API call.
 
-## Development Commands
+**Infra (local):** Postgres 15, Mongo 7, MinIO, Nginx, all in
+docker-compose with named volumes and healthchecks.
 
-### Frontend (from `/frontend`)
+## Common commands
 
 ```bash
-# Install dependencies
-pnpm install
+# Bring the whole stack up
+docker compose up --build
 
-# Development server (http://localhost:3000)
+# Tear down (preserves volumes)
+docker compose down
+
+# Tear down + wipe volumes (forces seed re-run on next up)
+docker compose down -v
+
+# Logs for one service
+docker compose logs -f user-service
+
+# Run frontend lint / build / dev locally (against running backend stack)
+cd frontend
+pnpm install
+pnpm lint
+pnpm build
 pnpm dev
 
-# Production build
-pnpm build
-
-# Start production server
-pnpm start
-
-# Lint code
-pnpm lint
-
-# Add shadcn/ui components
-pnpm dlx shadcn@latest add <component-name>
-```
-
-**Note on shadcn/ui:** Components install directly to `src/components/ui/` (no nested folder issue). The configuration in `components.json` is already correct with proper aliases.
-
-### Backend Services
-
-#### 1. Start Consul (Required First)
-
-```bash
-cd services/api-gateway-service
-./consul-setup.sh
-
-# Consul UI: http://localhost:8500
-```
-
-#### 2. Start API Gateway
-
-```bash
-cd services/api-gateway-service
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+# Backend service iteration (outside compose)
+cd services/<svc>
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python main.py
-
-# Health check: http://localhost:8000/health
-# Routes list: http://localhost:8000/routes
+uvicorn main:app --reload --port <port>
 ```
 
-#### 3. Start Test Management Service
+## API Gateway
 
-```bash
-cd services/test-management-service
-source venv/bin/activate  # Create venv if needed
-pip install -r requirements.txt
-python main.py
-
-# API docs: http://localhost:8001/docs
-```
-
-#### 4. Start Question Management Service
-
-```bash
-cd services/question-management-service
-source venv/bin/activate
-pip install -r requirements.txt
-python main.py
-```
-
-### Development Workflow (Full Stack)
-
-1. **Start infrastructure:**
-   ```bash
-   # Terminal 1: Start Consul
-   cd services/api-gateway-service && ./consul-setup.sh
-   ```
-
-2. **Start backend services:**
-   ```bash
-   # Terminal 2: API Gateway
-   cd services/api-gateway-service && python main.py
-
-   # Terminal 3: Test Management
-   cd services/test-management-service && python main.py
-
-   # Terminal 4: Question Management (optional)
-   cd services/question-management-service && python main.py
-   ```
-
-3. **Start frontend:**
-   ```bash
-   # Terminal 5: Frontend
-   cd frontend && pnpm dev
-   ```
-
-4. **Verify setup:**
-   - Consul UI: http://localhost:8500 (check all services are healthy)
-   - API Gateway health: http://localhost:8000/health
-   - Frontend: http://localhost:3000
-   - API docs: http://localhost:8001/docs
-
-## API Gateway Architecture
-
-### Routing Patterns
-
-The API Gateway supports two routing modes:
-
-#### 1. Smart Routing (Pattern-based) - Preferred
-Routes requests based on endpoint patterns without service names in URLs:
+`services/api-gateway-service/main.py` does pattern-based routing —
+no service name in the URL. Routes:
 
 ```python
 ROUTES = [
-    {"pattern": r"^/v1/api/tests", "service": "test-management-service"},
-    {"pattern": r"^/v1/api/questions", "service": "question-management-service"},
+    {"pattern": r"^/v1/api/users(/.*)?$",      "service": "user-service"},
+    {"pattern": r"^/v1/api/dashboard(/.*)?$",  "service": "test-management-service"},
+    {"pattern": r"^/v1/api/tests(/.*)?$",      "service": "test-management-service"},
+    {"pattern": r"^/v1/api/submissions(/.*)?$","service": "test-management-service"},
+    {"pattern": r"^/v1/api/skills(/.*)?$",     "service": "test-management-service"},
+    {"pattern": r"^/v1/api/questions(/.*)?$",  "service": "question-management-service"},
 ]
 ```
 
-**Example:**
-```bash
-# Frontend makes request to gateway
-GET http://localhost:8000/v1/api/tests
-# → Automatically routed to test-management-service at http://localhost:8001/v1/api/tests
-```
+The gateway:
+1. Verifies the Bearer JWT against `JWT_SECRET` env (HS256).
+2. Extracts `sub`, `email`, `role` from claims.
+3. Injects `X-User-Id`, `X-User-Email`, `X-User-Role` headers downstream.
+4. Forwards via httpx; preserves query params + body.
 
-#### 2. Legacy Routing (Service name in URL)
-```bash
-GET http://localhost:8000/test-management-service/v1/api/tests
-```
+Service discovery is compose-internal DNS — `http://user-service:8002`
+resolves from any container in the network.
 
-### Service Discovery with Consul
+## Authentication
 
-**Registration:**
-- Services auto-register with Consul on startup
-- TTL-based health checks (15s TTL, 1m deregister timeout)
-- Background heartbeat thread (every 10s)
-- Auto-deregistration on graceful shutdown
+**user-service** exposes:
 
-**Discovery:**
-- Gateway queries Consul for healthy service instances
-- Uses first available healthy instance
-- No load balancing (single instance per service currently)
+- `POST /v1/api/auth/register` — email + password (+ optional full_name, role)
+- `POST /v1/api/auth/login` — email + password → JWT
+- `GET /v1/api/auth/me` — Bearer-protected, returns user profile
 
-**Failure Handling:**
-- 3 consecutive heartbeat failures trigger re-registration attempt
-- Failed requests return appropriate HTTP status codes
+Token claims: `sub=str(user.id)`, `email`, `role`, `exp`.
 
-### Request Forwarding Behavior
+**Frontend** has matching BFF routes that set / read an httpOnly cookie:
 
-**Preserved:**
-- Query parameters
-- Request body and method
-- Most headers (except host, content-length, x-forwarded-*)
-- HTTP status codes from downstream services
+- `POST /api/auth/register` → forwards to user-service, stores cookie
+- `POST /api/auth/login` → same
+- `POST /api/auth/logout` → clears cookie
+- `GET /api/auth/me` → reads cookie, fetches profile via gateway
 
-**Modified:**
-- Forces HTTP for internal service communication (not HTTPS)
-- Adds 30-second timeout
-- Follows redirects automatically
+`useAuth()` (`frontend/src/lib/auth/useAuth.ts`) is a client hook that
+hydrates from `/api/auth/me`. `getSession()` (`frontend/src/lib/session.ts`)
+is the server-side equivalent.
 
-### Current Limitations
+## Microservices Detail
 
-**NOT Implemented in API Gateway:**
-- ❌ JWT token validation or authentication middleware
-- ❌ Authorization/role-based access control
-- ❌ Rate limiting or throttling
-- ❌ Circuit breaker patterns
-- ❌ CORS configuration (handled by individual services)
-- ❌ WebSocket support (required for voice interviews)
-- ❌ Request/response transformation
-- ❌ Caching layer
-- ❌ Load balancing across multiple service instances
+### user-service (port 8002)
 
-**Action Items:**
-- Add JWT validation middleware to verify WorkOS tokens
-- Implement rate limiting using slowapi
-- Add CORS middleware for frontend origin
-- Upgrade to support WebSocket for real-time voice interviews
+PostgreSQL + SQLAlchemy. Models: `User(id, email, password_hash,
+full_name, first_name, last_name, role: UserRole, is_active,
+organization_id, created_at, updated_at, last_login)`. UserRole enum:
+`TRAINER`, `PARTICIPANT`.
 
-## Frontend Architecture
+Tables are created on startup via `init_db()` — no Alembic.
 
-### Directory Structure
+### question-management-service (port 8003)
 
-```
-frontend/src/
-├── app/
-│   ├── (dashboard)/              # Route group for authenticated routes
-│   │   ├── _components/          # Shared dashboard components
-│   │   ├── trainer/              # Trainer-specific routes
-│   │   │   ├── dashboard/
-│   │   │   ├── tests/            # Test creation, management
-│   │   │   ├── questions/        # Question bank management
-│   │   │   ├── scoring/          # Review and score interviews
-│   │   │   └── reports/          # Analytics and reports
-│   │   ├── associate/            # Associate (student) routes
-│   │   │   ├── dashboard/
-│   │   │   ├── tests/            # View assigned tests
-│   │   │   │   ├── [id]/
-│   │   │   │   └── take/         # Test-taking interfaces
-│   │   │   │       ├── mcq/      # MCQ test UI
-│   │   │   │       └── interview/ # Voice interview UI
-│   │   │   └── results/          # View scores and feedback
-│   │   └── dashboard/            # Role-based redirect
-│   ├── api/
-│   │   └── auth/                 # WorkOS authentication routes
-│   │       ├── login/route.ts
-│   │       ├── callback/route.ts
-│   │       └── logout/route.ts
-│   ├── layout.tsx                # Root layout with AuthKitProvider
-│   ├── page.tsx                  # Landing page
-│   └── globals.css
-├── components/
-│   └── ui/                       # shadcn/ui components
-├── lib/
-│   ├── utils.ts
-│   ├── session.ts                # Role detection utilities
-│   └── workos-org.ts             # WorkOS organization helpers
-└── middleware.ts                 # AuthKit + role-based protection
-```
+MongoDB + Beanie. `MONGO_URI` env (e.g.
+`mongodb://admin:admin@mongo:27017/evalai?authSource=admin`) takes
+precedence over the Atlas-style component fields when set.
 
-### Recommended Structure for New Features
+`src/utils/s3_client.py` exposes a MinIO-aware boto3 client plus
+`ensure_bucket()`, `generate_presigned_put_url()`, and
+`generate_presigned_get_url()` helpers — wire these into an image-upload
+endpoint on W2 D8.
 
-When implementing new features from user stories:
+### test-management-service (port 8001)
+
+PostgreSQL + SQLAlchemy async (asyncpg). Models: `Test`, `Skill`,
+`TestSubmission`. Uses Alembic-style structure but `init_db()` /
+`Base.metadata.create_all` for table creation on first start.
+
+`seed_db.py` is run by the container's `start.sh` after table creation;
+it inserts 2 trainers + 5 participants (all share password
+`password123`) + 6 demo tests + a skills catalogue + sample submissions.
+
+`src/utils/dependencies.py` provides `get_current_user_from_headers`
+(reads `X-User-Id`/`X-User-Email` set by the gateway, fetches the full
+record from user-service), plus role-gated variants
+`get_current_trainer` and `get_current_participant`.
+
+### api-gateway-service (port 8000)
+
+See above. No persistence.
+
+### reporting-and-analytics-service
+
+Empty service directory. Candidates create on W2 D10 — likely
+`/v1/api/reports/*` patterns routed through the gateway.
+
+## Frontend
+
+Routes under `(dashboard)` are role-protected via the middleware
+(`src/middleware.ts`):
+
+- `/trainer/*` → TRAINER / ADMIN roles
+- `/participant/*` → PARTICIPANT role
+- `/dashboard` → auto-redirect based on role
+
+Public:
+
+- `/` — landing + login/register form
+- `/unauthorized` — access-denied page
+
+The BFF proxy at `frontend/src/app/api/v1/[...path]/route.ts` forwards
+any frontend-side `/api/v1/*` call to the gateway with the cookie's
+JWT attached as a Bearer token.
+
+`useUserProfile()` is not yet present; use `useAuth()` from
+`@/lib/auth/useAuth`.
+
+## Environment
+
+`.env.example` is the source of truth. Required for `docker compose up`:
 
 ```
-src/
-├── app/
-│   └── (dashboard)/
-│       ├── trainer/
-│       │   └── [feature]/
-│       │       ├── _components/  # Feature-specific components
-│       │       ├── page.tsx
-│       │       └── layout.tsx    # Optional feature layout
-│       └── associate/
-│           └── [feature]/
-├── components/
-│   ├── ui/                       # shadcn components
-│   ├── forms/                    # Reusable form components
-│   ├── layouts/                  # Layout components
-│   └── shared/                   # Cross-feature shared components
-├── lib/
-│   ├── api/                      # API client layer (recommended)
-│   │   ├── client.ts             # Base API client with auth
-│   │   ├── test-management.ts
-│   │   ├── questions.ts
-│   │   └── ai-evaluation.ts
-│   └── hooks/                    # Custom React hooks
-└── types/                        # TypeScript type definitions
+JWT_SECRET=change-me-in-production
+POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+MONGO_USER, MONGODB_PASSWORD, MONGO_DB
+S3_ACCESS_KEY, S3_SECRET_KEY, S3_BUCKET_NAME
 ```
 
-## Authentication & Authorization
-
-### WorkOS AuthKit Flow
-
-1. User clicks "Sign In" → redirects to `/auth/login`
-2. Login route redirects to WorkOS hosted authentication UI
-3. User authenticates (email/password, SSO, or social login)
-4. WorkOS redirects to `/callback` with authorization code
-5. Callback exchanges code for encrypted session cookie
-6. Middleware validates session and redirects based on role
-
-### Role Mapping
-
-```typescript
-WorkOS Organization Role  → Application Role → Dashboard Access
-─────────────────────────────────────────────────────────────────
-org-trainer              → trainer          → /trainer/dashboard
-org-participant          → associate        → /associate/dashboard
-org-admin                → admin            → Full system access
-(no role)                → associate        → /associate/dashboard (default)
-```
-
-### Route Protection (middleware.ts)
-
-**Protected Routes:**
-```typescript
-'/trainer/*'   → Requires: org-trainer, trainer, org-admin, or admin role
-'/associate/*' → Requires: org-participant, participant, or member role
-'/dashboard'   → All authenticated users (redirects based on role)
-```
-
-**Public Routes:**
-- `/` - Landing page
-- `/auth/login` - Authentication entry point
-- `/api/auth/callback` - OAuth callback
-- `/unauthorized` - Access denied page
-
-### Role Detection
-
-Located in `src/lib/session.ts`:
-```typescript
-export async function getRole(): Promise<string> {
-  const session = await getSignedInUser();
-  if (!session) return 'associate'; // Default
-
-  // Maps WorkOS role to application role
-  return session.role || 'associate';
-}
-```
-
-### Critical Gap: Backend Authentication
-
-**Current State:**
-- ✅ Frontend: WorkOS handles authentication and role-based routing
-- ❌ Backend: No JWT validation in API Gateway or microservices
-- ❌ No token passing from frontend to backend
-- ❌ No user context propagation to services
-
-**Required Implementation:**
-1. Extract JWT from WorkOS session in frontend
-2. Pass JWT in `Authorization: Bearer <token>` header to API Gateway
-3. Add JWT validation middleware in API Gateway
-4. Propagate user context to downstream services
-5. Implement role-based authorization in service endpoints
-
-## Microservices Details
-
-### Test Management Service
-
-**Location:** `services/test-management-service`
-
-**API Endpoints:**
-```
-POST   /v1/api/tests                              - Create test
-GET    /v1/api/tests                              - List all tests
-GET    /v1/api/tests/{id}                         - Get test by ID
-PUT    /v1/api/tests/{id}                         - Update test
-DELETE /v1/api/tests/{id}                         - Delete test
-POST   /v1/api/tests/{id}/participants            - Assign participant to test
-DELETE /v1/api/tests/{id}/participants/{email}    - Remove participant from test
-```
-
-**Data Models (`services/test-management-service/src/models/`):**
-
-```python
-# Test model
-class Test(Base):
-    id: int (PK)
-    name: str
-    role: str                    # e.g., "Software Developer"
-    curriculum: str              # e.g., "Java Full Stack"
-    skills: List[str]            # e.g., ["Python", "SQL", "REST APIs"]
-    duration: timedelta          # Test time limit
-    created_by: str              # Creator email/ID
-    active: bool                 # Published status
-    created_at: datetime
-    updated_at: datetime
-    participants: Relationship   # Many-to-many with Participant
-
-# Participant model
-class Participant(Base):
-    id: int (PK)
-    email: str (unique)          # Student email
-    tests: Relationship          # Many-to-many with Test
-```
-
-**Architecture Pattern:**
-```
-src/
-├── config/
-│   └── settings.py              # Pydantic settings from env vars
-├── db/
-│   ├── init_db.py               # SQLAlchemy Base
-│   └── session.py               # Database session management
-├── models/                      # SQLAlchemy ORM models
-├── schemas/                     # Pydantic request/response schemas
-├── repositories/                # Data access layer (CRUD operations)
-├── services/                    # Business logic layer
-└── v1/routes/                   # FastAPI routers
-```
-
-**Database:**
-- Development: SQLite (`dev.db`)
-- Production: PostgreSQL (configured via `DB_*` env vars)
-
-### Question Management Service
-
-Similar structure to Test Management Service:
-- Routes: `/v1/api/questions/*`
-- Consul service discovery enabled
-- CRUD operations for questions
-
-**Planned Features (from user stories):**
-- Question types: MCQ, multiple correct, yes/no, text
-- Visibility controls: public, protected, private
-- Categorization: topic, module, unit, skill
-- Vector database integration (Milvus) for semantic search
-
-### Placeholder Services (Not Yet Implemented)
-
-**AI Evaluation Service:**
-- Speech-to-text conversion
-- Text-to-speech generation (ElevenLabs)
-- Response evaluation using NLP
-- Malpractice detection (plagiarism, AI-generated content)
-- Transcript summarization with timestamp mapping
-
-**Notification Service:**
-- Email notifications (test assignments, results)
-- In-app notifications
-- SMS notifications (optional)
-- Template management
-- SQS queue-based processing
-
-**Reporting & Analytics Service:**
-- Performance aggregation and metrics
-- Outlier detection (25th/75th percentile flagging)
-- Dashboard data APIs
-- Trend analysis and comparisons
-
-## Feature Implementation Guidance
-
-### Speech-to-Speech Interviews (User Story 5.1)
-
-**Architecture:**
-```
-Frontend (Audio Recording via WebRTC)
-    ↓ WebSocket connection
-API Gateway (WebSocket upgrade required)
-    ↓
-Voice Interview Service (new)
-    ↓ Audio → Text
-ElevenLabs API / Speech-to-Text
-    ↓ Text → AI Response
-AI Evaluation Service
-    ↓ Response → Audio
-ElevenLabs TTS
-    ↓ Audio stream
-Frontend (Real-time playback)
-```
-
-**Required Changes:**
-1. **API Gateway:** Add WebSocket support (currently HTTP only)
-2. **New Service:** `voice-interview-service` with WebSocket handlers
-3. **Frontend:** WebRTC audio capture at `/associate/tests/take/interview`
-4. **ElevenLabs Integration:** Text-to-speech and speech-to-text APIs
-
-**Delay Detection (Fail-safe System):**
-- Track response timing: 5s warning → 30s warning → 2min pause
-- After 3rd warning: pause test, request justification
-- Trainer approval/rejection workflow
-- Implemented in frontend timer + backend state tracking
-
-### MCQ Test Taking (User Story 5.2)
-
-**Frontend Location:** `/associate/tests/take/mcq/[testId]`
-
-**Components Needed:**
-- Question display with multiple choice options
-- Navigation (previous/next/review)
-- Timer with auto-submit
-- Progress indicator
-- Answer review before final submission
-- Local storage for answer persistence
-
-**API Integration:**
-```typescript
-// Fetch test questions
-GET /v1/api/tests/{testId}/questions
-
-// Submit answers
-POST /v1/api/tests/{testId}/submit
-{
-  "answers": [
-    {"questionId": 1, "selectedOptions": [2]},
-    {"questionId": 2, "selectedOptions": [1, 3]}  // Multiple correct
-  ]
-}
-```
-
-### Video Upload Support (Planned)
-
-**Required Infrastructure:**
-1. S3 bucket for video storage
-2. Pre-signed URL generation in backend
-3. CloudFront for video streaming
-4. Video processing service (optional: transcoding)
-
-**Implementation:**
-```
-Frontend → Request upload URL → Backend generates pre-signed URL
-Frontend → Upload directly to S3 → Notify backend of completion
-Backend → Store video metadata → Trigger processing (if needed)
-```
-
-### Trainer Scoring Workflow (User Story 2.1)
-
-**Location:** `/trainer/scoring`
-
-**Required Features:**
-1. Fetch completed tests with AI scores
-2. Display transcript with timestamps
-3. Audio/video playback with seek functionality
-4. Summary view with links to transcript sections
-5. Dual scoring: AI score (read-only) vs Trainer score (editable)
-6. Comment/feedback annotation
-7. Override and save final score
-
-**API Endpoints Needed:**
-```
-GET  /v1/api/tests/{testId}/transcript
-GET  /v1/api/tests/{testId}/summary
-GET  /v1/api/tests/{testId}/recording     # Audio/video URL
-POST /v1/api/tests/{testId}/trainer-score
-{
-  "trainerId": "...",
-  "score": 85,
-  "comments": "...",
-  "overrideAiScore": true
-}
-```
-
-## Environment Configuration
-
-### Frontend (.env.local)
-
-```bash
-# WorkOS Authentication (Required)
-WORKOS_API_KEY=sk_live_...                              # From WorkOS dashboard
-WORKOS_CLIENT_ID=client_...                             # From WorkOS dashboard
-WORKOS_COOKIE_PASSWORD=<random-32-char-string>          # Generate secure random string
-NEXT_PUBLIC_WORKOS_REDIRECT_URI=http://localhost:3000/callback
-WORKOS_DEFAULT_ORG=org_...                              # Your organization ID
-
-# API Gateway
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-
-# Optional
-AUTH_MODE=ON                                             # Set to OFF to disable auth
-NODE_ENV=development
-```
-
-**Generate WORKOS_COOKIE_PASSWORD:**
-```bash
-openssl rand -base64 32
-```
-
-### API Gateway (.env)
-
-```bash
-SERVICE_NAME=api-gateway
-PORT=8000
-SERVICE_HOSTNAME=127.0.0.1
-
-# Consul
-CONSUL_HOST=127.0.0.1
-CONSUL_PORT=8500
-```
-
-### Microservices (.env template)
-
-```bash
-# PostgreSQL Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_USERNAME=postgres
-DB_PASSWORD=your_password
-DB_NAME=evalai
-
-# MongoDB (for certain services)
-MONGO_USER=admin
-MONGODB_PASSWORD=your_password
-
-# Service Configuration
-SERVICE_NAME=test-management-service    # Unique per service
-PORT=8001                               # Unique per service
-SERVICE_HOSTNAME=127.0.0.1
-
-# Consul Service Discovery
-CONSUL_HOST=127.0.0.1
-CONSUL_PORT=8500
-
-# CORS
-ALLOW_ORIGINS=http://localhost:3000,http://localhost:8000
-```
-
-**Note:** Each microservice needs its own unique `SERVICE_NAME` and `PORT`.
+The repo-root `.env` is gitignored. Do not commit secrets.
 
 ## Testing
 
-**Current State:** No test suites configured
+Backend services have no `tests/` directories yet — CI skips pytest
+when absent. Frontend has no test runner wired (`pnpm test --if-present`
+short-circuits). Add tests as part of feature work; the CI pipeline
+will pick them up automatically.
 
-**Recommended Setup:**
+## Trainer / candidate context
 
-**Backend:**
-```bash
-# Install pytest
-pip install pytest pytest-asyncio httpx
+Day-1 starting state is the `v0-day1-start` tag on `main`. The
+`trainer/reference` branch tracks the trainer's working
+implementation 1–2 days ahead of the cohort. End-of-week solution
+branches will be cut as `solutions/week-N` from the corresponding
+`trainer/reference` commit.
 
-# Run tests
-pytest services/test-management-service/tests/
-```
+## What's deliberately stripped (history)
 
-**Frontend:**
-```bash
-# Install testing libraries
-pnpm add -D jest @testing-library/react @testing-library/jest-dom
+If you're tempted to add any of these back, check `PEP_rev-eval-ai_ScopeMap_v0.md`
+and `PEP_BrownfieldStrip_v3.md` in the curriculum workspace first:
 
-# Run tests
-pnpm test
-```
+- WorkOS / AuthKit  → replaced by local JWT + bcrypt
+- HashiCorp Consul  → replaced by compose-internal DNS
+- AWS Cloud Map     → same
+- AWS S3 + boto3 against real S3  → MinIO endpoint override
+- AWS SQS + SES + notification-service  → out of scope
+- AWS Lambda (interview-evaluator, quiz-evaluation-handler)  → out of scope
+- AWS Bedrock + LangChain + LangGraph + LangSmith  → Phase 2
+- ElevenLabs voice synthesis  → Phase 2
+- three / @react-three (3D interview avatar)  → Phase 2
+- Terraform (deploy/terraform/*)  → PEP delivers via GitHub Actions only
+- AWS ECS deploy workflows  → PEP is local-first
 
-## Git Workflow
-
-- **Main Branch:** `main` (production-ready code)
-- **Development:** Feature branches → PR to main
-- **Recent Work:** Dynamic routing, API gateway, WorkOS authentication setup
-
-## Common Issues & Solutions
-
-### Issue: Consul services not appearing as healthy
-
-**Solution:**
-```bash
-# Check Consul is running
-curl http://localhost:8500/v1/status/leader
-
-# Verify service registered
-curl http://localhost:8500/v1/agent/services
-
-# Check service logs for heartbeat errors
-# Ensure SERVICE_NAME and PORT env vars are set correctly
-```
-
-### Issue: Frontend auth not working
-
-**Solution:**
-1. Verify all WorkOS env vars are set in `.env.local`
-2. Check `WORKOS_DEFAULT_ORG` matches your organization
-3. Ensure `WORKOS_COOKIE_PASSWORD` is 32+ characters
-4. Restart Next.js dev server after env changes
-
-### Issue: API Gateway can't find service
-
-**Solution:**
-1. Ensure service is registered in Consul (`http://localhost:8500`)
-2. Check service is passing health checks
-3. Verify route pattern in `api-gateway-service/main.py` matches your endpoint
-4. Check API Gateway logs for routing decisions
-
-### Issue: CORS errors from frontend to backend
-
-**Solution:**
-1. Add frontend URL to `ALLOW_ORIGINS` in service `.env`
-2. Restart the service
-3. For API Gateway, CORS middleware not yet implemented (see limitations)
-
-### Issue: shadcn components not found
-
-**Solution:**
-```bash
-# Verify components.json exists and has correct aliases
-cat frontend/components.json
-
-# Reinstall component
-cd frontend
-pnpm dlx shadcn@latest add button
-
-# Check import path matches alias
-import { Button } from "@/components/ui/button"
-```
-
-## Port Allocation
-
-| Service                  | Port | URL                              |
-|--------------------------|------|----------------------------------|
-| Frontend (Next.js)       | 3000 | http://localhost:3000            |
-| API Gateway              | 8000 | http://localhost:8000            |
-| Test Management Service  | 8001 | http://localhost:8001            |
-| Question Management      | 8002 | http://localhost:8002 (typical)  |
-| Consul UI                | 8500 | http://localhost:8500            |
-
-## Key Implementation Patterns
-
-### Adding a New Microservice
-
-1. **Create service directory:**
-   ```bash
-   cd services
-   mkdir new-service
-   cd new-service
-   ```
-
-2. **Initialize structure:**
-   ```
-   new-service/
-   ├── main.py                    # Entry point with Consul registration
-   ├── requirements.txt
-   ├── .env
-   └── src/
-       ├── config/settings.py
-       ├── db/
-       ├── models/
-       ├── schemas/
-       ├── repositories/
-       ├── services/
-       └── v1/routes/
-   ```
-
-3. **Copy Consul registration from existing service** (e.g., test-management-service/main.py)
-
-4. **Add route to API Gateway:**
-   ```python
-   # services/api-gateway-service/main.py
-   ROUTES = [
-       # ... existing routes
-       {"pattern": r"^/v1/api/new-feature", "service": "new-service"},
-   ]
-   ```
-
-5. **Configure .env with unique SERVICE_NAME and PORT**
-
-### Adding a New Frontend Feature
-
-1. **Create route:**
-   ```bash
-   cd frontend/src/app/(dashboard)/trainer  # or associate
-   mkdir feature-name
-   ```
-
-2. **Create page component:**
-   ```typescript
-   // frontend/src/app/(dashboard)/trainer/feature-name/page.tsx
-   export default function FeaturePage() {
-     return <div>Feature content</div>
-   }
-   ```
-
-3. **Add navigation:**
-   Update dashboard navigation component to include new feature link
-
-4. **Create API client:**
-   ```typescript
-   // frontend/src/lib/api/feature-name.ts
-   export async function getFeatureData() {
-     const response = await fetch(
-       `${process.env.NEXT_PUBLIC_API_BASE_URL}/v1/api/feature`
-     );
-     return response.json();
-   }
-   ```
-
-### Service-to-Service Communication
-
-**Current:** Services are independent, communicate only through API Gateway
-
-**For direct service communication:**
-```python
-import httpx
-from src.config.settings import settings
-
-# Discover service via Consul
-async def call_other_service(service_name: str, endpoint: str):
-    import consul
-    c = consul.Consul(
-        host=settings.CONSUL_HOST,
-        port=settings.CONSUL_PORT
-    )
-
-    # Get healthy service instance
-    _, services = c.health.service(service_name, passing=True)
-    if not services:
-        raise Exception(f"No healthy {service_name} found")
-
-    service = services[0]
-    service_url = f"http://{service['Service']['Address']}:{service['Service']['Port']}"
-
-    async with httpx.AsyncClient() as client:
-        response = await client.get(f"{service_url}{endpoint}")
-        return response.json()
-```
-
-## Project Status
-
-### Implemented ✅
-- API Gateway with Consul service discovery and pattern-based routing
-- Test Management Service (complete CRUD)
-- Question Management Service (basic structure)
-- Frontend authentication with WorkOS AuthKit
-- Role-based dashboards (trainer/associate)
-- Next.js App Router with TypeScript
-- shadcn/ui component library
-
-### In Progress 🚧
-- JWT token integration between frontend and backend
-- Additional microservices (AI Evaluation, Notifications, Analytics, User Service)
-- MCQ test-taking interface
-- Trainer scoring workflow
-
-### Planned 📋
-- Speech-to-speech interview feature with ElevenLabs
-- Video upload and processing
-- Malpractice detection (plagiarism, AI-generated content, delays)
-- Transcript summarization with timestamp mapping
-- Rate limiting and circuit breakers in API Gateway
-- WebSocket support for real-time features
-- Comprehensive test suites (pytest, Jest)
-- CI/CD pipeline
-- Production deployment configuration
-
-## Resources
-
-- **WorkOS Docs:** https://workos.com/docs
-- **Next.js App Router:** https://nextjs.org/docs/app
-- **shadcn/ui Components:** https://ui.shadcn.com
-- **FastAPI:** https://fastapi.tiangolo.com
-- **Consul:** https://www.consul.io/docs
-- **SQLAlchemy:** https://docs.sqlalchemy.org
-- **ElevenLabs API:** https://elevenlabs.io/docs (for voice features)
-
-## Quick Reference
-
-**Most Common Tasks:**
-
-```bash
-# Start everything (in separate terminals)
-cd services/api-gateway-service && ./consul-setup.sh
-cd services/api-gateway-service && python main.py
-cd services/test-management-service && python main.py
-cd frontend && pnpm dev
-
-# Add new shadcn component
-cd frontend && pnpm dlx shadcn@latest add <component>
-
-# View Consul services
-open http://localhost:8500
-
-# View API documentation
-open http://localhost:8001/docs
-
-# Check service health
-curl http://localhost:8000/health
-
-# Test API endpoint
-curl http://localhost:8000/v1/api/tests
-```
+Each removal is documented in its commit message.
