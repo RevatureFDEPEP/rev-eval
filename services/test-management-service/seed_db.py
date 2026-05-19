@@ -1,13 +1,24 @@
 #!/usr/bin/env python3
 """
-Database seeding script for test-management-service
-Adds mock data for testing the dashboard and API endpoints using psycopg2
+Database seeding script for test-management-service.
+
+Inserts a handful of demo users (with bcrypt password hashes) and demo
+tests/skills/questions into the shared Postgres instance used by
+user-service and test-management-service.
 """
 
 import os
-import psycopg2
-from psycopg2.extras import execute_values
 from datetime import datetime, timedelta
+
+import psycopg2
+from passlib.context import CryptContext
+from psycopg2.extras import execute_values
+
+# All seeded users share this password — local dev convenience only.
+DEV_PASSWORD = "password123"
+_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+DEV_PASSWORD_HASH = _pwd_context.hash(DEV_PASSWORD)
+
 
 def get_db_connection():
     """Create database connection"""
@@ -35,32 +46,33 @@ def seed_users(conn):
         return
 
     users_data = [
-        # Real test users (role values must match UserRole enum: UPPERCASE)
-        ('rev-eval.test001@yopmail.com', 'user_01K8KKR2PHNCK6XWB4T2SY2ZSN', 'Test Trainer', 'Test', 'Trainer', 'TRAINER', 'org_01K8KCHSJ3X7Z809R6T030H7QN'),
-        ('rev-eval.test002@yopmail.com', 'user_01K8PN4B9MWF3QYDXJD0WXRXY0', 'Test Participant', 'Test', 'Participant', 'PARTICIPANT', 'org_01K8KCHSJ3X7Z809R6T030H7QN'),
+        # (email, full_name, first_name, last_name, role, organization_id)
         # Mock trainers
-        ('trainer1@revature.com', 'trainer_1_workos_id', 'John Trainer', 'John', 'Trainer', 'TRAINER', None),
-        ('trainer2@revature.com', 'trainer_2_workos_id', 'Sarah Instructor', 'Sarah', 'Instructor', 'TRAINER', None),
+        ('trainer1@revature.com', 'John Trainer', 'John', 'Trainer', 'TRAINER', None),
+        ('trainer2@revature.com', 'Sarah Instructor', 'Sarah', 'Instructor', 'TRAINER', None),
         # Mock participants
-        ('student1@revature.com', 'student_1_workos_id', 'Alice Johnson', 'Alice', 'Johnson', 'PARTICIPANT', None),
-        ('student2@revature.com', 'student_2_workos_id', 'Bob Smith', 'Bob', 'Smith', 'PARTICIPANT', None),
-        ('student3@revature.com', 'student_3_workos_id', 'Carol Davis', 'Carol', 'Davis', 'PARTICIPANT', None),
-        ('student4@revature.com', 'student_4_workos_id', 'David Wilson', 'David', 'Wilson', 'PARTICIPANT', None),
-        ('student5@revature.com', 'student_5_workos_id', 'Eva Brown', 'Eva', 'Brown', 'PARTICIPANT', None),
+        ('student1@revature.com', 'Alice Johnson', 'Alice', 'Johnson', 'PARTICIPANT', None),
+        ('student2@revature.com', 'Bob Smith', 'Bob', 'Smith', 'PARTICIPANT', None),
+        ('student3@revature.com', 'Carol Davis', 'Carol', 'Davis', 'PARTICIPANT', None),
+        ('student4@revature.com', 'David Wilson', 'David', 'Wilson', 'PARTICIPANT', None),
+        ('student5@revature.com', 'Eva Brown', 'Eva', 'Brown', 'PARTICIPANT', None),
     ]
 
     execute_values(
         cur,
         """
-        INSERT INTO users (email, workos_user_id, full_name, first_name, last_name, role, organization_id, is_active, created_at, updated_at)
+        INSERT INTO users (email, password_hash, full_name, first_name, last_name, role, organization_id, is_active, created_at, updated_at)
         VALUES %s
         """,
-        [(u[0], u[1], u[2], u[3], u[4], u[5], u[6], True, datetime.utcnow(), datetime.utcnow()) for u in users_data]
+        [
+            (u[0], DEV_PASSWORD_HASH, u[1], u[2], u[3], u[4], u[5], True, datetime.utcnow(), datetime.utcnow())
+            for u in users_data
+        ]
     )
 
     conn.commit()
     cur.close()
-    print(f"✅ Created {len(users_data)} users")
+    print(f"✅ Created {len(users_data)} users (shared dev password: {DEV_PASSWORD!r})")
 
 def seed_tests(conn):
     """Create mock tests"""
@@ -499,9 +511,7 @@ def main():
         print(f"    • In Progress: {in_progress_count}")
         print(f"    • Assigned: {assigned_count}")
 
-        print("\n🔑 Test Credentials:")
-        print("  Trainer: rev-eval.test001@yopmail.com")
-        print("  Participant: rev-eval.test002@yopmail.com")
+        print(f"\n🔑 Dev credentials: any seeded user / password = {DEV_PASSWORD!r}")
 
     except Exception as e:
         print(f"❌ Error during seeding: {e}")
@@ -511,3 +521,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

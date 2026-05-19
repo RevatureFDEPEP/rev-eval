@@ -39,8 +39,8 @@ async def list_submissions(
 
     # If authenticated user exists, check their role
     if current_user:
-        user_role = current_user.get("role", "")  # Role from database is already uppercase
-        auth_user_id = current_user.get("id")  # Database user ID, not WorkOS ID
+        user_role = current_user.get("role", "")
+        auth_user_id = current_user.get("id")
 
         # Participants automatically see only their own submissions
         if user_role == "PARTICIPANT" and auth_user_id:
@@ -78,8 +78,8 @@ async def bulk_assign_test(
 ):
     """
     Bulk assign a test to multiple participants by email.
-    Creates user records if they don't exist and sends WorkOS invites.
-    The assigned_by_id is automatically extracted from the JWT token and fetched from user-service.
+    Creates user records (inactive) for unknown emails.
+    The assigned_by_id is automatically extracted from gateway headers and resolved via user-service.
     """
     return await TestSubmissionService.bulk_assign_test(db, request, current_user)
 

@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Import JWT middleware
-from src.middleware.auth import verify_workos_token, add_user_context_headers
+from src.middleware.auth import verify_jwt_token, add_user_context_headers
 
 app = FastAPI(title="API Gateway")
 
@@ -75,48 +75,6 @@ def get_service_url(service_name: str) -> str:
     return f"http://{service_name}:{port}"
 
 
-async def sync_user_with_user_service(user_context: Dict[str, str]):
-    """
-    Sync user with user-service after JWT verification.
-
-    This ensures the user exists in the centralized user database
-    before routing requests to other services.
-    """
-    try:
-        user_service_url = get_service_url("user-service")
-        user_sync_url = f"{user_service_url}/v1/api/users/sync"
-
-        # Prepare headers with user context
-        headers = {
-            "X-User-Id": user_context.get("user_id", ""),
-            "X-User-Email": user_context.get("email", ""),
-            "X-User-First-Name": user_context.get("first_name", ""),
-            "X-User-Last-Name": user_context.get("last_name", ""),
-            "X-User-Role": user_context.get("role", ""),
-            "Content-Type": "application/json"
-        }
-
-        logger.info(f"🔄 Syncing user with user-service: {user_context.get('email')}")
-
-        # Call user-service to sync user
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                user_sync_url,
-                headers=headers,
-                timeout=10.0
-            )
-
-            if response.status_code == 200:
-                logger.info(f"✅ User synced successfully")
-            else:
-                logger.warning(f"⚠️ User sync returned status {response.status_code}")
-
-    except Exception as e:
-        # Don't fail the request if user sync fails
-        # Log the error and continue
-        logger.error(f"❌ User sync failed: {str(e)}")
-        logger.error("   Request will continue without user sync")
-
 # ===== STARTUP/SHUTDOWN =====
 @app.on_event("startup")
 def on_startup():
@@ -152,7 +110,7 @@ def list_routes():
 async def smart_gateway(
     path: str,
     request: Request,
-    user_context: Dict[str, str] = Depends(verify_workos_token)
+    user_context: Dict[str, str] = Depends(verify_jwt_token)
 ):
     """
     Smart routing based on endpoint pattern with JWT authentication.
@@ -163,10 +121,6 @@ async def smart_gateway(
     logger.info("=" * 80)
     logger.info(f"🔍 Incoming: {request.method} /{path}")
     logger.info(f"👤 User: {user_context.get('email')} ({user_context.get('role')})")
-
-    # Sync user with user-service (non-blocking, best-effort)
-    # This ensures user exists in centralized user database
-    await sync_user_with_user_service(user_context)
 
     # Find service based on path
     service_name = find_service_for_path(path)
@@ -205,19 +159,12 @@ async def smart_gateway(
             # Add user context headers for downstream services
             headers = add_user_context_headers(headers, user_context)
 
-            # Determine timeout based on endpoint (AI endpoints need more time)
-            # LLM question generation can take 30-60 seconds
-            timeout = 120.0 if "part-a/questions" in path or "part-b/questions" in path else 30.0
-
-            if timeout > 30:
-                logger.info(f"⏱️  Using extended timeout: {timeout}s for AI endpoint")
-
             resp = await client.request(
                 method,
                 target_url,
                 content=body if body else None,
                 headers=headers,
-                timeout=timeout
+                timeout=30.0
             )
 
         logger.info(f"✅ Response: {resp.status_code}")
