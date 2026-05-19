@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     MONGO_MAX_POOL_SIZE: int = 10
     MONGO_MIN_POOL_SIZE: int = 1
 
+    # S3 / MinIO Configuration (object storage for question images)
+    S3_ENDPOINT_URL: str = "http://minio:9000"
+    S3_ACCESS_KEY: str = "minioadmin"
+    S3_SECRET_KEY: str = "minioadmin"
+    S3_BUCKET_NAME: str = "question-images"
+    S3_REGION: str = "us-east-1"
+    S3_PRESIGN_EXPIRY_SECONDS: int = 3600
+
     @property
     def mongo_url(self) -> str:
         """

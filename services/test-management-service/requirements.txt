@@ -12,4 +12,3 @@ python-jose[cryptography]
 python-multipart
 asyncpg
 httpx
-boto3
