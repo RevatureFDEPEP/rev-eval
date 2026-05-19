@@ -10,6 +10,8 @@ jobs:
   backend-build-test:
     name: Backend (${{ matrix.service }})
     runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: ${{ secrets.JWT_SIGNING_SECRET }}
     strategy:
       fail-fast: false
       matrix:
@@ -19,7 +21,7 @@ jobs:
           - test-management-service
           - api-gateway-service
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -28,8 +30,16 @@ jobs:
           cache: pip
           cache-dependency-path: services/${{ matrix.service }}/requirements.txt
 
+      - name: Verify JWT_SECRET is set
+        run: |
+          if [ -z "${JWT_SECRET}" ]; then
+            echo "❌ JWT_SECRET is empty — was the repo secret configured?"
+            exit 1
+          fi
+          echo "✅ JWT_SECRET length: ${#JWT_SECRET}"
+
       - name: Install dependencies
-        working-directory: services/${{ matrix.service }}
+        working-directory: services/${{ matrix.service }}/src
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
@@ -55,7 +65,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 9
+          version: 8
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -75,6 +85,11 @@ jobs:
       - name: Build
         working-directory: frontend
         run: pnpm build
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: 'frontend/.next/**/*'
 
       - name: Test
         working-directory: frontend
