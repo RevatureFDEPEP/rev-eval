@@ -23,10 +23,6 @@ class Settings(BaseSettings):
     PORT: int = 8002
     SERVICE_HOSTNAME: str = "localhost"
 
-    # Consul Configuration (optional for AWS Cloud Map deployment)
-    CONSUL_HOST: Optional[str] = None
-    CONSUL_PORT: Optional[int] = None
-
     # Optional MongoDB Connection Settings
     MONGO_TIMEOUT_MS: int = 5000
     MONGO_MAX_POOL_SIZE: int = 10

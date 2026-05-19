@@ -13,8 +13,6 @@ class Settings(BaseSettings):
     ALLOW_ORIGINS: str
     SERVICE_NAME: str
     PORT: int
-    CONSUL_HOST: Optional[str] = None
-    CONSUL_PORT: Optional[int] = None
     SERVICE_HOSTNAME: str
 
     # Service-to-Service Communication

@@ -11,4 +11,3 @@ python-multipart
 pymongo[srv]
 beanie
 motor
-python-consul

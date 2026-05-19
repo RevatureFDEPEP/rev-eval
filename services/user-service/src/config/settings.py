@@ -15,9 +15,6 @@ class Settings(BaseSettings):
     SERVICE_NAME: str = "user-service"
     PORT: int = 8002
 
-    # Consul (optional for AWS Cloud Map deployment)
-    CONSUL_HOST: Optional[str] = None
-    CONSUL_PORT: Optional[int] = None
     SERVICE_HOSTNAME: str = "user-service"
 
     # WorkOS

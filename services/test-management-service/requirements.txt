@@ -10,7 +10,6 @@ psycopg2-binary
 passlib[bcrypt]
 python-jose[cryptography]
 python-multipart
-python-consul2
 asyncpg
 httpx
 boto3
