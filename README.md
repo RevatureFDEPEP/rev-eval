@@ -2,15 +2,12 @@
 
 Revature Evaluation Platform — PEP brownfield substrate.
 
-Local-first multi-service application built for the 4-week PEP cohort:
-
+Local-first multi-service application:
 - **FastAPI** microservices (Python 3.11)
 - **Next.js 16** frontend (React 19, TypeScript)
 - **PostgreSQL 15** + **MongoDB 7** for persistence
 - **MinIO** for S3-compatible object storage
 - **Nginx** reverse proxy (candidates wire routes on W2 D6)
-
-See `CLAUDE.md` for guidance on working with this codebase via Claude Code.
 
 ---
 
@@ -60,16 +57,4 @@ gateway verifies the cookie's JWT on each request and forwards
 
 `.github/workflows/ci-pipeline.yml` runs build + test for the four
 backend services (matrix) and the frontend on every push / PR to
-`main`. **It is deliberately seeded with five plausible failures**
-that candidates diagnose on W1 D3 and fix on W1 D4.
-
-If something else fails, it's unintended — surface it before treating
-it as a seeded bug.
-
-## What's **not** here
-
-The full Phase 2 substrate (`Revature/rev-eval-ai`) included AI quiz
-generation, AI interviews, voice synthesis, WorkOS auth, AWS deploy, and
-Terraform. All of that was stripped for the PEP cohort; trace history
-through commits between `b5835c3` and the strip's `v0-day1-start` tag
-for the rationale.
+`main`.

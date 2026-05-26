@@ -106,11 +106,6 @@ check_service "Frontend" "http://localhost:3000"
 
 echo ""
 echo "🌱 Notes:"
-echo "   - Using AWS RDS PostgreSQL (no local PostgreSQL container)"
-echo "   - Database seeding happens automatically on service startup"
-echo "   - MongoDB Atlas cluster connection (no local MongoDB container)"
-echo "   - Quiz Evaluation Lambda runs locally in Docker (port 9000)"
-echo "   - Lambda can be triggered via HTTP: POST http://localhost:9000/invoke"
 echo "   - Check logs: docker compose logs -f test-management-service"
 
 echo ""
