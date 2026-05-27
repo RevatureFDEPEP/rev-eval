@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Startup script for test-management-service
 # Creates tables, seeds data, and starts the service
