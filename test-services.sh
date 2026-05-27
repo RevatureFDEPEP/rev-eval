@@ -59,10 +59,10 @@ echo "5. Quiz Evaluation Lambda"
 test_service "Health Check" "http://localhost:9000/health" "200"
 echo ""
 
-# Test Database Connection
+# Test Database Connection # naming convention mismatch -> eval_ai_test_management
 echo "6. Database"
 if command -v psql &> /dev/null; then
-    if psql -U postgres -d eval_ai_test_management -c "SELECT 1" &> /dev/null; then
+    if psql -U postgres -d eval_ai_test_management -c "SELECT 1" &> /dev/null; then 
         echo -e "Database Connection... ${GREEN}✓ OK${NC}"
 
         # Check if tables exist

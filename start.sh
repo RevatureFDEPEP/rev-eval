@@ -73,6 +73,7 @@ echo "🔍 Checking service health..."
 echo ""
 
 # Function to check if a service is healthy
+#fall back after retries?? if the script is terminated for any reason, what will happen???
 check_service() {
     local name=$1
     local url=$2
@@ -93,6 +94,9 @@ check_service() {
 }
 
 # Check each service
+# but why are we missing data layer checks(postgres, minio,mongo)
+#is it too early for db health checks or some other reason 
+#some health checks are not required for now 
 check_service "Consul" "http://localhost:8500/v1/status/leader"
 check_service "User Service" "http://localhost:8002/health"
 check_service "Notification Service" "http://localhost:8004/health"
