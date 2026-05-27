@@ -11,6 +11,9 @@ from src.v1.routes.test_submission_route import router as test_submission_router
 from src.db.session import init_db
 from src.config.settings import settings
 
+# NOTE: The term "test" here refers to application domain tests (quiz/interview content and submissions),
+# not automated pytest or e2e test suites.
+
 load_dotenv()
 
 app = FastAPI(title="Test Management Service", version="1.0.0")

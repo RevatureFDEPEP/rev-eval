@@ -48,6 +48,8 @@ jobs:
       - name: Run pytest
         working-directory: services/${{ matrix.service }}
         run: |
+          # Pytest is installed for service-level test directories. If a service has no tests/ folder,
+          # the CI step skips execution rather than failing the build.
           if [ -d tests ]; then
             pytest --cov --cov-report=xml
           else

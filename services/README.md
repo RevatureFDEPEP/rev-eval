@@ -153,7 +153,7 @@ uvicorn src.main:app --reload
    app.include_router(test_routes.router, prefix="/api/v1/tests")
    app.include_router(participant_routes.router, prefix="/api/v1/participants")
    ```
-
+> Note: The `test_routes` and `test_management_service` labels refer to platform test content and submissions, not to unit/integration/e2e test automation.
 ---
 
 ### **Updating Models**
