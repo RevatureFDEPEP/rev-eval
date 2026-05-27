@@ -1,12 +1,22 @@
 # Frontend Dockerfile (Multi-stage for development and production)
+# NOTE (human): This Dockerfile was updated to standardize the local development
+# and production build flow for Next.js. Key reasons for changes:
+# - Use a multi-stage build to keep final images small (separate build/runtime).
+# - Install `pnpm` and use the lockfile for deterministic installs in CI.
+# - Add healthcheck and run as a non-root user to improve security and observability.
+# These edits make local development, CI builds, and production runs more predictable
+# and align with the rest of the compose-based development stack.
 
 # Development stage
 FROM node:20-alpine AS development
 
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+# Configure npm with longer timeout and retry, then install pnpm
+RUN npm config set fetch-timeout 120000 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm install -g pnpm --registry https://registry.npmjs.org/
 
 # Copy package files
 COPY package.json pnpm-lock.yaml* ./
