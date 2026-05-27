@@ -32,6 +32,7 @@ app.add_middleware(
 )
 
 # Service name to port mapping (compose-internal DNS)
+# These ports are used when the gateway forwards requests to each backend service
 SERVICE_PORTS = {
     "user-service": 8002,
     "test-management-service": 8001,
@@ -40,6 +41,7 @@ SERVICE_PORTS = {
 
 # ===== SERVICE ROUTING CONFIGURATION =====
 # Map endpoint patterns to services
+# Note: this is application-level routing, not a test-runner.
 ROUTES = [
     {"pattern": r"^/v1/api/auth(/.*)?$", "service": "user-service"},
     {"pattern": r"^/v1/api/users(/.*)?$", "service": "user-service"},
@@ -51,6 +53,8 @@ ROUTES = [
 ]
 
 # Paths that bypass JWT verification (login, register).
+# The gateway still forwards these to user-service, but allows unauthenticated access
+# because login/register need to issue or create credentials.
 PUBLIC_PATH_PREFIXES = (
     "/v1/api/auth/login",
     "/v1/api/auth/register",
@@ -123,6 +127,8 @@ async def public_auth_proxy(auth_path: str, request: Request):
     login + register need to issue tokens; other /auth/* paths (e.g. /me)
     still need a Bearer header and are forwarded as-is — user-service
     enforces its own auth there.
+
+    This route is intentionally public for auth initialization.
     """
     full_path = f"/v1/api/auth/{auth_path}"
     logger.info(f"🔓 Public auth proxy: {request.method} {full_path}")
@@ -161,7 +167,9 @@ async def smart_gateway(
     Smart routing based on endpoint pattern with JWT authentication.
     Example: GET /v1/api/tests -> routes to test-management-service
 
-    Requires: Valid JWT token in Authorization header
+    Requires: Valid JWT token in Authorization header.
+
+    This route is the main gateway path for authenticated API traffic.
     """
     logger.info("=" * 80)
     logger.info(f"🔍 Incoming: {request.method} /{path}")
@@ -260,6 +268,9 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
     """
     Legacy routing with service name in URL.
     Example: GET /test-management-service/v1/api/tests
+
+    This is kept for backward compatibility when upstream callers include
+    the target service name directly in the path.
     """
     logger.info("=" * 80)
     logger.info(f"🔍 Legacy route: {request.method} /{service_name}/{path}")
