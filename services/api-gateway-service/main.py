@@ -58,11 +58,13 @@ PUBLIC_PATH_PREFIXES = (
 
 
 # Compile patterns for performance
+# This converts regex strings into compiled regex objects once at startup.
 COMPILED_ROUTES = [
     {"pattern": re.compile(r["pattern"]), "service": r["service"]}
     for r in ROUTES
 ]
 
+# This function determine which service should handle the path request
 def find_service_for_path(path: str) -> Optional[str]:
     """Find service based on endpoint pattern"""
     full_path = f"/{path}" if not path.startswith("/") else path
@@ -74,6 +76,7 @@ def find_service_for_path(path: str) -> Optional[str]:
     return None
 
 
+# Build the actual URL
 def get_service_url(service_name: str) -> str:
     """Get service URL via compose-internal DNS (service-name:port)."""
     port = SERVICE_PORTS.get(service_name)
@@ -83,6 +86,7 @@ def get_service_url(service_name: str) -> str:
 
 
 # ===== STARTUP/SHUTDOWN =====
+# This function get call automatically on app start up 
 @app.on_event("startup")
 def on_startup():
     """Log startup information"""
@@ -91,6 +95,7 @@ def on_startup():
     logger.info(f"✅ {service_name} starting on port {service_port}")
     logger.info(f"📍 Service discovery: compose-internal DNS")
 
+# This function get call automatically on app shut down
 @app.on_event("shutdown")
 def on_shutdown():
     """Log shutdown"""
@@ -98,10 +103,12 @@ def on_shutdown():
     logger.info(f"👋 {service_name} shutting down")
 
 # ===== ROUTES =====
+# return api healthcheck
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
+# return all available routes
 @app.get("/routes")
 def list_routes():
     """List all configured routes"""
@@ -113,6 +120,8 @@ def list_routes():
     }
 
 # ===== PUBLIC AUTH PASS-THROUGH (no JWT required) =====
+
+# This tells FASTAPI to Create one endpoint that matches ALL HTTP methods for any path under /v1/api/auth/
 @app.api_route(
     "/v1/api/auth/{auth_path:path}",
     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -151,6 +160,7 @@ async def public_auth_proxy(auth_path: str, request: Request):
 
 
 # ===== SMART ROUTING (NO SERVICE NAME IN URL) =====
+# Smart gateway to automatically detect service
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def smart_gateway(
     path: str,
@@ -255,6 +265,7 @@ async def smart_gateway(
         )
 
 # ===== LEGACY ROUTE (WITH SERVICE NAME) =====
+# Service name explicit URL
 @app.api_route("/{service_name}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def legacy_gateway(service_name: str, path: str, request: Request):
     """
