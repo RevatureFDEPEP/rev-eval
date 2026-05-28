@@ -21,8 +21,14 @@ jobs:
           - test-management-service
           - api-gateway-service
     steps:
-      - uses: actions/checkout@v3 #version mismatch backend uses v3
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: services/${{ matrix.service }}/requirements.txt
 
       - name: Set up Python
         uses: actions/setup-python@v5 #tags are mutable -> change to immutable  pinned version style like SHA
