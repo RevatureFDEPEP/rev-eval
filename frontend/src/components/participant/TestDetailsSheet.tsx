@@ -1,26 +1,34 @@
 "use client";
 
-import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { AssignedTestInfo, TestSession, GradedQuizQuestion } from '@/lib/api/types';
 import { getTestSessionBySubmission } from '@/lib/api/quiz-sessions';
+import type { AssignedTestInfo, GradedQuizQuestion, TestSession } from '@/lib/api/types';
+import { formatTableDate } from '@/lib/utils/date';
+import { Award, CalendarDays, CheckCircle, CheckCircle2, Clock, FileText, MessageSquare, TrendingUp, XCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 // Interview-transcript surface was removed in the PEP brownfield strip
 // (ai-interview-service is Phase 2). Candidates rebuild this on W3 D13–D14.
 interface InterviewTranscriptMessage {
+   // Phase 2 transcript payloads may identify speaker type by role for UI styling.
+  role?: 'assistant' | 'user' | 'system';
   speaker?: string;
   text?: string;
+  content?: string; // Alias for text, since some payloads use "content" instead of "text"
   timestamp?: string;
 }
 
 interface InterviewTranscriptEvaluation {
   overall_score: number;
   score_breakdown: Record<string, number>;
-  skill_breakdown: Record<string, { score?: number }>;
+  skill_breakdown: Record<string, { 
+    score?: number
+    proficiency_level?: 'EXPERT' | 'PROFICIENT' | 'COMPETENT' | 'BASIC' | string; 
+    feedback?: string;}>;
   feedback?: string;
   strengths?: string[];
   improvements?: string[];
@@ -31,13 +39,12 @@ interface InterviewTranscriptEvaluation {
 interface InterviewTranscript {
   messages: InterviewTranscriptMessage[];
   lambda_evaluation?: InterviewTranscriptEvaluation;
+  status?: 'COMPLETED' | 'IN_PROGRESS' | 'PENDING' | 'FAILED' | string;
 }
 
 async function getInterviewTranscript(_submissionId: number): Promise<InterviewTranscript> {
   throw new Error('Interview transcripts not available — candidate-built on W3 D13.');
 }
-import { formatTableDate } from '@/lib/utils/date';
-import { Award, CalendarDays, CheckCircle2, Clock, FileText, MessageSquare, TrendingUp, CheckCircle, XCircle } from 'lucide-react';
 
 interface ParticipantTestDetailsSheetProps {
   test: AssignedTestInfo | null;
@@ -589,7 +596,7 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
                                           >
                                             {skill.proficiency_level}
                                           </Badge>
-                                          <span className="text-sm font-medium text-slate-700">{Math.round(skill.score)}%</span>
+                                          <span className="text-sm font-medium text-slate-700">{Math.round(skill.score ?? 0)}%</span>
                                     </div>
                                     </div>
                                       <p className="text-xs text-slate-600">{skill.feedback}</p>
