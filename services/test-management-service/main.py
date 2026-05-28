@@ -11,6 +11,12 @@ from src.v1.routes.test_submission_route import router as test_submission_router
 from src.db.session import init_db
 from src.config.settings import settings
 
+# NOTE: The term "test" here refers to application domain tests (quiz/interview content and submissions),
+# not automated pytest or e2e test suites.
+#
+# This service exposes the business workflow for creating and assigning tests,
+# and should not be confused with test automation artifacts.
+
 load_dotenv()
 
 app = FastAPI(title="Test Management Service", version="1.0.0")
@@ -31,6 +37,8 @@ app.add_middleware(
 )
 
 # ---- Routes ----
+# Register the service routers. All endpoints are exposed under /v1/api.
+# Router prefixes are shared because each module uses distinct paths internally.
 app.include_router(test_router, prefix="/v1/api")
 app.include_router(skill_router, prefix="/v1/api")
 app.include_router(test_submission_router, prefix="/v1/api")
@@ -41,6 +49,8 @@ def health_check():
     return {"status": "ok"}
 
 # ---- DB Init ----
+# Initialize the database connection on startup. This is the asynchronous
+# database session setup used by the FastAPI service.
 @app.on_event("startup")
 async def on_startup():
     await init_db()

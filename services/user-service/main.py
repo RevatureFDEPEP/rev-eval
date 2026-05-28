@@ -30,6 +30,9 @@ app.add_middleware(
 )
 
 # ---- Routes ----
+# Register authentication and user management routes under /v1/api.
+# The auth router handles login/register flows, and user router handles
+# profile and user CRUD operations.
 app.include_router(auth_router, prefix="/v1/api")
 app.include_router(user_router, prefix="/v1/api")
 
@@ -39,6 +42,9 @@ def health_check():
     return {"status": "ok"}
 
 # ---- DB Init ----
+# Initialize the database connection when the service starts.
+# This user-service startup hook is synchronous, unlike the async init in
+# the test-management-service.
 @app.on_event("startup")
 def on_startup():
     init_db()

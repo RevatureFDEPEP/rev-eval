@@ -1,5 +1,5 @@
-#!/bin/bash
-set -euo pipefail
+#!/bin/sh
+set -e
 
 echo "🚀 Starting Question Management Service..."
 
