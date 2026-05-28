@@ -97,7 +97,7 @@ jobs:
         uses: actions/attest-build-provenance@v1
         continue-on-error: true
         with:
-          subject-path: 'frontend/.next/**/*'
+          subject-path: 'frontend/.next/BUILD_ID'
 
       - name: Test
         working-directory: frontend
