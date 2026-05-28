@@ -95,6 +95,7 @@ jobs:
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v1
+        continue-on-error: true
         with:
           subject-path: 'frontend/.next/**/*'
 
