@@ -50,7 +50,8 @@ ROUTES = [
     {"pattern": r"^/v1/api/questions(/.*)?$", "service": "question-management-service"},
 ]
 
-# Paths that bypass JWT verification (login, register).
+# Paths that bypass JWT verification (login, register). under what criteria do we bypass jwt??
+#why is it designed this way 
 PUBLIC_PATH_PREFIXES = (
     "/v1/api/auth/login",
     "/v1/api/auth/register",
@@ -113,6 +114,8 @@ def list_routes():
     }
 
 # ===== PUBLIC AUTH PASS-THROUGH (no JWT required) =====
+# why do we have three types of routing instead of just one unified smart routing system with JWT verification
+#do we need load balancing if we convert this to a single routing system?? 
 @app.api_route(
     "/v1/api/auth/{auth_path:path}",
     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -254,7 +257,7 @@ async def smart_gateway(
             detail=f"Gateway error: {str(e)}"
         )
 
-# ===== LEGACY ROUTE (WITH SERVICE NAME) =====
+# ===== LEGACY ROUTE (WITH SERVICE NAME) ===== // why this is in place?? which scenario requires legacy routing??
 @app.api_route("/{service_name}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def legacy_gateway(service_name: str, path: str, request: Request):
     """

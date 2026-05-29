@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   backend-build-test:
@@ -30,22 +30,29 @@ jobs:
           cache: pip
           cache-dependency-path: services/${{ matrix.service }}/requirements.txt
 
-      - name: Verify JWT_SECRET is set
+      - name: Set up Python
+        uses: actions/setup-python@v5 #tags are mutable -> change to immutable  pinned version style like SHA
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: services/${{ matrix.service }}/requirements.txt
+
+      - name: Verify JWT_SECRET is set #might be a security vulnerability might leak log data -> modify echoing or length tracking to native runner step expressions 
         run: |
           if [ -z "${JWT_SECRET}" ]; then
             echo "❌ JWT_SECRET is empty — was the repo secret configured?"
             exit 1
           fi
-          echo "✅ JWT_SECRET length: ${#JWT_SECRET}"
+          echo "✅ JWT_SECRET length: ${#JWT_SECRET}" 
 
       - name: Install dependencies
-        working-directory: services/${{ matrix.service }}/src
+        working-directory: services/${{ matrix.service }}
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest pytest-cov
 
-      - name: Run pytest
+      - name: Run pytest #modify this for tests accordingly
         working-directory: services/${{ matrix.service }}
         run: |
           if [ -d tests ]; then
@@ -55,12 +62,13 @@ jobs:
           fi
 
       # NOTE: Trivy + Ruff scans added in W2 D7 by candidates (not seeded here)
+      
 
   frontend-build-test:
     name: Frontend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4 #version mismatch frontend uses v4 
 
       - name: Install pnpm
         uses: pnpm/action-setup@v3
@@ -71,12 +79,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Install dependencies
         working-directory: frontend
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Lint
         working-directory: frontend
@@ -94,3 +100,6 @@ jobs:
       - name: Test
         working-directory: frontend
         run: pnpm test --if-present
+
+        #There's no step to push images to a registry or deploy anywhere, making it CI-only with no CD.
+        #docker related actions?? should we not build a new image everytime?? is it an exercise for us to include?? 
