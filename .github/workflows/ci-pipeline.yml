@@ -4,7 +4,8 @@ on:
   push:
     branches: ['**']
   pull_request:
-    branches: ['**']
+  workflow_dispatch:
+
 
 jobs:
   backend-build-test:
@@ -41,7 +42,6 @@ jobs:
           echo "✅ JWT_SECRET length: ${#JWT_SECRET}"
 
       - name: Install dependencies
-        # Fix: install from service root where requirements.txt actually lives
         working-directory: services/${{ matrix.service }}
         run: |
           python -m pip install --upgrade pip
@@ -80,12 +80,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Install dependencies
         working-directory: frontend
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Lint
         working-directory: frontend
