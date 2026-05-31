@@ -33,7 +33,9 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
-          cache-dependency-path: services/${{ matrix.service }}/requirements.txt
+          cache-dependency-path: |
+            services/${{ matrix.service }}/requirements.txt
+            services/requirements-dev.txt
 
       - name: Verify JWT_SECRET is set
         run: |
@@ -45,12 +47,13 @@ jobs:
 
       - name: Install dependencies
         working-directory: services/${{ matrix.service }}
+        working-directory: services/${{ matrix.service }}
         run: |
           python -m pip install --upgrade pip
           # Install service runtime dependencies first, then shared test/dev dependencies.
           pip install -r requirements.txt
           pip install -r ../requirements-dev.txt
-          
+
       - name: Run pytest
         working-directory: services/${{ matrix.service }}
         run: |
@@ -71,7 +74,6 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v3
         with:
-          # Match frontend/package.json packageManager: pnpm@9.15.0.
           version: 9
 
       - name: Set up Node

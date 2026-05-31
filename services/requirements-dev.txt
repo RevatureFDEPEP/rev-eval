@@ -1,5 +1,8 @@
+<<<<<<< HEAD
 # Shared development/testing dependencies for backend services.
 # Runtime dependencies remain in each service-level requirements.txt file.
+=======
+>>>>>>> d809000 (Refine CI pipeline with minimal changes)
 pytest
 pytest-cov
 httpx
