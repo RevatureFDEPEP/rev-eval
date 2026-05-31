@@ -27,6 +27,11 @@ type QuizState = 'loading' | 'part-a' | 'transitioning' | 'part-b' | 'submitting
 // Answer type can be: number (mcq), number[] (multi), boolean (true_false)
 type AnswerValue = number | number[] | boolean;
 
+interface QuizContentProps {
+  testId: number;
+  submissionId: number;
+}
+
 export default function QuizTestPage({ params }: QuizTestPageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -55,7 +60,7 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
               <div className="text-center">
                 <h2 className="text-lg font-semibold text-slate-900">Invalid Test ID</h2>
                 <p className="mt-2 text-sm text-slate-600">
-                  The test ID in the URL is invalid. Received: "{resolvedParams.testId}"
+                  The test ID in the URL is invalid. Received: &quot;{resolvedParams.testId}&quot;
                 </p>
               </div>
               <Button onClick={() => router.push('/participant/tests')}>Back to Tests</Button>
@@ -91,6 +96,13 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
 
   console.log('✅ testId validation passed:', testId);
   console.log('✅ submissionId validation passed:', submissionId);
+
+  // Keep quiz hooks in a child component so invalid URL states do not change hook order.
+  return <QuizContent testId={testId} submissionId={submissionId} />;
+}
+
+function QuizContent({ testId, submissionId }: QuizContentProps) {
+  const router = useRouter();
 
   // State management
   const [state, setState] = useState<QuizState>('loading');
