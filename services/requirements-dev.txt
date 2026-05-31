@@ -1,5 +1,3 @@
-# Shared development/testing dependencies for backend services.
-# Runtime dependencies remain in each service-level requirements.txt file.
 pytest
 pytest-cov
 httpx
