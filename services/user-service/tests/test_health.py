@@ -1,4 +1,6 @@
 import os
+import sys
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -8,10 +10,9 @@ os.environ.setdefault("DB_USERNAME", "root")
 os.environ.setdefault("DB_PASSWORD", "root")
 os.environ.setdefault("DB_NAME", "eval_ai_test")
 
-
-import sys
-from pathlib import Path
+# Ensure pytest can import main from the service root.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from main import app
 
 

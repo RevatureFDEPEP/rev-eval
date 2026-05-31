@@ -1,4 +1,6 @@
 import os
+import sys
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -7,6 +9,9 @@ os.environ.setdefault("SERVICE_NAME", "question-management-service")
 os.environ.setdefault("PORT", "8003")
 os.environ.setdefault("MONGO_URI", "mongodb://localhost:27017/evalai")
 os.environ.setdefault("ALLOW_ORIGINS", "http://localhost:3000")
+
+# Ensure pytest can import main from the service root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from main import app
 

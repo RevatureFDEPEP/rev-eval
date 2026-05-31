@@ -1,4 +1,6 @@
 import os
+import sys
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -12,9 +14,9 @@ os.environ.setdefault("SERVICE_NAME", "test-management-service")
 os.environ.setdefault("PORT", "8001")
 os.environ.setdefault("SERVICE_HOSTNAME", "test-management-service")
 
-import sys
-from pathlib import Path
+# Ensure pytest can import main from the service root.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from main import app
 
 
