@@ -12,6 +12,9 @@ os.environ.setdefault("SERVICE_NAME", "test-management-service")
 os.environ.setdefault("PORT", "8001")
 os.environ.setdefault("SERVICE_HOSTNAME", "test-management-service")
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from main import app
 
 
