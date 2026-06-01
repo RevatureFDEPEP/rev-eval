@@ -493,16 +493,16 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
                               <div
                                 key={index}
                                 className={`rounded-lg p-3 ${
-                                  message.role === 'assistant'
+                                  message.speaker === 'assistant'
                                     ? 'bg-blue-50 border border-blue-200'
-                                    : message.role === 'user'
+                                    : message.speaker === 'user'
                                       ? 'bg-green-50 border border-green-200'
                                       : 'bg-slate-50 border border-slate-200'
                                 }`}
                               >
                                 <div className="mb-1 flex items-center gap-2">
                                   <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                    {message.role === 'assistant' ? 'AI Interviewer' : message.role === 'user' ? 'You' : 'System'}
+                                    {message.speaker === 'assistant' ? 'AI Interviewer' : message.speaker === 'user' ? 'You' : 'System'}
                                   </span>
                                   {message.timestamp && (
                                     <span className="text-xs text-slate-400">
@@ -510,7 +510,7 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-sm leading-relaxed text-slate-700 wrap-break-word">{message.content}</p>
+                                <p className="text-sm leading-relaxed text-slate-700 wrap-break-word">{message.text}</p>
                               </div>
                             ))}
                           </div>
