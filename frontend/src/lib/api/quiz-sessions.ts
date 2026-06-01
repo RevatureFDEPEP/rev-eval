@@ -24,11 +24,12 @@ import {
  */
 export async function createTestSession(data: TestSessionCreate): Promise<TestSession> {
   // Backend returns TestSessionOut with 'id' field, we need to map to 'session_id'
+  // The service /v1/api/test-sessions/ is not created yet in the backend.
   const response = await api.post<any>('/v1/api/test-sessions/', data);
 
   return {
     id: response.id,
-    session_id: response.id,  // Map 'id' to 'session_id' for backwards compatibility
+    session_id: response.id, // Map 'id' to 'session_id' for backwards compatibility
     test_id: response.test_id,
     submission_id: response.submission_id,
     user_id: response.user_id,
@@ -44,7 +45,7 @@ export async function createTestSession(data: TestSessionCreate): Promise<TestSe
     percentage_score: response.percentage_score,
     created_at: response.created_at,
     updated_at: response.updated_at,
-    current_part: null,  // Not in backend response, infer from status
+    current_part: null, // Not in backend response, infer from status
   };
 }
 
@@ -55,12 +56,8 @@ export async function createTestSession(data: TestSessionCreate): Promise<TestSe
  * @returns Part A questions (without correct answers)
  * @note Backend fetches test_id from session automatically
  */
-export async function getPartAQuestions(
-  sessionId: string
-): Promise<PartAQuestionsResponse> {
-  return api.get<PartAQuestionsResponse>(
-    `/v1/api/test-sessions/${sessionId}/part-a/questions`
-  );
+export async function getPartAQuestions(sessionId: string): Promise<PartAQuestionsResponse> {
+  return api.get<PartAQuestionsResponse>(`/v1/api/test-sessions/${sessionId}/part-a/questions`);
 }
 
 /**
@@ -73,7 +70,7 @@ export async function submitPartA(data: PartAAnswersSubmit): Promise<QuizSubmitR
   const { session_id, answers } = data;
   return api.post<QuizSubmitResponse>(
     `/v1/api/test-sessions/${session_id}/part-a/submit`,
-    { session_id, answers }  // Backend expects both session_id and answers in body
+    { session_id, answers } // Backend expects both session_id and answers in body
   );
 }
 
@@ -84,12 +81,8 @@ export async function submitPartA(data: PartAAnswersSubmit): Promise<QuizSubmitR
  * @returns Part B questions (adaptive difficulty, excludes Part A questions)
  * @note Backend fetches test_id from session and adapts based on Part A performance
  */
-export async function getPartBQuestions(
-  sessionId: string
-): Promise<PartBQuestionsResponse> {
-  return api.get<PartBQuestionsResponse>(
-    `/v1/api/test-sessions/${sessionId}/part-b/questions`
-  );
+export async function getPartBQuestions(sessionId: string): Promise<PartBQuestionsResponse> {
+  return api.get<PartBQuestionsResponse>(`/v1/api/test-sessions/${sessionId}/part-b/questions`);
 }
 
 /**
@@ -102,7 +95,7 @@ export async function submitPartB(data: PartBAnswersSubmit): Promise<QuizSubmitR
   const { session_id, answers } = data;
   return api.post<QuizSubmitResponse>(
     `/v1/api/test-sessions/${session_id}/part-b/submit`,
-    { session_id, answers }  // Backend expects both session_id and answers in body
+    { session_id, answers } // Backend expects both session_id and answers in body
   );
 }
 

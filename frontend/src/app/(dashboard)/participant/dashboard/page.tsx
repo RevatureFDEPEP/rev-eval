@@ -8,6 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { AssociateCharts } from '@/components/associate/AssociateCharts';
+/** getAssociateDashboardStats is not being used in this file, 
+but we want to keep it for backwards compatibility with the old dashboard page. 
+We can remove it once we are sure the new dashboard is fully 
+rolled out and the old one is removed.**/
 import { getAssociateDashboardStats, getAssignedTests } from '@/lib/api';
 import type { AssignedTestInfo, ParticipantDashboardStats } from '@/lib/api/types';
 import { SubmissionStatus, TestType } from '@/lib/api/types';
