@@ -92,10 +92,10 @@ jobs:
         working-directory: frontend
         run: pnpm build
 
-      - name: Attest build provenance
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: 'frontend/.next/**/*'
+      # - name: Attest build provenance
+      #   uses: actions/attest-build-provenance@v1
+      #   with:
+      #     subject-path: 'frontend/.next/**/*'
 
       - name: Test
         working-directory: frontend
