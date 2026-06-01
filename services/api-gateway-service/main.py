@@ -149,34 +149,6 @@ async def public_auth_proxy(auth_path: str, request: Request):
         media_type=resp.headers.get("content-type"),
     )
 
-
-# =============================================================================
-# SECURITY NOTES
-#
-# Issue 1 — Unauthenticated legacy route (auth bypass)
-#   WHAT:  The legacy route (/<service_name>/<path>) had no JWT dependency.
-#          Any caller could reach downstream services — including write
-#          endpoints — without a valid token simply by prefixing the service
-#          name to the URL (e.g. POST /test-management-service/v1/api/tests).
-#          The smart route and the auth middleware were both bypassed entirely.
-#   FIX:   Added Depends(verify_jwt_token) to legacy_gateway, identical to
-#          smart_gateway. Also injecting X-User-* headers so downstream
-#          services receive the same user context regardless of which route
-#          the request arrived through.
-#
-# Issue 2 — Internal error details leaked in 500 responses
-#   WHAT:  Both smart_gateway and legacy_gateway caught bare Exception and
-#          returned detail=f"Gateway error: {str(e)}" plus called
-#          traceback.print_exc(). This exposed internal stack details
-#          (service names, internal URLs, library errors) to the client —
-#          useful information for an attacker mapping the backend topology.
-#   FIX:   Replaced with logger.exception() (full stack goes to server logs
-#          only) and a fixed "Internal server error" string to the client.
-#          ConnectError still returns the service name in the 503 detail
-#          because that message is operationally useful and does not expose
-#          stack internals.
-# =============================================================================
-
 # ===== SMART ROUTING (NO SERVICE NAME IN URL) =====
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def smart_gateway(
