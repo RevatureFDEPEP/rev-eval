@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+// Google font builds rely on Turbopack system TLS certs configured in next.config.ts.
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
