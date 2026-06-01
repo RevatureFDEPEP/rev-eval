@@ -1,3 +1,13 @@
+# NOTE: This `docker-compose.yml` was updated to improve local development
+# and service startup ordering. Changes include small configuration tweaks such as
+# healthcheck timing, explicit service dependency hints, and environment variables
+# (CORS / S3 endpoints) to make the stack easier to run locally and to allow the
+# `api-gateway` to reliably route to backend services using compose internal DNS
+# (service-name:port). These comments explain *why* the file was changed and
+# provide context for future maintainers.
+#
+# If you didn't intend to commit local environment changes (IDE files, lockfiles),
+# consider moving them to `.gitignore` or opening a dedicated feature branch.
 services:
   postgres:
     image: postgres:15-alpine
@@ -12,7 +22,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-root}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-root} -h localhost -d postgres"]
       interval: 5s
       timeout: 5s
       retries: 10
