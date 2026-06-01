@@ -578,21 +578,8 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
                                     <div key={skillName} className="rounded-lg border border-purple-200 bg-white p-3">
                                       <div className="mb-2 flex items-center justify-between">
                                         <span className="text-sm font-semibold text-slate-900">{skillName}</span>
-                                        <div className="flex items-center gap-2">
-                                          <Badge
-                                            variant={
-                                              skill.proficiency_level === 'EXPERT' || skill.proficiency_level === 'PROFICIENT' ? 'default' :
-                                              skill.proficiency_level === 'COMPETENT' ? 'secondary' :
-                                              skill.proficiency_level === 'BASIC' ? 'outline' : 'destructive'
-                                            }
-                                            className="text-xs"
-                                          >
-                                            {skill.proficiency_level}
-                                          </Badge>
-                                          <span className="text-sm font-medium text-slate-700">{Math.round(skill.score)}%</span>
-                                    </div>
-                                    </div>
-                                      <p className="text-xs text-slate-600">{skill.feedback}</p>
+                                        <span className="text-sm font-medium text-slate-700">{Math.round(skill.score || 0)}%</span>
+                                      </div>
                                     </div>
                                   ))}
                                 </div>
@@ -663,7 +650,7 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
                           <p className="text-xs text-slate-500 mt-1">
                             {loadingTranscript
                               ? 'Loading evaluation data...'
-                              : transcript?.status === 'COMPLETED'
+                              : test?.status === 'COMPLETED'
                                 ? 'Your interview is being evaluated. This may take a few minutes.'
                                 : 'Complete the interview to receive your evaluation.'}
                           </p>
@@ -701,11 +688,6 @@ function QuestionResultCard({ question, index }: { question: GradedQuizQuestion;
     easy: 'bg-green-100 text-green-800 border-green-200',
     medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     hard: 'bg-red-100 text-red-800 border-red-200',
-  };
-
-  const getOptionText = (optionId: number): string => {
-    const option = question.options?.find((opt) => opt.option_id === optionId);
-    return option?.text || `Option ${optionId}`;
   };
 
   return (
