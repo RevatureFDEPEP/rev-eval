@@ -150,6 +150,33 @@ async def public_auth_proxy(auth_path: str, request: Request):
     )
 
 
+# =============================================================================
+# SECURITY NOTES
+#
+# Issue 1 — Unauthenticated legacy route (auth bypass)
+#   WHAT:  The legacy route (/<service_name>/<path>) had no JWT dependency.
+#          Any caller could reach downstream services — including write
+#          endpoints — without a valid token simply by prefixing the service
+#          name to the URL (e.g. POST /test-management-service/v1/api/tests).
+#          The smart route and the auth middleware were both bypassed entirely.
+#   FIX:   Added Depends(verify_jwt_token) to legacy_gateway, identical to
+#          smart_gateway. Also injecting X-User-* headers so downstream
+#          services receive the same user context regardless of which route
+#          the request arrived through.
+#
+# Issue 2 — Internal error details leaked in 500 responses
+#   WHAT:  Both smart_gateway and legacy_gateway caught bare Exception and
+#          returned detail=f"Gateway error: {str(e)}" plus called
+#          traceback.print_exc(). This exposed internal stack details
+#          (service names, internal URLs, library errors) to the client —
+#          useful information for an attacker mapping the backend topology.
+#   FIX:   Replaced with logger.exception() (full stack goes to server logs
+#          only) and a fixed "Internal server error" string to the client.
+#          ConnectError still returns the service name in the 503 detail
+#          because that message is operationally useful and does not expose
+#          stack internals.
+# =============================================================================
+
 # ===== SMART ROUTING (NO SERVICE NAME IN URL) =====
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def smart_gateway(
@@ -245,24 +272,25 @@ async def smart_gateway(
             status_code=503,
             detail=f"Cannot connect to service '{service_name}': {str(e)}"
         )
-    except Exception as e:
-        logger.error(f"❌ ERROR: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Gateway error: {str(e)}"
-        )
+    except Exception:
+        logger.exception("Unhandled smart gateway error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 # ===== LEGACY ROUTE (WITH SERVICE NAME) =====
 @app.api_route("/{service_name}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
-async def legacy_gateway(service_name: str, path: str, request: Request):
+async def legacy_gateway(
+    service_name: str,
+    path: str,
+    request: Request,
+    user_context: Dict[str, str] = Depends(verify_jwt_token),
+):
     """
     Legacy routing with service name in URL.
     Example: GET /test-management-service/v1/api/tests
     """
     logger.info("=" * 80)
     logger.info(f"🔍 Legacy route: {request.method} /{service_name}/{path}")
+    logger.info(f"👤 User: {user_context.get('email')} ({user_context.get('role')})")
     logger.info("=" * 80)
 
     try:
@@ -278,23 +306,25 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
             method = request.method
             body = await request.body()
             headers = dict(request.headers)
-            
+
             headers.pop('host', None)
             headers.pop('content-length', None)
             headers.pop('x-forwarded-proto', None)
             headers.pop('x-forwarded-scheme', None)
-            
+
+            headers = add_user_context_headers(headers, user_context)
+
             resp = await client.request(
-                method, 
-                target_url, 
+                method,
+                target_url,
                 content=body if body else None,
                 headers=headers,
                 timeout=30.0
             )
 
-        print(f"✅ Response: {resp.status_code}")
-        print("=" * 80)
-        
+        logger.info(f"✅ Response: {resp.status_code}")
+        logger.info("=" * 80)
+
         if resp.headers.get("content-type", "").startswith("application/json"):
             return JSONResponse(content=resp.json(), status_code=resp.status_code)
         else:
@@ -303,17 +333,15 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
                 status_code=resp.status_code,
                 media_type=resp.headers.get("content-type")
             )
-            
+
     except HTTPException:
         raise
     except httpx.ConnectError as e:
-        print(f"❌ Connection Error: {str(e)}")
+        logger.error(f"❌ Connection Error: {str(e)}")
         raise HTTPException(status_code=503, detail=f"Cannot connect to service: {str(e)}")
     except Exception as e:
-        print(f"❌ ERROR: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Gateway error: {str(e)}")
+        logger.exception("Unhandled legacy gateway error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 if __name__ == "__main__":
     port = int(getenv("PORT", "8000"))
