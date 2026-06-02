@@ -59,6 +59,10 @@ jobs:
   frontend-build-test:
     name: Frontend
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write       # mint OIDC token for provenance signing
+      attestations: write   # write the attestation to the repo
     steps:
       - uses: actions/checkout@v4
 
