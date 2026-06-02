@@ -34,7 +34,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-
+  
   minio:
     image: minio/minio:latest
     container_name: rev-eval-minio
@@ -53,18 +53,20 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-
+  
   nginx:
     image: nginx:alpine
     container_name: rev-eval-nginx
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
     depends_on:
       - frontend
-
+      - api-gateway
   user-service:
     build:
       context: ./services/user-service
@@ -194,7 +196,8 @@ services:
     restart: unless-stopped
     environment:
       API_GATEWAY_URL: http://api-gateway:8000
-      NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:8000
+      NEXT_PUBLIC_SITE_URL: https://localhost
+      NEXT_PUBLIC_API_GATEWAY_URL: /api/v1
       NODE_ENV: development
     ports:
       - "3000:3000"
