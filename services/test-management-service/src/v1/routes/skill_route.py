@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.services.skill_service import SkillService
-from src.schemas.skill_schema import SkillCreate, SkillUpdate, SkillOut
 from src.db.session import get_db
+from src.schemas.skill_schema import SkillCreate, SkillOut, SkillUpdate
+from src.services.skill_service import SkillService
 
 router = APIRouter(prefix="/skills", tags=["Skills"])
 

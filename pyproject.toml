@@ -1,0 +1,32 @@
+[tool.ruff]
+# Shared Ruff config for all backend Python services (W2-D7 quality gate).
+# Each service is linted via `ruff check .` from its own dir; Ruff walks up
+# to discover this repo-root config, so there is a single source of truth.
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+# F   = pyflakes
+# E/W = pycodestyle (errors / warnings)
+# I   = isort (import ordering)
+# B   = flake8-bugbear
+select = ["F", "E", "W", "I", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# Allow re-exported names in package __init__ files.
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency-injection markers are evaluated once at import time on
+# purpose, so B008 (function-call-in-default-argument) is a false positive.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Form",
+    "fastapi.File",
+    "fastapi.Header",
+    "fastapi.Cookie",
+    "fastapi.Security",
+]

@@ -43,7 +43,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov
+          pip install pytest pytest-cov ruff
+
+      - name: Ruff lint
+        working-directory: services/${{ matrix.service }}
+        run: ruff check .
 
       - name: Run pytest
         working-directory: services/${{ matrix.service }}
@@ -54,7 +58,7 @@ jobs:
             echo "No tests/ directory in services/${{ matrix.service }} — skipping pytest."
           fi
 
-      # NOTE: Trivy + Ruff scans added in W2 D7 by candidates (not seeded here)
+      # NOTE: Trivy container scan still pending (W2 D7) — Ruff lint wired above.
 
   frontend-build-test:
     name: Frontend

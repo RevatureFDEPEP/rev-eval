@@ -1,7 +1,8 @@
 from typing import List, Optional
-from src.models.question import Question
-from beanie.operators import In
+
 from beanie import PydanticObjectId
+from beanie.operators import In
+from src.models.question import Question
 
 
 class QuestionRepository:

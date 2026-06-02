@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, status, Query
-from pydantic import ValidationError
 from typing import List, Optional
-from src.schemas.question import QuestionCreate, QuestionUpdate, QuestionResponse
+
+from fastapi import APIRouter, HTTPException, Query, status
+from pydantic import ValidationError
+from src.schemas.question import QuestionCreate, QuestionResponse, QuestionUpdate
 from src.services.question_service import QuestionService
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
