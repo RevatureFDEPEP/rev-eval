@@ -31,6 +31,7 @@ interface InterviewTranscriptEvaluation {
 interface InterviewTranscript {
   messages: InterviewTranscriptMessage[];
   lambda_evaluation?: InterviewTranscriptEvaluation;
+  status?: string;
 }
 
 async function getInterviewTranscript(_submissionId: number): Promise<InterviewTranscript> {
