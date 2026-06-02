@@ -3,6 +3,9 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+#Graphify-out
+graphify-out/
+
 # C extensions
 *.so
 

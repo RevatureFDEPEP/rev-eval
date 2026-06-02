@@ -4,18 +4,19 @@ FastAPI dependencies for test-management-service.
 The API Gateway verifies the JWT and injects X-User-* headers; this module
 resolves those headers to a full user record by calling user-service.
 """
+
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 import httpx
 from fastapi import Depends, Header, HTTPException, status
 
 
 async def get_current_user_from_headers(
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
-    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
-    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
-) -> Dict[str, Any]:
+    x_user_id: str | None = Header(None, alias="X-User-Id"),
+    x_user_email: str | None = Header(None, alias="X-User-Email"),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+) -> dict[str, Any]:
     """
     Resolve the authenticated user from gateway-supplied headers.
 
@@ -42,7 +43,7 @@ async def get_current_user_from_headers(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Cannot connect to user-service: {e}",
-        )
+        ) from e
 
     if response.status_code == 200:
         return response.json()
@@ -58,8 +59,8 @@ async def get_current_user_from_headers(
 
 
 async def get_current_trainer(
-    current_user: Dict = Depends(get_current_user_from_headers),
-) -> Dict:
+    current_user: dict = Depends(get_current_user_from_headers),
+) -> dict:
     """Require the current user to have TRAINER role."""
     if (current_user.get("role") or "").upper() != "TRAINER":
         raise HTTPException(
@@ -70,8 +71,8 @@ async def get_current_trainer(
 
 
 async def get_current_participant(
-    current_user: Dict = Depends(get_current_user_from_headers),
-) -> Dict:
+    current_user: dict = Depends(get_current_user_from_headers),
+) -> dict:
     """Require the current user to have PARTICIPANT role."""
     if (current_user.get("role") or "").upper() != "PARTICIPANT":
         raise HTTPException(

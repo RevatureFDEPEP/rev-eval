@@ -1,17 +1,20 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum
 from datetime import datetime
+from enum import StrEnum
+
+from sqlalchemy import Boolean, Column, DateTime, Enum, Integer, String
 from src.db.session import Base
-import enum
 
 
-class UserRole(str, enum.Enum):
+class UserRole(StrEnum):
     """User roles in the system"""
+
     TRAINER = "TRAINER"
     PARTICIPANT = "PARTICIPANT"
 
 
 class User(Base):
     """Unified user model for trainers and participants."""
+
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)

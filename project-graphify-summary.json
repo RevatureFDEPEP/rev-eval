@@ -1,0 +1,621 @@
+{
+  "project": {
+    "name": "rev-eval",
+    "description": "Revature Evaluation Platform / PEP brownfield substrate",
+    "architecture": "Local-first multi-service app with FastAPI microservices, Next.js frontend, PostgreSQL, MongoDB, MinIO, API Gateway, and optional Nginx.",
+    "source_basis": [
+      "graphify-out/GRAPH_REPORT.md",
+      "graphify-out/graph.json",
+      "README.md",
+      "PROJECT REVIEW.md",
+      "docker-compose.yml",
+      "services/api-gateway-service/main.py",
+      "frontend/src/lib/api/*.ts",
+      "frontend/src/app/api/**/*.ts",
+      "services/*/main.py"
+    ]
+  },
+  "graphify": {
+    "report_date": "2026-06-01",
+    "generation_mode": "AST/code graph update without LLM API key",
+    "command_used": "graphify update .",
+    "corpus": {
+      "files": 165,
+      "approx_words": 77331,
+      "verdict": "Corpus is large enough that graph structure adds value."
+    },
+    "graph": {
+      "nodes": 1367,
+      "edges": 3124,
+      "communities": 93,
+      "communities_shown": 75,
+      "thin_communities_omitted": 18
+    },
+    "extraction": {
+      "extracted_percent": 80,
+      "inferred_percent": 20,
+      "ambiguous_percent": 0,
+      "inferred_edges": 626,
+      "average_inferred_confidence": 0.51,
+      "llm_token_cost": {
+        "input": 0,
+        "output": 0
+      }
+    },
+    "freshness": {
+      "built_from_commit": "a9e2fa05",
+      "refresh_command": "graphify update ."
+    },
+    "top_god_nodes": [
+      {
+        "name": "cn()",
+        "edges": 132
+      },
+      {
+        "name": "UserRole",
+        "edges": 37
+      },
+      {
+        "name": "TestService",
+        "edges": 33
+      },
+      {
+        "name": "User",
+        "edges": 33
+      },
+      {
+        "name": "TestSubmissionService",
+        "edges": 32
+      },
+      {
+        "name": "TestSubmissionRepository",
+        "edges": 31
+      },
+      {
+        "name": "TestSubmissionUpdate",
+        "edges": 29
+      },
+      {
+        "name": "TestRepository",
+        "edges": 28
+      },
+      {
+        "name": "TestSubmissionCreate",
+        "edges": 28
+      },
+      {
+        "name": "AuthService",
+        "edges": 27
+      }
+    ],
+    "limitations": [
+      "No LLM API key was configured, so the generated graph is strongest for code structure, imports, symbols, routes, and docs already parseable locally.",
+      "Full semantic extraction for prose, PDFs, images, design intent, and richer cross-document inference requires a provider key such as GEMINI_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY.",
+      "Manual verification was still used for service counts, route mapping, and unfinished feature checks."
+    ]
+  },
+  "counts": {
+    "docker_compose_containers": 9,
+    "backend_service_directories": 5,
+    "backend_services_runnable": 4,
+    "backend_services_placeholder_or_empty": 1,
+    "frontend_consumed_backend_services_including_gateway": 4,
+    "frontend_consumed_business_services_via_gateway": 3,
+    "frontend_references_missing_backend_services": 1
+  },
+  "containers": [
+    {
+      "name": "postgres",
+      "type": "infrastructure",
+      "image_or_build": "postgres:15-alpine",
+      "ports": [
+        "5432:5432"
+      ],
+      "purpose": "Postgres DB for users, tests, skills, and submissions",
+      "needed_now": true,
+      "frontend_consumes_directly": false
+    },
+    {
+      "name": "mongo",
+      "type": "infrastructure",
+      "image_or_build": "mongo:7",
+      "ports": [
+        "27017:27017"
+      ],
+      "purpose": "MongoDB for question-management-service",
+      "needed_now": true,
+      "frontend_consumes_directly": false
+    },
+    {
+      "name": "minio",
+      "type": "infrastructure",
+      "image_or_build": "minio/minio:latest",
+      "ports": [
+        "9000:9000",
+        "9001:9001"
+      ],
+      "purpose": "Local S3-compatible storage for question images",
+      "needed_now": "partial",
+      "frontend_consumes_directly": false,
+      "gap": "Configured, but upload endpoint is not wired yet."
+    },
+    {
+      "name": "nginx",
+      "type": "proxy",
+      "image_or_build": "nginx:alpine",
+      "ports": [
+        "80:80"
+      ],
+      "purpose": "Future reverse proxy",
+      "needed_now": false,
+      "frontend_consumes_directly": false,
+      "gap": "Currently returns 502 by design / not functional app path today."
+    },
+    {
+      "name": "user-service",
+      "type": "backend_service",
+      "image_or_build": "build: ./services/user-service",
+      "ports": [
+        "8002:8002"
+      ],
+      "purpose": "Auth, JWT, users",
+      "needed_now": true,
+      "frontend_consumes_directly": false,
+      "frontend_consumes_via_gateway": true,
+      "gateway_prefixes": [
+        "/v1/api/auth",
+        "/v1/api/users"
+      ]
+    },
+    {
+      "name": "question-management-service",
+      "type": "backend_service",
+      "image_or_build": "build: ./services/question-management-service",
+      "ports": [
+        "8003:8003"
+      ],
+      "purpose": "Question bank and future MinIO uploads",
+      "needed_now": true,
+      "frontend_consumes_directly": false,
+      "frontend_consumes_via_gateway": true,
+      "gateway_prefixes": [
+        "/v1/api/questions"
+      ]
+    },
+    {
+      "name": "test-management-service",
+      "type": "backend_service",
+      "image_or_build": "build: ./services/test-management-service",
+      "ports": [
+        "8001:8001"
+      ],
+      "purpose": "Tests, skills, submissions",
+      "needed_now": true,
+      "frontend_consumes_directly": false,
+      "frontend_consumes_via_gateway": true,
+      "gateway_prefixes": [
+        "/v1/api/dashboard",
+        "/v1/api/tests",
+        "/v1/api/submissions",
+        "/v1/api/skills"
+      ],
+      "gap": "Gateway routes /v1/api/dashboard here, but dashboard router is not included and route handlers are commented out."
+    },
+    {
+      "name": "api-gateway",
+      "type": "backend_gateway",
+      "image_or_build": "build: ./services/api-gateway-service",
+      "ports": [
+        "8000:8000"
+      ],
+      "purpose": "JWT verification and request routing",
+      "needed_now": true,
+      "frontend_consumes_directly": true,
+      "downstream_services": [
+        "user-service",
+        "test-management-service",
+        "question-management-service"
+      ]
+    },
+    {
+      "name": "frontend",
+      "type": "frontend",
+      "image_or_build": "build: ./frontend",
+      "ports": [
+        "3000:3000"
+      ],
+      "purpose": "Next.js UI and BFF routes",
+      "needed_now": true,
+      "frontend_consumes_directly": false,
+      "uses_api_gateway_url": "http://api-gateway:8000"
+    }
+  ],
+  "backend_services": [
+    {
+      "name": "api-gateway-service",
+      "path": "services/api-gateway-service",
+      "status": "runnable",
+      "port": 8000,
+      "database": null,
+      "dockerfile": true,
+      "main_file": "services/api-gateway-service/main.py",
+      "role": "JWT verification, route matching, request forwarding",
+      "consumed_by_frontend": true,
+      "gateway_routes_declared": [
+        {
+          "pattern": "^/v1/api/auth(/.*)?$",
+          "service": "user-service"
+        },
+        {
+          "pattern": "^/v1/api/users(/.*)?$",
+          "service": "user-service"
+        },
+        {
+          "pattern": "^/v1/api/dashboard(/.*)?$",
+          "service": "test-management-service"
+        },
+        {
+          "pattern": "^/v1/api/tests(/.*)?$",
+          "service": "test-management-service"
+        },
+        {
+          "pattern": "^/v1/api/submissions(/.*)?$",
+          "service": "test-management-service"
+        },
+        {
+          "pattern": "^/v1/api/skills(/.*)?$",
+          "service": "test-management-service"
+        },
+        {
+          "pattern": "^/v1/api/questions(/.*)?$",
+          "service": "question-management-service"
+        }
+      ],
+      "notable_gap": "No /v1/api/test-sessions route despite frontend usage."
+    },
+    {
+      "name": "user-service",
+      "path": "services/user-service",
+      "status": "runnable",
+      "port": 8002,
+      "database": "Postgres",
+      "dockerfile": true,
+      "main_file": "services/user-service/main.py",
+      "role": "Auth + users, JWT + bcrypt",
+      "consumed_by_frontend": true,
+      "frontend_prefixes": [
+        "/v1/api/auth",
+        "/v1/api/users"
+      ],
+      "routes_registered": [
+        "auth_router",
+        "user_router"
+      ]
+    },
+    {
+      "name": "question-management-service",
+      "path": "services/question-management-service",
+      "status": "runnable",
+      "port": 8003,
+      "database": "MongoDB",
+      "dockerfile": true,
+      "main_file": "services/question-management-service/main.py",
+      "role": "Question bank, question CRUD, filtering, future question image storage",
+      "consumed_by_frontend": true,
+      "frontend_prefixes": [
+        "/v1/api/questions"
+      ],
+      "routes_registered": [
+        "question_router"
+      ],
+      "notable_gap": "MinIO/S3 client exists, but question-image upload endpoint is not wired."
+    },
+    {
+      "name": "test-management-service",
+      "path": "services/test-management-service",
+      "status": "runnable",
+      "port": 8001,
+      "database": "Postgres",
+      "dockerfile": true,
+      "main_file": "services/test-management-service/main.py",
+      "role": "Tests, skills, submissions",
+      "consumed_by_frontend": true,
+      "frontend_prefixes": [
+        "/v1/api/tests",
+        "/v1/api/submissions",
+        "/v1/api/skills",
+        "/v1/api/dashboard"
+      ],
+      "routes_registered": [
+        "test_router",
+        "skill_router",
+        "test_submission_router"
+      ],
+      "notable_gaps": [
+        "dashboard_route.py exists but is not included in main.py",
+        "dashboard_route.py route handlers are commented out",
+        "No test-sessions service/router exists"
+      ]
+    },
+    {
+      "name": "reporting-and-analytics-service",
+      "path": "services/reporting-and-analytics-service",
+      "status": "empty_placeholder",
+      "port": null,
+      "database": null,
+      "dockerfile": false,
+      "main_file": null,
+      "role": "Future reporting/analytics candidate task",
+      "consumed_by_frontend": false,
+      "notable_gap": "README is empty and service is not in docker-compose or gateway routes."
+    }
+  ],
+  "frontend_consumption": {
+    "pattern": "BFF pattern: browser calls Next.js /api routes; Next.js API routes forward to API Gateway with JWT from httpOnly auth cookie.",
+    "gateway_env": {
+      "docker": "API_GATEWAY_URL=http://api-gateway:8000",
+      "browser_public": "NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8000"
+    },
+    "next_bff_routes": [
+      {
+        "route": "frontend/src/app/api/v1/[...path]/route.ts",
+        "purpose": "Generic proxy for /api/v1/* to API Gateway /v1/* with bearer token."
+      },
+      {
+        "route": "frontend/src/app/api/auth/login/route.ts",
+        "upstream": "/v1/api/auth/login",
+        "service": "user-service"
+      },
+      {
+        "route": "frontend/src/app/api/auth/register/route.ts",
+        "upstream": "/v1/api/auth/register",
+        "service": "user-service"
+      },
+      {
+        "route": "frontend/src/app/api/auth/me/route.ts",
+        "upstream": "/v1/api/auth/me",
+        "service": "user-service"
+      }
+    ],
+    "frontend_api_modules": [
+      {
+        "file": "frontend/src/lib/api/users.ts",
+        "prefixes": [
+          "/v1/api/users"
+        ],
+        "mapped_service": "user-service"
+      },
+      {
+        "file": "frontend/src/lib/api/tests.ts",
+        "prefixes": [
+          "/v1/api/tests",
+          "/v1/api/submissions/bulk-assign"
+        ],
+        "mapped_service": "test-management-service"
+      },
+      {
+        "file": "frontend/src/lib/api/submissions.ts",
+        "prefixes": [
+          "/v1/api/submissions"
+        ],
+        "mapped_service": "test-management-service"
+      },
+      {
+        "file": "frontend/src/lib/api/skills.ts",
+        "prefixes": [
+          "/v1/api/skills"
+        ],
+        "mapped_service": "test-management-service"
+      },
+      {
+        "file": "frontend/src/lib/api/questions.ts",
+        "prefixes": [
+          "/v1/api/questions"
+        ],
+        "mapped_service": "question-management-service"
+      },
+      {
+        "file": "frontend/src/lib/api/dashboard.ts",
+        "prefixes": [
+          "/v1/api/tests",
+          "/v1/api/submissions"
+        ],
+        "mapped_service": "test-management-service",
+        "note": "Current dashboard client aggregates from tests and submissions instead of relying only on backend dashboard endpoints."
+      },
+      {
+        "file": "frontend/src/lib/api/server.ts",
+        "prefixes": [
+          "/v1/api/dashboard/trainer/stats",
+          "/v1/api/dashboard/trainer/tests"
+        ],
+        "mapped_service": "test-management-service",
+        "status": "stale_or_risky",
+        "gap": "Backend dashboard route exists only as commented code and is not registered."
+      },
+      {
+        "file": "frontend/src/lib/api/quiz-sessions.ts",
+        "prefixes": [
+          "/v1/api/test-sessions"
+        ],
+        "mapped_service": null,
+        "status": "broken_missing_backend",
+        "gap": "Frontend comment says service is not created yet; gateway has no matching route."
+      }
+    ],
+    "consumed_services": {
+      "direct": [
+        "api-gateway"
+      ],
+      "via_gateway": [
+        "user-service",
+        "test-management-service",
+        "question-management-service"
+      ],
+      "expected_but_missing": [
+        "test-sessions / AI Quiz service"
+      ],
+      "not_consumed": [
+        "reporting-and-analytics-service"
+      ]
+    }
+  },
+  "unfinished_backend_features": [
+    {
+      "feature": "test-sessions / AI Quiz service",
+      "status": "missing",
+      "evidence": [
+        "frontend/src/lib/api/quiz-sessions.ts calls /v1/api/test-sessions/*",
+        "frontend comment says service is not created yet",
+        "services/api-gateway-service/main.py has no /v1/api/test-sessions route",
+        "docker-compose.yml has no test-sessions or AI quiz container",
+        "PROJECT REVIEW.md flags AI Quiz Service on port 8005 as missing"
+      ],
+      "impact": "Participant MCQ/adaptive quiz taking flow will fail when trying to create or query a test session."
+    },
+    {
+      "feature": "dashboard backend endpoints",
+      "status": "disabled_or_stale",
+      "evidence": [
+        "services/test-management-service/src/v1/routes/dashboard_route.py route handlers are commented out",
+        "services/test-management-service/main.py does not include dashboard_router",
+        "gateway still routes /v1/api/dashboard/* to test-management-service"
+      ],
+      "impact": "Any frontend path using /v1/api/dashboard/* through gateway can 404 or fail."
+    },
+    {
+      "feature": "question image uploads via MinIO/S3",
+      "status": "partial",
+      "evidence": [
+        "MinIO container exists",
+        "question-management-service has S3 settings and s3_client.py",
+        "s3_client.py says W2 D8 candidate task: wire POST /v1/api/questions/{id}/image"
+      ],
+      "impact": "Question bank cannot fully use image upload despite storage infrastructure."
+    },
+    {
+      "feature": "reporting and analytics service",
+      "status": "empty_placeholder",
+      "evidence": [
+        "README lists services/reporting-and-analytics-service as empty W2 D10 candidate task",
+        "service README has zero lines",
+        "service has no Dockerfile, main.py, compose entry, or gateway route"
+      ],
+      "impact": "No backend analytics/reporting capability exists yet."
+    },
+    {
+      "feature": "nginx reverse proxy",
+      "status": "incomplete",
+      "evidence": [
+        "README says Nginx returns 502 by design",
+        "PROJECT REVIEW.md says nginx is optional and incomplete"
+      ],
+      "impact": "http://localhost is not a functional reverse-proxied app entrypoint today."
+    },
+    {
+      "feature": "start script healthchecks",
+      "status": "stale",
+      "evidence": [
+        "start.sh checks Consul even though compose has no Consul",
+        "start.sh checks notification-service even though user_service.py notes notification-service was removed",
+        "start.sh checks AI Quiz Service even though no container or gateway route exists"
+      ],
+      "impact": "Local startup/status output can mislead users about expected services."
+    }
+  ],
+  "unfinished_frontend_features": [
+    {
+      "feature": "participant MCQ/adaptive quiz flow",
+      "status": "blocked_by_missing_backend",
+      "evidence": [
+        "frontend/src/app/(dashboard)/participant/tests/take/mcq/[testId]/page.tsx creates test sessions and fetches Part A/Part B questions",
+        "frontend/src/lib/api/quiz-sessions.ts calls /v1/api/test-sessions/*",
+        "Backend route/service does not exist"
+      ],
+      "impact": "Quiz page can load test metadata but cannot complete session-based quiz flow."
+    },
+    {
+      "feature": "interview-taking route",
+      "status": "missing_route",
+      "evidence": [
+        "participant tests page links to /participant/tests/take/interview/{testId}?submission={submissionId}",
+        "find found only frontend/src/app/(dashboard)/participant/tests/take/mcq/[testId]/page.tsx under take/"
+      ],
+      "impact": "Start Interview link points to a non-existent frontend route."
+    },
+    {
+      "feature": "interview transcript display for participant",
+      "status": "explicitly_not_available",
+      "evidence": [
+        "frontend/src/components/participant/TestDetailsSheet.tsx throws Error('Interview transcripts not available - candidate-built on W3 D13.')"
+      ],
+      "impact": "Completed interview detail UI can show transcript tab shell but cannot fetch real transcript."
+    },
+    {
+      "feature": "learning progress card",
+      "status": "coming_soon",
+      "evidence": [
+        "frontend/src/app/(dashboard)/participant/dashboard/page.tsx displays Learning Progress with CardDescription 'Coming soon'"
+      ],
+      "impact": "Participant skill progress / learning paths / recommendations are UI placeholder only."
+    },
+    {
+      "feature": "quiz results page",
+      "status": "not_implemented",
+      "evidence": [
+        "MCQ page comment says results page not yet implemented and redirects to /participant/tests after submit"
+      ],
+      "impact": "After quiz completion, user returns to list instead of a dedicated results experience."
+    },
+    {
+      "feature": "AI evaluation and audio surfaces",
+      "status": "frontend_surface_without_confirmed_backend",
+      "evidence": [
+        "trainer review sheets include transcript, audio_urls, lambda_evaluation, trainer_evaluation UI fields",
+        "No dedicated interview/transcript service exists in compose or gateway routes"
+      ],
+      "impact": "Review UI expects rich interview artifacts that may not be produced by current backend stack."
+    }
+  ],
+  "project_health_summary": {
+    "core_current_flow": [
+      "User auth and current user lookup",
+      "Trainer creates/edits tests",
+      "Skills CRUD/listing",
+      "Question CRUD/listing/filtering",
+      "Submissions and assignment flows",
+      "Dashboard values aggregated client-side from tests and submissions"
+    ],
+    "highest_risk_gaps": [
+      "test-sessions / AI Quiz missing while frontend depends on it",
+      "interview-taking route missing while frontend links to it",
+      "dashboard backend routes stale/commented while gateway still advertises dashboard prefix",
+      "reporting service empty",
+      "MinIO image upload incomplete"
+    ],
+    "likely_next_fixes": [
+      "Decide whether test-sessions / AI Quiz returns; either implement service + gateway route, or remove/guard frontend MCQ session flow.",
+      "Add interview-taking route or disable Start Interview for INTERVIEW tests.",
+      "Delete stale dashboard backend route and unused BFF routes, or re-enable dashboard_router and tests.",
+      "Wire POST /v1/api/questions/{id}/image to s3_client.py or remove MinIO from dev compose until needed.",
+      "Remove nginx from default dev compose or complete nginx proxy config.",
+      "Remove stale start.sh checks for Consul, notification-service, and AI Quiz."
+    ]
+  },
+  "references": {
+    "graphify_report": "graphify-out/GRAPH_REPORT.md",
+    "graphify_json": "graphify-out/graph.json",
+    "docker_compose": "docker-compose.yml",
+    "readme_services_in_scope": "README.md:41",
+    "project_review_containers": "PROJECT REVIEW.md:5",
+    "project_review_inconsistencies": "PROJECT REVIEW.md:23",
+    "gateway_routes": "services/api-gateway-service/main.py:35",
+    "test_management_registered_routes": "services/test-management-service/main.py:33",
+    "dashboard_route_commented": "services/test-management-service/src/v1/routes/dashboard_route.py:45",
+    "frontend_quiz_sessions": "frontend/src/lib/api/quiz-sessions.ts:27",
+    "frontend_interview_link": "frontend/src/app/(dashboard)/participant/tests/page.tsx:162",
+    "frontend_interview_transcript_error": "frontend/src/components/participant/TestDetailsSheet.tsx:36",
+    "frontend_learning_progress": "frontend/src/app/(dashboard)/participant/dashboard/page.tsx:109",
+    "question_s3_client_todo": "services/question-management-service/src/utils/s3_client.py:7"
+  }
+}

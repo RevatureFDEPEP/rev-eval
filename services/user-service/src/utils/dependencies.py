@@ -1,9 +1,9 @@
 """FastAPI dependencies for the user-service."""
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWTError
 from sqlalchemy.orm import Session
-
 from src.db.session import get_db
 from src.models.user import User
 from src.services.auth_service import AuthService
@@ -18,12 +18,12 @@ def get_current_user(
     """Resolve the authenticated user from a Bearer JWT, or raise 401."""
     try:
         payload = AuthService.decode_access_token(credentials.credentials)
-    except PyJWTError:
+    except PyJWTError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
 
     sub = payload.get("sub")
     if sub is None:
