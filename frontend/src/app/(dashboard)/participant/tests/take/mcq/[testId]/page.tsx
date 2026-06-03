@@ -34,14 +34,8 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   // Use React's use() hook to unwrap Promise params in Client Component
   const resolvedParams = use(params);
 
-  console.log('🔍 Quiz page params:', resolvedParams);
-  console.log('🔍 params.testId:', resolvedParams.testId, 'type:', typeof resolvedParams.testId);
-
   const testId = parseInt(resolvedParams.testId, 10);
   const submissionId = parseInt(searchParams.get('submission') || '', 10);
-
-  console.log('🔍 Parsed testId:', testId, 'isNaN:', isNaN(testId));
-  console.log('🔍 Parsed submissionId:', submissionId, 'isNaN:', isNaN(submissionId));
 
   //DECLARE ALL HOOKS FIRST - before any validation logic
   // Moved all state, memo, effect, and callback hooks above the isNaN guards.
@@ -180,19 +174,15 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
         setAnswers(new Map());
         setCurrentQuestionIndex(0);
 
-        console.log('🚀 Initializing quiz for testId:', testId, 'submissionId:', submissionId);
-
         // Clear any stale localStorage data for this test
         localStorage.removeItem(`quiz-session-${testId}`);
         localStorage.removeItem(`quiz-part-${testId}`);
         localStorage.removeItem(`quiz-answers-${testId}`);
         localStorage.removeItem(`quiz-timer-${testId}`);
-        console.log('🧹 Cleared localStorage for test:', testId);
 
         // Fetch test data
         const testData = await getTest(testId);
         setTest(testData);
-        console.log('📋 Test data loaded:', testData.name);
 
         const durationSeconds = testData.duration_seconds || 2700;
         resetTimer(durationSeconds);
@@ -201,23 +191,11 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
         const currentUser = await getCurrentUser();
         const userId = currentUser.id;
 
-        console.log('🔄 Creating new test session with:', {
-          test_id: testId,
-          submission_id: submissionId,
-          user_id: userId,
-          total_questions: testData.number_of_questions,
-        });
-
         const session = await createTestSession({
           test_id: testId,
           submission_id: submissionId,
           user_id: userId,
           total_questions: testData.number_of_questions,
-        });
-
-        console.log('✅ Test session created successfully:', {
-          session_id: session.session_id,
-          status: session.status,
         });
 
         // Set session ID in state
@@ -232,10 +210,7 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
         localStorage.setItem(`quiz-session-${testId}`, activeSessionId);
         localStorage.setItem(`quiz-part-${testId}`, 'A');
 
-        // Load Part A questions
-        console.log('📥 Fetching Part A questions for session:', activeSessionId);
         const partAData = await getPartAQuestions(activeSessionId);
-        console.log('✅ Part A questions loaded:', partAData.questions.length, 'questions');
 
         setPartAQuestions(partAData.questions);
         setQuestions(partAData.questions);
