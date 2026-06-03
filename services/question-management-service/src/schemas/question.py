@@ -1,7 +1,8 @@
-from pydantic import BaseModel, field_validator, model_validator, Field
-from typing import List, Optional, Union
 from datetime import datetime
-from src.models.question import Option, OptionCreate, QuestionType
+from typing import List, Optional, Union
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+from src.models.question import OptionCreate, QuestionType
 
 
 class QuestionCreate(BaseModel):
@@ -110,7 +111,10 @@ class QuestionCreate(BaseModel):
             # Validate correct answer is a valid position (1-indexed)
             max_option_index = len(self.options)
             if self.correct_answers[0] < 1 or self.correct_answers[0] > max_option_index:
-                raise ValueError(f"correct_answers must be between 1 and {max_option_index}. Got: {self.correct_answers[0]}")
+                raise ValueError(
+                    f"correct_answers must be between 1 and {max_option_index}. "
+                    f"Got: {self.correct_answers[0]}"
+                )
 
         elif self.type == QuestionType.MULTI:
             # MULTI: Must have options and at least one correct answer (list of ints)
@@ -127,7 +131,10 @@ class QuestionCreate(BaseModel):
             max_option_index = len(self.options)
             for ans in self.correct_answers:
                 if ans < 1 or ans > max_option_index:
-                    raise ValueError(f"correct_answers contains invalid position {ans}. Must be between 1 and {max_option_index}")
+                    raise ValueError(
+                        f"correct_answers contains invalid position {ans}. "
+                        f"Must be between 1 and {max_option_index}"
+                    )
 
             # Check for duplicate correct answers
             if len(self.correct_answers) != len(set(self.correct_answers)):
@@ -266,7 +273,10 @@ class QuestionUpdate(BaseModel):
             if all(isinstance(ans, int) for ans in self.correct_answers):
                 for ans in self.correct_answers:
                     if ans < 1 or ans > max_option_index:
-                        raise ValueError(f"correct_answers contains invalid position {ans}. Must be between 1 and {max_option_index}")
+                        raise ValueError(
+                            f"correct_answers contains invalid position {ans}. "
+                            f"Must be between 1 and {max_option_index}"
+                        )
 
         return self
 

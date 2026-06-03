@@ -3,9 +3,10 @@ User Schemas
 
 Pydantic models for API request/response validation.
 """
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, EmailStr, Field
 from src.models.user import UserRole
 
 

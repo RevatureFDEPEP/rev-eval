@@ -3,21 +3,10 @@ Dashboard Statistics Endpoints
 
 Provides aggregated statistics for trainer and participant dashboards.
 """
-from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
-from src.db.session import get_db
-from src.models.test import Test, TestType
-from src.models.test_submission import TestSubmission, SubmissionStatus
-from src.models.user import User, UserRole
-from src.schemas.test_schema import (
-    TrainerDashboardStats,
-    ParticipantDashboardStats,
-    AssignedTestInfo
-)
-from typing import Optional, List
-from datetime import datetime, timedelta
 import logging
+from typing import Optional
+
+from fastapi import APIRouter, Header, HTTPException
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -106,7 +95,10 @@ def get_user_context(
 #     completed_submissions = sum(
 #         1 for s in submissions if s.status == SubmissionStatus.COMPLETED
 #     )
-#     logger.info(f"📈 Submissions - Total: {total_submissions}, Pending: {pending_submissions_count}, Completed: {completed_submissions}")
+#     logger.info(
+#         f"📈 Submissions - Total: {total_submissions}, "
+#         f"Pending: {pending_submissions_count}, Completed: {completed_submissions}"
+#     )
 
 #     # Get unique participants count (user_id instead of participant_id)
 #     unique_user_ids = set(s.user_id for s in submissions)
@@ -174,10 +166,16 @@ def get_user_context(
 #         1 for s in submissions if s.status == SubmissionStatus.IN_PROGRESS
 #     )
 
-#     logger.info(f"📈 Participant submissions - Total: {assigned_tests_count}, Completed: {completed_tests_count}, In Progress: {in_progress_tests_count}")
+#     logger.info(
+#         f"📈 Participant submissions - Total: {assigned_tests_count}, "
+#         f"Completed: {completed_tests_count}, In Progress: {in_progress_tests_count}"
+#     )
 
 #     # Calculate average score from completed tests
-#     completed_with_scores = [s for s in submissions if s.status == SubmissionStatus.COMPLETED and s.final_score is not None]
+#     completed_with_scores = [
+#         s for s in submissions
+#         if s.status == SubmissionStatus.COMPLETED and s.final_score is not None
+#     ]
 #     average_score = (
 #         sum(s.final_score for s in completed_with_scores) / len(completed_with_scores)
 #         if completed_with_scores else None
@@ -202,7 +200,7 @@ def get_user_context(
 #         average_score=average_score,
 #         tests_due_this_week=tests_due_this_week
 #     )
-    
+
 #     logger.info(f"✅ Returning participant stats: {stats}")
 #     return stats
 

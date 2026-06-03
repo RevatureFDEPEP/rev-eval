@@ -1,12 +1,12 @@
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import OperationalError
-
-from src.db.init_db import Base
+from sqlalchemy.orm import sessionmaker
 from src.config.settings import settings
+from src.db.init_db import Base
 
-# Import all models to register them with Base metadata
-from src.models.user import User
+# Import all models to register them with Base.metadata before create_all.
+# Removing this import breaks table creation (the model would never register).
+from src.models.user import User  # noqa: F401
 
 # Use settings for database URL
 DATABASE_URL = settings.SQLALCHEMY_DATABASE_URL
@@ -31,7 +31,6 @@ def init_db():
     """
     try:
         # Import all models here so they are registered with Base
-        from src.models.user import User
 
         # Create tables
         Base.metadata.create_all(bind=engine)

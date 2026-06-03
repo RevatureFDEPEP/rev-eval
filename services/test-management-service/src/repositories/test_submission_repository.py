@@ -1,11 +1,16 @@
 # src/repositories/test_submission_repository.py
+from datetime import datetime
 from typing import List, Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from datetime import datetime
 from src.models.test_submission import TestSubmission
-from src.schemas.test_submission_schema import TestSubmissionCreate, TestSubmissionUpdate
+from src.schemas.test_submission_schema import (
+    TestSubmissionCreate,
+    TestSubmissionUpdate,
+)
+
 
 class TestSubmissionRepository:
 
@@ -47,7 +52,7 @@ class TestSubmissionRepository:
             .order_by(TestSubmission.created_at.desc())
         )
         return list(result.scalars().all())
-    
+
     @staticmethod
     async def list_by_test(db: AsyncSession, test_id: int) -> List[TestSubmission]:
         """Get all submissions for a specific test"""
@@ -58,7 +63,7 @@ class TestSubmissionRepository:
             .order_by(TestSubmission.created_at.desc())
         )
         return list(result.scalars().all())
-    
+
     @staticmethod
     async def get_by_user_and_test(
         db: AsyncSession,
@@ -82,7 +87,7 @@ class TestSubmissionRepository:
         # Convert to dict and strip timezones (POC fix)
         submission_data = submission_in.model_dump() if hasattr(submission_in, 'model_dump') else submission_in.dict()
         submission_data = TestSubmissionRepository._strip_timezone_from_dict(submission_data)
-        
+
         submission = TestSubmission(**submission_data)
         db.add(submission)
         await db.commit()
@@ -90,11 +95,17 @@ class TestSubmissionRepository:
         return submission
 
     @staticmethod
-    async def update(db: AsyncSession, submission: TestSubmission, submission_in: TestSubmissionUpdate) -> TestSubmission:
+    async def update(
+        db: AsyncSession, submission: TestSubmission, submission_in: TestSubmissionUpdate
+    ) -> TestSubmission:
         # Convert to dict and strip timezones (POC fix)
-        update_data = submission_in.model_dump(exclude_unset=True) if hasattr(submission_in, 'model_dump') else submission_in.dict(exclude_unset=True)
+        update_data = (
+            submission_in.model_dump(exclude_unset=True)
+            if hasattr(submission_in, 'model_dump')
+            else submission_in.dict(exclude_unset=True)
+        )
         update_data = TestSubmissionRepository._strip_timezone_from_dict(update_data)
-        
+
         for field, value in update_data.items():
             setattr(submission, field, value)
         await db.commit()

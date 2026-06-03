@@ -7,19 +7,69 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Detect which areas changed so we only run the relevant jobs.
+  # A backend service runs only when its own dir changed; a shared backend
+  # file (root pyproject ruff config) or this workflow re-runs all backends.
+  # Frontend runs only when frontend/ (or this workflow) changed.
+  # On workflow_dispatch (manual) we force everything to run.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.set.outputs.backend }}
+      backend_any: ${{ steps.set.outputs.backend_any }}
+      frontend: ${{ steps.set.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            user-service: ['services/user-service/**']
+            question-management-service: ['services/question-management-service/**']
+            test-management-service: ['services/test-management-service/**']
+            api-gateway-service: ['services/api-gateway-service/**']
+            backend-shared: ['pyproject.toml', '.github/workflows/ci-pipeline.yml']
+            frontend: ['frontend/**', '.github/workflows/ci-pipeline.yml']
+
+      - name: Build job set
+        id: set
+        env:
+          CHANGED: ${{ steps.filter.outputs.changes }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          all='["user-service","question-management-service","test-management-service","api-gateway-service"]'
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            backend="$all"; frontend=true
+          else
+            if echo "$CHANGED" | jq -e 'index("backend-shared")' >/dev/null; then
+              backend="$all"
+            else
+              # intersection of changed filters with the backend service list
+              backend=$(jq -cn --argjson a "$all" --argjson c "$CHANGED" '$a - ($a - $c)')
+            fi
+            frontend=$(echo "$CHANGED" | jq -e 'index("frontend")' >/dev/null && echo true || echo false)
+          fi
+          backend_any=$([ "$(echo "$backend" | jq 'length')" -gt 0 ] && echo true || echo false)
+          {
+            echo "backend=$backend"
+            echo "backend_any=$backend_any"
+            echo "frontend=$frontend"
+          } >> "$GITHUB_OUTPUT"
+          echo "backend=$backend | frontend=$frontend"
+
   backend-build-test:
     name: Backend (${{ matrix.service }})
+    needs: changes
+    if: needs.changes.outputs.backend_any == 'true'
     runs-on: ubuntu-latest
     env:
       JWT_SECRET: ${{ secrets.JWT_SIGNING_SECRET }}
     strategy:
       fail-fast: false
       matrix:
-        service:
-          - user-service
-          - question-management-service
-          - test-management-service
-          - api-gateway-service
+        service: ${{ fromJSON(needs.changes.outputs.backend) }}
     steps:
       - uses: actions/checkout@v3
 
@@ -43,7 +93,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov
+          pip install pytest pytest-cov ruff
+
+      - name: Ruff lint
+        working-directory: services/${{ matrix.service }}
+        run: ruff check .
 
       - name: Run pytest
         working-directory: services/${{ matrix.service }}
@@ -54,10 +108,12 @@ jobs:
             echo "No tests/ directory in services/${{ matrix.service }} — skipping pytest."
           fi
 
-      # NOTE: Trivy + Ruff scans added in W2 D7 by candidates (not seeded here)
+      # NOTE: Trivy container scan still pending (W2 D7) — Ruff lint wired above.
 
   frontend-build-test:
     name: Frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

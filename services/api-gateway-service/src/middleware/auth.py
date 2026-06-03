@@ -66,13 +66,13 @@ async def verify_jwt_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token expired",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from None
     except jwt.PyJWTError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid token: {e}",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
 
     user_id = payload.get("sub")
     if not user_id:
