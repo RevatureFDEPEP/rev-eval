@@ -182,7 +182,7 @@ export function SubmissionReviewSheet({
     };
 
     loadDetails();
-  }, [submission, open]);
+  }, [submission, open, readOnly]);
 
   const handlePlayAudio = async (audioUrl: string, messageIndex: number) => {
     // If already playing this audio, pause it
@@ -227,6 +227,8 @@ export function SubmissionReviewSheet({
       audioPlayer.stop();
       setPlayingAudioIndex(null);
     };
+  // audioPlayer recreates each render; adding it would re-run cleanup every render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const handleUseAIValue = (setter: (value: string) => void, value: string | string[] | undefined) => {
@@ -271,7 +273,7 @@ export function SubmissionReviewSheet({
                 proficiency_level: data.proficiency,
               };
               return acc;
-            }, {} as Record<string, any>)
+            }, {} as Record<string, { score: number; feedback: string; proficiency_level: string }>)
           : undefined,
       };
 
@@ -694,7 +696,7 @@ export function SubmissionReviewSheet({
                         <Textarea
                           value={strengths}
                           onChange={(e) => setStrengths(e.target.value)}
-                          placeholder={details.transcript?.lambda_evaluation?.strengths?.length ? `AI: ${details.transcript.lambda_evaluation.strengths.slice(0, 2).join(' | ')}${details.transcript.lambda_evaluation.strengths.length > 2 ? '...' : ''}` : "Enter strengths (one per line)&#10;Example:&#10;Strong problem-solving skills&#10;Clear communication"}
+                          placeholder={details.transcript?.lambda_evaluation?.strengths?.length ? `AI: ${details.transcript.lambda_evaluation.strengths.slice(0, 2).join(' | ')}${details.transcript.lambda_evaluation.strengths.length > 2 ? '...' : ''}` : "Enter strengths (one per line)\nExample:\nStrong problem-solving skills\nClear communication"}
                           rows={5}
                           className="placeholder:text-slate-400"
                           disabled={readOnly}
@@ -726,7 +728,7 @@ export function SubmissionReviewSheet({
                         <Textarea
                           value={improvements}
                           onChange={(e) => setImprovements(e.target.value)}
-                          placeholder={details.transcript?.lambda_evaluation?.improvements?.length ? `AI: ${details.transcript.lambda_evaluation.improvements.slice(0, 2).join(' | ')}${details.transcript.lambda_evaluation.improvements.length > 2 ? '...' : ''}` : "Enter areas for improvement (one per line)&#10;Example:&#10;Could provide more detailed explanations&#10;Consider edge cases more thoroughly"}
+                          placeholder={details.transcript?.lambda_evaluation?.improvements?.length ? `AI: ${details.transcript.lambda_evaluation.improvements.slice(0, 2).join(' | ')}${details.transcript.lambda_evaluation.improvements.length > 2 ? '...' : ''}` : "Enter areas for improvement (one per line)\nExample:\nCould provide more detailed explanations\nConsider edge cases more thoroughly"}
                           rows={5}
                           className="placeholder:text-slate-400"
                           disabled={readOnly}
