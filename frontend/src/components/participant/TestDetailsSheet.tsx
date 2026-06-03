@@ -12,6 +12,8 @@ import { getTestSessionBySubmission } from '@/lib/api/quiz-sessions';
 // Interview-transcript surface was removed in the PEP brownfield strip
 // (ai-interview-service is Phase 2). Candidates rebuild this on W3 D13–D14.
 interface InterviewTranscriptMessage {
+  role?: string;
+  content?: string;
   speaker?: string;
   text?: string;
   timestamp?: string;
@@ -490,30 +492,34 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
                       ) : transcript ? (
                         <ScrollArea className="h-[400px] rounded-lg border border-slate-200 bg-slate-50 p-4">
                           <div className="space-y-4">
-                            {transcript.messages.map((message, index) => (
-                              <div
-                                key={index}
-                                className={`rounded-lg p-3 ${
-                                  message.role === 'assistant'
-                                    ? 'bg-blue-50 border border-blue-200'
-                                    : message.role === 'user'
-                                      ? 'bg-green-50 border border-green-200'
-                                      : 'bg-slate-50 border border-slate-200'
-                                }`}
-                              >
-                                <div className="mb-1 flex items-center gap-2">
-                                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                    {message.role === 'assistant' ? 'AI Interviewer' : message.role === 'user' ? 'You' : 'System'}
-                                  </span>
-                                  {message.timestamp && (
-                                    <span className="text-xs text-slate-400">
-                                      {new Date(message.timestamp).toLocaleTimeString()}
+                            {transcript.messages.map((message, index) => {
+                              const role = message.role ?? message.speaker ?? '';
+                              const content = message.content ?? message.text ?? '';
+                              return (
+                                <div
+                                  key={index}
+                                  className={`rounded-lg p-3 ${
+                                    role === 'assistant'
+                                      ? 'bg-blue-50 border border-blue-200'
+                                      : role === 'user'
+                                        ? 'bg-green-50 border border-green-200'
+                                        : 'bg-slate-50 border border-slate-200'
+                                  }`}
+                                >
+                                  <div className="mb-1 flex items-center gap-2">
+                                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                      {role === 'assistant' ? 'AI Interviewer' : role === 'user' ? 'You' : 'System'}
                                     </span>
-                                  )}
+                                    {message.timestamp && (
+                                      <span className="text-xs text-slate-400">
+                                        {new Date(message.timestamp).toLocaleTimeString()}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-sm leading-relaxed text-slate-700 wrap-break-word">{content}</p>
                                 </div>
-                                <p className="text-sm leading-relaxed text-slate-700 wrap-break-word">{message.content}</p>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </ScrollArea>
                       ) : (
