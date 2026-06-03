@@ -42,8 +42,8 @@ interface ReviewDetails {
     test_name: string;
     test_role?: string;
     messages: Array<{
-      role: string;
-      content: string;
+      speaker: string;
+      text: string;
       timestamp: string;
     }>;
     audio_urls?: Array<{
@@ -933,14 +933,14 @@ export function SubmissionReviewSheet({
                           <div
                             key={idx}
                             className={`rounded-lg border p-4 ${
-                              message.role === 'user'
+                              message.speaker === 'user'
                                 ? 'border-blue-200 bg-blue-50/50'
                                 : 'border-slate-200 bg-slate-50/50'
                             }`}
                           >
                             <div className="mb-2 flex items-center justify-between">
-                              <Badge variant={message.role === 'user' ? 'default' : 'secondary'}>
-                                {message.role === 'user' ? 'Participant' : 'AI Interviewer'}
+                              <Badge variant={message.speaker === 'user' ? 'default' : 'secondary'}>
+                                {message.speaker === 'user' ? 'Participant' : 'AI Interviewer'}
                               </Badge>
                               {getAudioUrlForMessage(idx) && (
                                 <div className="flex items-center gap-2">
@@ -1009,7 +1009,7 @@ export function SubmissionReviewSheet({
                               )}
                             </div>
                             <p className="text-sm text-slate-700 whitespace-pre-wrap">
-                              {message.content}
+                              {message.text}
                             </p>
                             <p className="mt-2 text-xs text-slate-400">
                               {new Date(message.timestamp).toLocaleString()}
