@@ -66,9 +66,9 @@ class QuestionService:
             question = Question(**question_data)
             return await QuestionRepository.create(question)
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from e
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error creating question: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error creating question: {str(e)}") from e
 
     @staticmethod
     async def get_all_questions() -> List[Question]:
@@ -140,7 +140,7 @@ class QuestionService:
                 update_data=update_data
             )
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from e
 
         # Add updated timestamp
         update_data["updated_at"] = datetime.now(timezone.utc)

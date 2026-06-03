@@ -89,4 +89,4 @@ def invite_user(invite_request: InviteUserRequest, db: Session = Depends(get_db)
         return InviteUserResponse(**result)
     except Exception as e:
         logger.error(f"Error inviting user: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to invite user: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to invite user: {str(e)}") from e

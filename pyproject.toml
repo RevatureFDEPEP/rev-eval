@@ -3,7 +3,9 @@
 # Each service is linted via `ruff check .` from its own dir; Ruff walks up
 # to discover this repo-root config, so there is a single source of truth.
 target-version = "py311"
-line-length = 88
+# 120 (not Black's 88): these FastAPI/SQLAlchemy services lean on descriptive
+# names and long type/route signatures; 88 flagged ~280 mostly-marginal lines.
+line-length = 120
 
 [tool.ruff.lint]
 # F   = pyflakes
@@ -15,6 +17,9 @@ select = ["F", "E", "W", "I", "B"]
 [tool.ruff.lint.per-file-ignores]
 # Allow re-exported names in package __init__ files.
 "__init__.py" = ["F401"]
+# Seed scripts embed long prose answer/explanation literals (demo fixtures,
+# not logic); wrapping them hurts readability, so exempt them from E501.
+"seed_*.py" = ["E501"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI dependency-injection markers are evaluated once at import time on

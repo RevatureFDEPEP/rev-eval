@@ -5,7 +5,7 @@ from src.config.settings import settings
 from src.db.init_db import Base
 
 # Import all models to register them with Base.metadata before create_all.
-# noqa: removing this breaks table creation (the model would never register).
+# Removing this import breaks table creation (the model would never register).
 from src.models.user import User  # noqa: F401
 
 # Use settings for database URL

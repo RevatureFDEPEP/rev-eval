@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from src.middleware.auth import add_user_context_headers, verify_jwt_token
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -16,9 +17,6 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
-
-# Import JWT middleware
-from src.middleware.auth import add_user_context_headers, verify_jwt_token
 
 app = FastAPI(title="API Gateway")
 
@@ -220,7 +218,7 @@ async def smart_gateway(
             logger.error("❌ Error Response:")
             try:
                 logger.error(f"   {resp.json()}")
-            except:
+            except Exception:
                 logger.error(f"   {resp.text[:200]}")
 
         logger.info("=" * 80)
@@ -245,7 +243,7 @@ async def smart_gateway(
         raise HTTPException(
             status_code=503,
             detail=f"Cannot connect to service '{service_name}': {str(e)}"
-        )
+        ) from e
     except Exception as e:
         logger.error(f"❌ ERROR: {str(e)}")
         import traceback
@@ -253,7 +251,7 @@ async def smart_gateway(
         raise HTTPException(
             status_code=500,
             detail=f"Gateway error: {str(e)}"
-        )
+        ) from e
 
 # ===== LEGACY ROUTE (WITH SERVICE NAME) =====
 @app.api_route("/{service_name}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
@@ -309,12 +307,12 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
         raise
     except httpx.ConnectError as e:
         print(f"❌ Connection Error: {str(e)}")
-        raise HTTPException(status_code=503, detail=f"Cannot connect to service: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Cannot connect to service: {str(e)}") from e
     except Exception as e:
         print(f"❌ ERROR: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Gateway error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Gateway error: {str(e)}") from e
 
 if __name__ == "__main__":
     port = int(getenv("PORT", "8000"))

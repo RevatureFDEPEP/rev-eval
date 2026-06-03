@@ -73,7 +73,7 @@ class TestSubmissionService:
         #                 submission_data = TestSubmissionCreate(
         #                     test_id=request.test_id,
         #                     user_id=user_id,
-        #                     assigned_by_id=current_user["id"],  # Use authenticated user's database ID from user-service
+        #                     assigned_by_id=current_user["id"],  # Authenticated user's DB ID from user-service
         #                     due_date=request.due_date
         #                 )
 
@@ -88,7 +88,7 @@ class TestSubmissionService:
         #                     test_skills = [ts.name for ts in test.skills] if test.skills else []
         #                     duration_minutes = int(test.duration_seconds / 60) if test.duration_seconds else 60
 
-        #                     logger.info(f"📤 Publishing TEST_ASSIGNED event for {email} (submission_id: {submission.id})")
+        #                     logger.info(f"📤 Publishing TEST_ASSIGNED event for {email} (sub: {submission.id})")
 
         #                     sqs_success = await sqs_client.publish_test_assigned_event(
         #                         test_id=test.id,
@@ -115,7 +115,7 @@ class TestSubmissionService:
 
         #                 except Exception as sqs_error:
         #                     # Don't fail the assignment if SQS publishing fails
-        #                     logger.error(f"❌ Exception while publishing TEST_ASSIGNED event for {email}: {str(sqs_error)}")
+        #                     logger.error(f"❌ Exception publishing TEST_ASSIGNED event for {email}: {str(sqs_error)}")
         #                     import traceback
         #                     logger.error(traceback.format_exc())
 
@@ -135,7 +135,9 @@ class TestSubmissionService:
         return TestSubmissionOut.from_orm(submission)
 
     @staticmethod
-    async def update_submission(db: AsyncSession, submission_id: int, submission_in: TestSubmissionUpdate) -> TestSubmissionOut:
+    async def update_submission(
+        db: AsyncSession, submission_id: int, submission_in: TestSubmissionUpdate
+    ) -> TestSubmissionOut:
         submission = await TestSubmissionRepository.get_by_id(db, submission_id)
         if not submission:
             raise ValueError("Submission not found")
@@ -462,7 +464,10 @@ class TestSubmissionService:
                 if response.status_code == 200:
                     transcript_data = response.json()
                 else:
-                    logger.warning(f"⚠️ Could not fetch transcript for submission {submission_id}: {response.status_code}")
+                    logger.warning(
+                        f"⚠️ Could not fetch transcript for submission {submission_id}: "
+                        f"{response.status_code}"
+                    )
         except Exception as e:
             logger.error(f"❌ Error fetching transcript for submission {submission_id}: {e}")
 
@@ -476,7 +481,10 @@ class TestSubmissionService:
                 "role": test.role,
                 "curriculum": test.curriculum,
                 "duration_seconds": test.duration_seconds,
-                "skills": [{"id": s.id, "name": s.name, "description": s.description} for s in test.skills] if test.skills else []
+                "skills": (
+                    [{"id": s.id, "name": s.name, "description": s.description} for s in test.skills]
+                    if test.skills else []
+                )
             },
             "transcript": transcript_data
         }
@@ -544,7 +552,8 @@ class TestSubmissionService:
                     )
                     if mongo_response.status_code != 200:
                         logger.warning(
-                            f"Failed to save trainer evaluation to MongoDB: {mongo_response.status_code} - {mongo_response.text}"
+                            "Failed to save trainer evaluation to MongoDB: "
+                            f"{mongo_response.status_code} - {mongo_response.text}"
                         )
             except Exception as e:
                 logger.error(f"Error saving trainer evaluation to MongoDB: {str(e)}")
