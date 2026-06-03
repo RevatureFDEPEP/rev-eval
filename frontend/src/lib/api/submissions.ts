@@ -123,7 +123,8 @@ export async function getSubmissionReviewDetails(submissionId: number): Promise<
     duration_seconds?: number;
     skills: Array<{ id: number; name: string; description?: string }>;
   };
-  transcript: any; // Full transcript from interview service
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  transcript: any; // Full transcript from interview service (shape varies by interview service)
 }> {
   return api.get(`/v1/api/submissions/${submissionId}/review-details`);
 }
@@ -136,7 +137,7 @@ export async function submitTrainerReview(
   data: {
     trainer_score: number;
     feedback?: string;
-    trainer_evaluation?: any;  // Comprehensive trainer evaluation structure
+    trainer_evaluation?: unknown;  // Comprehensive trainer evaluation structure
   }
 ): Promise<{
   submission_id: number;
