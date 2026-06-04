@@ -71,7 +71,7 @@ jobs:
       matrix:
         service: ${{ fromJSON(needs.changes.outputs.backend) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -116,6 +116,31 @@ jobs:
         with:
           name: coverage-${{ matrix.service }}
           path: services/${{ matrix.service }}/coverage.xml
+          if-no-files-found: ignore
+
+      # W2-D7 quality gate: scan the built image for vulnerabilities.
+      # ignore-unfixed keeps the gate actionable — base images ship CVEs
+      # with no published fix, which would otherwise dead-lock the pipeline.
+      - name: Build Docker image
+        working-directory: services/${{ matrix.service }}
+        run: docker build -t ${{ matrix.service }}:${{ github.sha }} .
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ matrix.service }}:${{ github.sha }}
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-${{ matrix.service }}
+          path: trivy-${{ matrix.service }}.sarif
           if-no-files-found: ignore
 
   frontend-build-test:
