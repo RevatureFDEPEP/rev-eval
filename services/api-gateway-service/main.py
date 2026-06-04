@@ -49,8 +49,8 @@ ROUTES = [
     {"pattern": r"^/v1/api/questions(/.*)?$", "service": "question-management-service"},
 ]
 
-# Paths that bypass JWT verification (login, register). under what criteria do we bypass jwt??
-#why is it designed this way
+# Paths that bypass JWT verification (login, register).
+# under what criteria do we bypass jwt?? why is it designed this way
 PUBLIC_PATH_PREFIXES = (
     "/v1/api/auth/login",
     "/v1/api/auth/register",
@@ -58,7 +58,9 @@ PUBLIC_PATH_PREFIXES = (
 
 
 # Compile patterns for performance
-COMPILED_ROUTES = [{"pattern": re.compile(r["pattern"]), "service": r["service"]} for r in ROUTES]
+COMPILED_ROUTES = [
+    {"pattern": re.compile(r["pattern"]), "service": r["service"]} for r in ROUTES
+]
 
 
 def find_service_for_path(path: str) -> str | None:
@@ -106,12 +108,14 @@ def health():
 @app.get("/routes")
 def list_routes():
     """List all configured routes"""
-    return {"routes": [{"pattern": r["pattern"], "service": r["service"]} for r in ROUTES]}
+    return {
+        "routes": [{"pattern": r["pattern"], "service": r["service"]} for r in ROUTES]
+    }
 
 
 # ===== PUBLIC AUTH PASS-THROUGH (no JWT required) =====
-# why do we have three types of routing instead of just one unified smart routing system with JWT verification
-#do we need load balancing if we convert this to a single routing system??
+# why do we have three types of routing instead of one unified smart routing system?
+# do we need load balancing if we convert this to a single routing system??
 @app.api_route(
     "/v1/api/auth/{auth_path:path}",
     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -154,9 +158,13 @@ async def public_auth_proxy(auth_path: str, request: Request):
 
 
 # ===== SMART ROUTING (NO SERVICE NAME IN URL) =====
-@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
+@app.api_route(
+    "/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+)
 async def smart_gateway(
-    path: str, request: Request, user_context: dict[str, str] = Depends(verify_jwt_token)
+    path: str,
+    request: Request,
+    user_context: dict[str, str] = Depends(verify_jwt_token),
 ):
     """
     Smart routing based on endpoint pattern with JWT authentication.
@@ -173,7 +181,9 @@ async def smart_gateway(
 
     if not service_name:
         logger.error(f"❌ No service found for path: /{path}")
-        raise HTTPException(status_code=404, detail=f"No service configured for path: /{path}")
+        raise HTTPException(
+            status_code=404, detail=f"No service configured for path: /{path}"
+        )
 
     logger.info(f"📍 Matched service: {service_name}")
 
@@ -203,7 +213,11 @@ async def smart_gateway(
             headers = add_user_context_headers(headers, user_context)
 
             resp = await client.request(
-                method, target_url, content=body if body else None, headers=headers, timeout=30.0
+                method,
+                target_url,
+                content=body if body else None,
+                headers=headers,
+                timeout=30.0,
             )
 
         logger.info(f"✅ Response: {resp.status_code}")
@@ -233,19 +247,21 @@ async def smart_gateway(
     except httpx.ConnectError as e:
         logger.error(f"❌ Connection Error: {str(e)}")
         raise HTTPException(
-            status_code=503, detail=f"Cannot connect to service '{service_name}': {str(e)}"
-        )
+            status_code=503,
+            detail=f"Cannot connect to service '{service_name}': {str(e)}",
+        ) from e
     except Exception as e:
         logger.error(f"❌ ERROR: {str(e)}")
         import traceback
 
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Gateway error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Gateway error: {str(e)}") from e
 
 
 # ===== LEGACY ROUTE (WITH SERVICE NAME) =====
 @app.api_route(
-    "/{service_name}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+    "/{service_name}/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
 )
 async def legacy_gateway(service_name: str, path: str, request: Request):
     """
@@ -276,7 +292,11 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
             headers.pop("x-forwarded-scheme", None)
 
             resp = await client.request(
-                method, target_url, content=body if body else None, headers=headers, timeout=30.0
+                method,
+                target_url,
+                content=body if body else None,
+                headers=headers,
+                timeout=30.0,
             )
 
         print(f"✅ Response: {resp.status_code}")
@@ -295,13 +315,15 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
         raise
     except httpx.ConnectError as e:
         print(f"❌ Connection Error: {str(e)}")
-        raise HTTPException(status_code=503, detail=f"Cannot connect to service: {str(e)}")
+        raise HTTPException(
+            status_code=503, detail=f"Cannot connect to service: {str(e)}"
+        ) from e
     except Exception as e:
         print(f"❌ ERROR: {str(e)}")
         import traceback
 
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Gateway error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Gateway error: {str(e)}") from e
 
 
 if __name__ == "__main__":

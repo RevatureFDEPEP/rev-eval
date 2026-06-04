@@ -25,7 +25,9 @@ def _issue_token(user: User) -> str:
     )
 
 
-@router.post("/auth/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/auth/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED
+)
 def register(request: RegisterRequest, db: Session = Depends(get_db)):
     if AuthService.get_user_by_email(db, request.email):
         raise HTTPException(

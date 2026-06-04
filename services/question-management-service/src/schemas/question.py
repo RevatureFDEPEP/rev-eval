@@ -19,8 +19,12 @@ class QuestionCreate(BaseModel):
     """
 
     type: QuestionType
-    question_text: str = Field(..., min_length=10, max_length=2000, description="The question text")
-    options: list[OptionCreate] | None = None  # User provides text only, IDs are auto-generated
+    question_text: str = Field(
+        ..., min_length=10, max_length=2000, description="The question text"
+    )
+    options: list[OptionCreate] | None = (
+        None  # User provides text only, IDs are auto-generated
+    )
     correct_answers: list[int | bool | str] | None = None
     sample_answer: str | None = Field(
         None, max_length=5000, description="Sample answer for text questions"
@@ -71,11 +75,15 @@ class QuestionCreate(BaseModel):
 
     @field_validator("options")
     @classmethod
-    def validate_options(cls, v: list[OptionCreate] | None) -> list[OptionCreate] | None:
+    def validate_options(
+        cls, v: list[OptionCreate] | None
+    ) -> list[OptionCreate] | None:
         """Validate options list structure (option_ids are auto-generated)."""
         if v is not None:
             if len(v) < 2:
-                raise ValueError("At least 2 options are required when options are provided")
+                raise ValueError(
+                    "At least 2 options are required when options are provided"
+                )
             if len(v) > 10:
                 raise ValueError("Maximum 10 options allowed")
 
@@ -113,11 +121,16 @@ class QuestionCreate(BaseModel):
                 raise ValueError("MCQ questions must have exactly one correct answer")
 
             if not isinstance(self.correct_answers[0], int):
-                raise ValueError("MCQ correct_answers must be an integer (1-indexed position)")
+                raise ValueError(
+                    "MCQ correct_answers must be an integer (1-indexed position)"
+                )
 
             # Validate correct answer is a valid position (1-indexed)
             max_option_index = len(self.options)
-            if self.correct_answers[0] < 1 or self.correct_answers[0] > max_option_index:
+            if (
+                self.correct_answers[0] < 1
+                or self.correct_answers[0] > max_option_index
+            ):
                 raise ValueError(
                     f"correct_answers must be between 1 and {max_option_index}. Got: {self.correct_answers[0]}"
                 )
@@ -128,7 +141,9 @@ class QuestionCreate(BaseModel):
                 raise ValueError("MULTI questions must have at least 2 options")
 
             if not self.correct_answers or len(self.correct_answers) == 0:
-                raise ValueError("MULTI questions must have at least one correct answer")
+                raise ValueError(
+                    "MULTI questions must have at least one correct answer"
+                )
 
             if not all(isinstance(ans, int) for ans in self.correct_answers):
                 raise ValueError(
@@ -149,7 +164,9 @@ class QuestionCreate(BaseModel):
 
             # At least one option should be correct, but not all
             if len(self.correct_answers) == len(self.options):
-                raise ValueError("MULTI questions cannot have all options as correct answers")
+                raise ValueError(
+                    "MULTI questions cannot have all options as correct answers"
+                )
 
         elif self.type == QuestionType.TRUE_FALSE:
             # TRUE_FALSE: Must have exactly one boolean correct answer, no options
@@ -157,10 +174,14 @@ class QuestionCreate(BaseModel):
                 raise ValueError("TRUE_FALSE questions should not have options")
 
             if not self.correct_answers:
-                raise ValueError("TRUE_FALSE questions must have correct_answers specified")
+                raise ValueError(
+                    "TRUE_FALSE questions must have correct_answers specified"
+                )
 
             if len(self.correct_answers) != 1:
-                raise ValueError("TRUE_FALSE questions must have exactly one correct answer")
+                raise ValueError(
+                    "TRUE_FALSE questions must have exactly one correct answer"
+                )
 
             if not isinstance(self.correct_answers[0], bool):
                 raise ValueError("TRUE_FALSE correct_answers must be a boolean value")
@@ -179,7 +200,9 @@ class QuestionCreate(BaseModel):
                 raise ValueError("TEXT questions must have a sample_answer")
 
             if len(self.sample_answer.strip()) < 10:
-                raise ValueError("TEXT sample_answer must be at least 10 characters long")
+                raise ValueError(
+                    "TEXT sample_answer must be at least 10 characters long"
+                )
 
         return self
 
@@ -243,11 +266,15 @@ class QuestionUpdate(BaseModel):
 
     @field_validator("options")
     @classmethod
-    def validate_options(cls, v: list[OptionCreate] | None) -> list[OptionCreate] | None:
+    def validate_options(
+        cls, v: list[OptionCreate] | None
+    ) -> list[OptionCreate] | None:
         """Validate options list structure (option_ids will be auto-generated)."""
         if v is not None:
             if len(v) < 2:
-                raise ValueError("At least 2 options are required when options are provided")
+                raise ValueError(
+                    "At least 2 options are required when options are provided"
+                )
             if len(v) > 10:
                 raise ValueError("Maximum 10 options allowed")
 

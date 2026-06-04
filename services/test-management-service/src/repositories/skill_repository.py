@@ -19,7 +19,11 @@ class SkillRepository:
     @staticmethod
     async def create(db: AsyncSession, skill_in: SkillCreate) -> Skill:
         # Use model_dump() for Pydantic v2, dict() for v1
-        skill_data = skill_in.model_dump() if hasattr(skill_in, "model_dump") else skill_in.dict()
+        skill_data = (
+            skill_in.model_dump()
+            if hasattr(skill_in, "model_dump")
+            else skill_in.dict()
+        )
         skill = Skill(**skill_data)
         db.add(skill)
         await db.commit()

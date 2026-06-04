@@ -18,7 +18,9 @@ DATABASE_URL = os.getenv("DATABASE_URL") or settings.SQLALCHEMY_DATABASE_URL
 if DATABASE_URL.startswith("postgresql://"):
     ASYNC_DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 elif DATABASE_URL.startswith("postgresql+psycopg2://"):
-    ASYNC_DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg2://", "postgresql+asyncpg://")
+    ASYNC_DATABASE_URL = DATABASE_URL.replace(
+        "postgresql+psycopg2://", "postgresql+asyncpg://"
+    )
 else:
     ASYNC_DATABASE_URL = DATABASE_URL  # for sqlite or other DBs
 
@@ -26,7 +28,9 @@ else:
 engine = create_async_engine(ASYNC_DATABASE_URL, echo=True, future=True)
 
 # ===== Async Session Factory =====
-AsyncSessionLocal = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+AsyncSessionLocal = sessionmaker(
+    bind=engine, class_=AsyncSession, expire_on_commit=False
+)
 
 
 # ===== Dependency for FastAPI =====

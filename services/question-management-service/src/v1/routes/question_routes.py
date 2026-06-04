@@ -39,12 +39,12 @@ async def create_question(question: QuestionCreate):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"validation_errors": e.errors()},
-        )
+        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while creating the question: {str(e)}",
-        )
+        ) from e
 
 
 @router.get(
@@ -58,12 +58,15 @@ async def get_all_questions():
     try:
         questions = await QuestionService.get_all_questions()
         # Convert Beanie documents to response schema (mode='json' converts ObjectId to string)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode="json")) for q in questions]
+        return [
+            QuestionResponse(**q.model_dump(by_alias=True, mode="json"))
+            for q in questions
+        ]
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while fetching questions: {str(e)}",
-        )
+        ) from e
 
 
 @router.get(
@@ -78,7 +81,8 @@ async def get_question_by_id(id: str):
         question = await QuestionService.get_question_by_id(id)
         if not question:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"Question with ID '{id}' not found"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Question with ID '{id}' not found",
             )
         # Convert Beanie document to response schema (mode='json' converts ObjectId to string)
         return QuestionResponse(**question.model_dump(by_alias=True, mode="json"))
@@ -88,7 +92,7 @@ async def get_question_by_id(id: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while fetching the question: {str(e)}",
-        )
+        ) from e
 
 
 @router.put(
@@ -110,7 +114,8 @@ async def update_question(id: str, question_update: QuestionUpdate):
         updated = await QuestionService.update_question(id, question_update)
         if not updated:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"Question with ID '{id}' not found"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Question with ID '{id}' not found",
             )
         return {"message": "Question updated successfully", "id": id}
     except HTTPException:
@@ -119,12 +124,12 @@ async def update_question(id: str, question_update: QuestionUpdate):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"validation_errors": e.errors()},
-        )
+        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while updating the question: {str(e)}",
-        )
+        ) from e
 
 
 @router.delete(
@@ -140,7 +145,8 @@ async def delete_question(id: str):
         deleted = await QuestionService.delete_question(id)
         if not deleted:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"Question with ID '{id}' not found"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Question with ID '{id}' not found",
             )
         return {"message": "Question deleted successfully", "id": id}
     except HTTPException:
@@ -149,7 +155,7 @@ async def delete_question(id: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while deleting the question: {str(e)}",
-        )
+        ) from e
 
 
 # ============================================================================
@@ -173,18 +179,24 @@ async def delete_question(id: str):
 )
 async def get_questions_by_type(
     question_type: str,
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    limit: int = Query(
+        100, ge=1, le=500, description="Maximum number of questions to return"
+    ),
 ):
     """Get questions filtered by type."""
     try:
         questions = await QuestionService.find_by_type(question_type, limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode="json")) for q in questions]
+        return [
+            QuestionResponse(**q.model_dump(by_alias=True, mode="json"))
+            for q in questions
+        ]
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An error occurred: {str(e)}"
-        )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred: {str(e)}",
+        ) from e
 
 
 @router.get(
@@ -195,18 +207,24 @@ async def get_questions_by_type(
 )
 async def get_questions_by_skill(
     skill: str,
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    limit: int = Query(
+        100, ge=1, le=500, description="Maximum number of questions to return"
+    ),
 ):
     """Get questions filtered by skill."""
     try:
         questions = await QuestionService.find_by_skill(skill, limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode="json")) for q in questions]
+        return [
+            QuestionResponse(**q.model_dump(by_alias=True, mode="json"))
+            for q in questions
+        ]
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An error occurred: {str(e)}"
-        )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred: {str(e)}",
+        ) from e
 
 
 @router.get(
@@ -224,18 +242,24 @@ async def get_questions_by_skill(
 )
 async def get_questions_by_difficulty(
     difficulty: str,
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    limit: int = Query(
+        100, ge=1, le=500, description="Maximum number of questions to return"
+    ),
 ):
     """Get questions filtered by difficulty."""
     try:
         questions = await QuestionService.find_by_difficulty(difficulty, limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode="json")) for q in questions]
+        return [
+            QuestionResponse(**q.model_dump(by_alias=True, mode="json"))
+            for q in questions
+        ]
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An error occurred: {str(e)}"
-        )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred: {str(e)}",
+        ) from e
 
 
 @router.get(
@@ -253,18 +277,24 @@ async def get_questions_by_difficulty(
 )
 async def get_questions_by_tags(
     tags: list[str] = Query(..., description="List of tags to filter by"),
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    limit: int = Query(
+        100, ge=1, le=500, description="Maximum number of questions to return"
+    ),
 ):
     """Get questions filtered by tags."""
     try:
         questions = await QuestionService.find_by_tags(tags, limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode="json")) for q in questions]
+        return [
+            QuestionResponse(**q.model_dump(by_alias=True, mode="json"))
+            for q in questions
+        ]
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An error occurred: {str(e)}"
-        )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred: {str(e)}",
+        ) from e
 
 
 @router.get(
@@ -292,7 +322,9 @@ async def filter_questions(
     skill: str | None = Query(None, description="Skill filter"),
     difficulty: str | None = Query(None, description="Difficulty filter"),
     tags: list[str] | None = Query(None, description="Tags filter (OR condition)"),
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    limit: int = Query(
+        100, ge=1, le=500, description="Maximum number of questions to return"
+    ),
 ):
     """
     Filter questions using multiple criteria with AND conditions.
@@ -302,12 +334,20 @@ async def filter_questions(
     """
     try:
         questions = await QuestionService.filter_questions(
-            question_type=type, skill=skill, difficulty=difficulty, tags=tags, limit=limit
+            question_type=type,
+            skill=skill,
+            difficulty=difficulty,
+            tags=tags,
+            limit=limit,
         )
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode="json")) for q in questions]
+        return [
+            QuestionResponse(**q.model_dump(by_alias=True, mode="json"))
+            for q in questions
+        ]
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An error occurred: {str(e)}"
-        )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred: {str(e)}",
+        ) from e

@@ -63,12 +63,19 @@ jobs:
         working-directory: services/${{ matrix.service }}
         run: |
           if [ -d tests ]; then
-            pytest --cov --cov-report=xml
+            pytest --cov --cov-report=xml --cov-fail-under=70
           else
             echo "No tests/ directory in services/${{ matrix.service }} — skipping pytest."
           fi
 
-      # NOTE: Trivy + Ruff scans added in W2 D7 by candidates (not seeded here)
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.service }}
+          path: services/${{ matrix.service }}/coverage.xml
+
+      # NOTE: Trivy scans added in W2 D7 by candidates (not seeded here)
       
 
   frontend-build-test:
@@ -97,8 +104,7 @@ jobs:
 
       - name: Lint
         working-directory: frontend
-        run: pnpm lint
-        continue-on-error: true
+        run: pnpm lint || echo "⚠️ Lint warnings found — not blocking build"
 
       - name: Build
         working-directory: frontend

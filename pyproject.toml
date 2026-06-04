@@ -1,0 +1,34 @@
+# Ruff linter + formatter config. Auto-discovered by walking up from the directory where `ruff check .` runs.
+
+# Max chars per line — formatter wraps code at 88; E501 is enforced except where noted below.
+line-length = 88
+
+# Valid Python syntax target — pyupgrade rules (UP) will suggest syntax available since 3.11.
+target-version = "py311"
+
+[lint]
+select = [
+    "E",   # pycodestyle errors   — spacing, indentation
+    "W",   # pycodestyle warnings — trailing whitespace etc.
+    "F",   # Pyflakes             — undefined names, unused imports
+    "I",   # isort                — import ordering (stdlib → third-party → local)
+    "B",   # flake8-bugbear       — catches real bugs (mutable defaults, loop-variable capture)
+    "UP",  # pyupgrade            — modern Python syntax (e.g. `list` over `List`)
+]
+
+ignore = [
+    # FastAPI uses Depends()/Query() in function argument defaults as its core DI pattern.
+    # B008 would flag every route handler — suppress project-wide.
+    "B008",
+    # E501 fires only on strings/comments/URLs the formatter cannot auto-wrap.
+    # The formatter already enforces line-length=88 on all wrappable code.
+    "E501",
+]
+
+[lint.isort]
+# Groups src.* imports as local (not third-party) so import order is: stdlib → third-party → src.*
+known-first-party = ["src"]
+
+[format]
+quote-style = "double"  # rewrite single-quoted strings to double on `ruff format`
+indent-style = "space"  # spaces over tabs — standard PEP 8

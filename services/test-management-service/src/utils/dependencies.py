@@ -43,7 +43,7 @@ async def get_current_user_from_headers(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Cannot connect to user-service: {e}",
-        )
+        ) from e
 
     if response.status_code == 200:
         return response.json()

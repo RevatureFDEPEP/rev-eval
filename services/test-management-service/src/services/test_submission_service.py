@@ -144,7 +144,9 @@ class TestSubmissionService:
         submission = await TestSubmissionRepository.get_by_id(db, submission_id)
         if not submission:
             raise ValueError("Submission not found")
-        submission = await TestSubmissionRepository.update(db, submission, submission_in)
+        submission = await TestSubmissionRepository.update(
+            db, submission, submission_in
+        )
         return TestSubmissionOut.from_orm(submission)
 
     @staticmethod
@@ -155,7 +157,9 @@ class TestSubmissionService:
         await TestSubmissionRepository.delete(db, submission)
 
     @staticmethod
-    async def get_submission_by_id(db: AsyncSession, submission_id: int) -> TestSubmissionOut:
+    async def get_submission_by_id(
+        db: AsyncSession, submission_id: int
+    ) -> TestSubmissionOut:
         submission = await TestSubmissionRepository.get_by_id(db, submission_id)
         if not submission:
             raise ValueError("Submission not found")
@@ -167,7 +171,9 @@ class TestSubmissionService:
         return [TestSubmissionOut.from_orm(s) for s in submissions]
 
     @staticmethod
-    async def list_submissions_by_user(db: AsyncSession, user_id: int) -> list[TestSubmissionOut]:
+    async def list_submissions_by_user(
+        db: AsyncSession, user_id: int
+    ) -> list[TestSubmissionOut]:
         """Get all submissions for a specific user (participant view)"""
         submissions = await TestSubmissionRepository.list_by_user(db, user_id)
         return [TestSubmissionOut.from_orm(s) for s in submissions]
@@ -213,7 +219,8 @@ class TestSubmissionService:
                     if user_response.status_code == 404:
                         # User doesn't exist, create and invite (direct call to user-service)
                         invite_response = await client.post(
-                            f"{user_service_url}/v1/api/users/invite", json={"email": email}
+                            f"{user_service_url}/v1/api/users/invite",
+                            json={"email": email},
                         )
 
                         if invite_response.status_code not in [200, 201]:
@@ -252,7 +259,9 @@ class TestSubmissionService:
                         due_date=request.due_date,
                     )
 
-                    submission = await TestSubmissionRepository.create(db, submission_data)
+                    submission = await TestSubmissionRepository.create(
+                        db, submission_data
+                    )
                     submission_out = TestSubmissionOut.from_orm(submission)
                     created_submissions.append(submission_out)
                     submission_ids.append(submission.id)
@@ -267,7 +276,9 @@ class TestSubmissionService:
                     )
                     failure_count += 1
                 except Exception as e:
-                    errors.append({"email": email, "error": f"Unexpected error: {str(e)}"})
+                    errors.append(
+                        {"email": email, "error": f"Unexpected error: {str(e)}"}
+                    )
                     failure_count += 1
 
         return BulkAssignResult(
@@ -300,7 +311,9 @@ class TestSubmissionService:
         # Get all EVALUATED submissions (any trainer can review any interview)
         query = (
             select(TestSubmission)
-            .options(selectinload(TestSubmission.test))  # Eagerly load test relationship
+            .options(
+                selectinload(TestSubmission.test)
+            )  # Eagerly load test relationship
             .join(Test, TestSubmission.test_id == Test.id)
             .where(TestSubmission.status == SubmissionStatus.EVALUATED)
             .order_by(TestSubmission.submitted_at.desc())
@@ -363,7 +376,9 @@ class TestSubmissionService:
         # Get all GRADED submissions
         query = (
             select(TestSubmission)
-            .options(selectinload(TestSubmission.test))  # Eagerly load test relationship
+            .options(
+                selectinload(TestSubmission.test)
+            )  # Eagerly load test relationship
             .join(Test, TestSubmission.test_id == Test.id)
             .where(TestSubmission.status == SubmissionStatus.GRADED)
             .order_by(TestSubmission.reviewed_at.desc())
@@ -402,7 +417,8 @@ class TestSubmissionService:
             .options(selectinload(TestSubmission.test))  # Eager load test relationship
             .where(
                 Test.created_by_id == trainer_id,  # Filter by trainer
-                TestSubmission.status != SubmissionStatus.EVALUATED,  # Exclude EVALUATED
+                TestSubmission.status
+                != SubmissionStatus.EVALUATED,  # Exclude EVALUATED
             )
             .order_by(TestSubmission.created_at.desc())  # Most recent first
         )
@@ -447,7 +463,9 @@ class TestSubmissionService:
         return submission_outs
 
     @staticmethod
-    async def get_submission_review_details(db: AsyncSession, submission_id: int) -> dict[str, Any]:
+    async def get_submission_review_details(
+        db: AsyncSession, submission_id: int
+    ) -> dict[str, Any]:
         """
         Get full review details for a submission including:
         - Submission metadata
@@ -484,7 +502,9 @@ class TestSubmissionService:
                         f"⚠️ Could not fetch transcript for submission {submission_id}: {response.status_code}"
                     )
         except Exception as e:
-            logger.error(f"❌ Error fetching transcript for submission {submission_id}: {e}")
+            logger.error(
+                f"❌ Error fetching transcript for submission {submission_id}: {e}"
+            )
 
         # Build response
         return {
@@ -497,7 +517,8 @@ class TestSubmissionService:
                 "curriculum": test.curriculum,
                 "duration_seconds": test.duration_seconds,
                 "skills": [
-                    {"id": s.id, "name": s.name, "description": s.description} for s in test.skills
+                    {"id": s.id, "name": s.name, "description": s.description}
+                    for s in test.skills
                 ]
                 if test.skills
                 else [],
@@ -507,7 +528,10 @@ class TestSubmissionService:
 
     @staticmethod
     async def submit_trainer_review(
-        db: AsyncSession, submission_id: int, review: TrainerReviewRequest, trainer_id: int
+        db: AsyncSession,
+        submission_id: int,
+        review: TrainerReviewRequest,
+        trainer_id: int,
     ) -> TrainerReviewResponse:
         """
         Submit trainer's review and score for a submission.
@@ -547,7 +571,9 @@ class TestSubmissionService:
         submission.reviewed_by_id = trainer_id
 
         # Update using repository
-        updated_submission = await TestSubmissionRepository.update(db, submission, update_data)
+        updated_submission = await TestSubmissionRepository.update(
+            db, submission, update_data
+        )
 
         # Save comprehensive trainer evaluation to MongoDB (for interviews)
         # This stores the full evaluation structure alongside AI evaluation

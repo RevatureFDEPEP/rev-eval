@@ -50,12 +50,33 @@ def seed_users(conn):
         # (email, full_name, first_name, last_name, role, organization_id)
         # Mock trainers
         ("trainer1@revature.com", "John Trainer", "John", "Trainer", "TRAINER", None),
-        ("trainer2@revature.com", "Sarah Instructor", "Sarah", "Instructor", "TRAINER", None),
+        (
+            "trainer2@revature.com",
+            "Sarah Instructor",
+            "Sarah",
+            "Instructor",
+            "TRAINER",
+            None,
+        ),
         # Mock participants
-        ("student1@revature.com", "Alice Johnson", "Alice", "Johnson", "PARTICIPANT", None),
+        (
+            "student1@revature.com",
+            "Alice Johnson",
+            "Alice",
+            "Johnson",
+            "PARTICIPANT",
+            None,
+        ),
         ("student2@revature.com", "Bob Smith", "Bob", "Smith", "PARTICIPANT", None),
         ("student3@revature.com", "Carol Davis", "Carol", "Davis", "PARTICIPANT", None),
-        ("student4@revature.com", "David Wilson", "David", "Wilson", "PARTICIPANT", None),
+        (
+            "student4@revature.com",
+            "David Wilson",
+            "David",
+            "Wilson",
+            "PARTICIPANT",
+            None,
+        ),
         ("student5@revature.com", "Eva Brown", "Eva", "Brown", "PARTICIPANT", None),
     ]
 
@@ -176,7 +197,18 @@ def seed_tests(conn):
         VALUES %s
         """,
         [
-            (t[0], t[1], t[2], t[3], t[4], t[5], t[6], t[7], datetime.utcnow(), datetime.utcnow())
+            (
+                t[0],
+                t[1],
+                t[2],
+                t[3],
+                t[4],
+                t[5],
+                t[6],
+                t[7],
+                datetime.utcnow(),
+                datetime.utcnow(),
+            )
             for t in tests_data
         ],
     )
@@ -551,7 +583,9 @@ def main():
         cur.execute("SELECT COUNT(*) FROM test_submissions WHERE status = 'COMPLETED';")
         completed_count = cur.fetchone()[0]
 
-        cur.execute("SELECT COUNT(*) FROM test_submissions WHERE status = 'IN_PROGRESS';")
+        cur.execute(
+            "SELECT COUNT(*) FROM test_submissions WHERE status = 'IN_PROGRESS';"
+        )
         in_progress_count = cur.fetchone()[0]
 
         cur.execute("SELECT COUNT(*) FROM test_submissions WHERE status = 'ASSIGNED';")

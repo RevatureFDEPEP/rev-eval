@@ -19,7 +19,7 @@ from typing import Any
 import httpx
 
 # Base URL for the question management service
-BASE_URL = "https://automatic-system-p55wjj9v6xjcr765-8002.app.github.dev:443/v1/api"
+BASE_URL = "http://localhost:8003/v1/api"
 
 
 # RAG and Context Engineering questions
@@ -56,7 +56,9 @@ QUESTIONS: list[dict[str, Any]] = [
         "question_text": "What is the primary purpose of the retrieval component in a RAG system?",
         "options": [
             {"text": "To generate random text"},
-            {"text": "To fetch relevant documents or information from a knowledge base"},
+            {
+                "text": "To fetch relevant documents or information from a knowledge base"
+            },
             {"text": "To compress the language model"},
             {"text": "To train the model faster"},
         ],
@@ -136,7 +138,9 @@ QUESTIONS: list[dict[str, Any]] = [
         "type": "multi",
         "question_text": "What are common challenges when implementing RAG systems? (Select all that apply)",
         "options": [
-            {"text": "Handling outdated or incorrect information in the knowledge base"},
+            {
+                "text": "Handling outdated or incorrect information in the knowledge base"
+            },
             {"text": "Balancing retrieval relevance with context window limitations"},
             {"text": "Managing embedding costs and latency"},
             {"text": "Eliminating all hallucinations"},
@@ -211,7 +215,9 @@ QUESTIONS: list[dict[str, Any]] = [
                 "text": "Language models performing worse on information in the middle of long contexts"
             },
             {"text": "Embeddings losing quality for medium-length texts"},
-            {"text": "The retrieval system skipping documents in the middle of the corpus"},
+            {
+                "text": "The retrieval system skipping documents in the middle of the corpus"
+            },
         ],
         "correct_answers": [2],
         "answer_explanation": "The 'lost in the middle' problem refers to research showing that LLMs often pay less attention to information placed in the middle of long contexts, performing better on information at the beginning or end. This affects RAG systems when multiple retrieved documents are concatenated.",
@@ -345,7 +351,9 @@ QUESTIONS: list[dict[str, Any]] = [
         "question_text": "What is the primary benefit of using system messages or role definitions in context engineering?",
         "options": [
             {"text": "They make the model run faster"},
-            {"text": "They establish consistent behavior patterns and boundaries for the model"},
+            {
+                "text": "They establish consistent behavior patterns and boundaries for the model"
+            },
             {"text": "They increase the context window size"},
             {"text": "They eliminate the need for examples"},
         ],
@@ -381,7 +389,9 @@ QUESTIONS: list[dict[str, Any]] = [
         "question_text": "Which factors should be considered when designing context for multi-turn conversations? (Select all that apply)",
         "options": [
             {"text": "Conversation history pruning strategies"},
-            {"text": "Maintaining relevant context across turns while managing window limits"},
+            {
+                "text": "Maintaining relevant context across turns while managing window limits"
+            },
             {"text": "Identifying and preserving key entities and facts"},
             {"text": "Ignoring previous turns to keep context fresh"},
             {"text": "Summarization of older conversation segments"},
@@ -423,7 +433,12 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_explanation": "Effective dynamic context construction uses prioritization, metadata-driven selection, intent detection, and adaptive budgeting. Simply maximizing information often leads to context stuffing and degraded performance.",
         "difficulty": "hard",
         "skills": ["Context Engineering"],
-        "tags": ["context-engineering", "dynamic-context", "optimization", "personalization"],
+        "tags": [
+            "context-engineering",
+            "dynamic-context",
+            "optimization",
+            "personalization",
+        ],
     },
     {
         "type": "text",
@@ -432,7 +447,12 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_explanation": "This tests advanced understanding of security considerations in context engineering.",
         "difficulty": "hard",
         "skills": ["Context Engineering"],
-        "tags": ["context-engineering", "security", "prompt-injection", "defensive-design"],
+        "tags": [
+            "context-engineering",
+            "security",
+            "prompt-injection",
+            "defensive-design",
+        ],
     },
     # ============================================================================
     # Combined RAG + Context Engineering Questions
@@ -460,7 +480,13 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_explanation": "This tests advanced integration of RAG and context engineering principles.",
         "difficulty": "hard",
         "skills": ["RAG using Pinecone", "Context Engineering"],
-        "tags": ["rag", "context-engineering", "hybrid-search", "optimization", "structured-data"],
+        "tags": [
+            "rag",
+            "context-engineering",
+            "hybrid-search",
+            "optimization",
+            "structured-data",
+        ],
     },
     {
         "type": "mcq",
@@ -495,7 +521,10 @@ async def create_question(question_data: dict[str, Any]) -> dict[str, Any]:
     async with httpx.AsyncClient() as client:
         try:
             response = await client.post(
-                f"{BASE_URL}/questions/", json=question_data, timeout=30.0, follow_redirects=True
+                f"{BASE_URL}/questions/",
+                json=question_data,
+                timeout=30.0,
+                follow_redirects=True,
             )
             response.raise_for_status()
             return response.json()
@@ -518,7 +547,9 @@ async def seed_questions():
 
     for i, question in enumerate(QUESTIONS, start=1):
         try:
-            print(f"Creating question {i}/{len(QUESTIONS)}: {question['question_text'][:60]}...")
+            print(
+                f"Creating question {i}/{len(QUESTIONS)}: {question['question_text'][:60]}..."
+            )
             result = await create_question(question)
             created_count += 1
             print(f"✅ Created question ID: {result.get('_id', 'unknown')}\n")

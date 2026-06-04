@@ -10,7 +10,9 @@ router = APIRouter(prefix="/tests", tags=["Tests"])
 
 
 # Get current user's database ID from headers
-async def get_current_user_id(current_user: dict = Depends(get_current_user_from_headers)) -> int:
+async def get_current_user_id(
+    current_user: dict = Depends(get_current_user_from_headers),
+) -> int:
     """
     Extract the database user ID from the current user context.
 
@@ -20,7 +22,8 @@ async def get_current_user_id(current_user: dict = Depends(get_current_user_from
     user_id = current_user.get("id")
     if not user_id:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User ID not found in user context"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User ID not found in user context",
         )
     return int(user_id)
 
@@ -44,7 +47,7 @@ async def get_test(test_id: int, db: AsyncSession = Depends(get_db)):
     try:
         return await TestService.get_test_by_id(db, test_id)
     except ValueError:
-        raise HTTPException(status_code=404, detail="Test not found")
+        raise HTTPException(status_code=404, detail="Test not found") from None
 
 
 @router.put("/{test_id}/", response_model=TestOut)
@@ -72,12 +75,14 @@ async def update_test(
 
         return await TestService.update_test(db, test_id, test_in)
     except ValueError:
-        raise HTTPException(status_code=404, detail="Test not found")
+        raise HTTPException(status_code=404, detail="Test not found") from None
 
 
 @router.delete("/{test_id}/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_test(
-    test_id: int, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user_id)
+    test_id: int,
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
 ):
     """
     Delete a test. Only the creator can delete their test.
@@ -97,7 +102,7 @@ async def delete_test(
 
         await TestService.delete_test(db, test_id)
     except ValueError:
-        raise HTTPException(status_code=404, detail="Test not found")
+        raise HTTPException(status_code=404, detail="Test not found") from None
 
 
 @router.get("/created-by/{user_id}/", response_model=list[TestOut])
@@ -107,6 +112,8 @@ async def list_tests_created_by_user(user_id: int, db: AsyncSession = Depends(ge
 
 
 @router.get("/submissions-by/{user_id}/", response_model=list[TestOut])
-async def list_tests_with_submissions_by_user(user_id: int, db: AsyncSession = Depends(get_db)):
+async def list_tests_with_submissions_by_user(
+    user_id: int, db: AsyncSession = Depends(get_db)
+):
     """Get all tests that a specific user has submitted"""
     return await TestService.list_tests_with_submissions_by_user(db, user_id)
