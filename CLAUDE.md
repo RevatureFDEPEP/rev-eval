@@ -102,9 +102,6 @@ v1/routes/             FastAPI router endpoints
 | `/trainer/*`    | Trainer only |
 | `/participant/*`| Participant only |
 
-### Event Publishing
-
-test-management-service publishes to an AWS SQS FIFO queue when a test is assigned to a participant. See `src/utils/sqs_client.py` (singleton).
 
 ## Environment Variables
 
