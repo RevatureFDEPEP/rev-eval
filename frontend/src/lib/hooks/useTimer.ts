@@ -61,6 +61,11 @@ export function useTimer(options: UseTimerOptions): UseTimerReturn {
   const warning5MinShown = useRef<boolean>(false);
   const warning1MinShown = useRef<boolean>(false);
   const expiredCallbackFired = useRef<boolean>(false);
+  const latestTimeRemaining = useRef<number>(timeRemaining);
+
+  useEffect(() => {
+    latestTimeRemaining.current = timeRemaining;
+  }, [timeRemaining]);
 
   // Save time to localStorage
   const saveToLocalStorage = useCallback((remaining: number) => {
@@ -159,11 +164,11 @@ export function useTimer(options: UseTimerOptions): UseTimerReturn {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (timeRemaining > 0) {
-        saveToLocalStorage(timeRemaining);
+      if (latestTimeRemaining.current > 0) {
+        saveToLocalStorage(latestTimeRemaining.current);
       }
     };
-  }, [timeRemaining, saveToLocalStorage]);
+  }, [saveToLocalStorage]);
 
   return {
     timeRemaining,

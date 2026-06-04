@@ -8,6 +8,7 @@ const config = {
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
   testEnvironment: "jest-environment-jsdom",
   moduleNameMapper: {
+    "^next/navigation$": "<rootDir>/src/test/mocks/next-navigation.ts",
     "^@/(.*)$": "<rootDir>/src/$1",
   },
   collectCoverageFrom: [
@@ -17,6 +18,7 @@ const config = {
     "!src/app/**/loading.tsx",
     "!src/app/**/error.tsx",
     "!src/app/**/not-found.tsx",
+    "!src/test/**",
   ],
   testPathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/node_modules/"],
 }
