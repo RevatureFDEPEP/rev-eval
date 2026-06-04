@@ -1,4 +1,6 @@
 [tool.ruff]
+exclude = [".agents/"]
+
 # Max chars per line — formatter wraps code at 88; E501 is enforced except where noted below.
 line-length = 88
 

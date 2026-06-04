@@ -30,13 +30,6 @@ jobs:
           cache: pip
           cache-dependency-path: services/${{ matrix.service }}/requirements.txt
 
-      - name: Set up Python
-        uses: actions/setup-python@v5 #tags are mutable -> change to immutable  pinned version style like SHA
-        with:
-          python-version: '3.11'
-          cache: pip
-          cache-dependency-path: services/${{ matrix.service }}/requirements.txt
-
       - name: Verify JWT_SECRET is set #might be a security vulnerability might leak log data -> modify echoing or length tracking to native runner step expressions 
         run: |
           if [ -z "${JWT_SECRET}" ]; then
@@ -104,7 +97,7 @@ jobs:
 
       - name: Lint
         working-directory: frontend
-        run: pnpm lint || echo "⚠️ Lint warnings found — not blocking build"
+        run: pnpm lint
 
       - name: Build
         working-directory: frontend
