@@ -10,13 +10,15 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from src.middleware.auth import add_user_context_headers, verify_jwt_token
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from src.utils.logging_config import setup_logging
 
 # Load environment variables
 load_dotenv()
+
+# Set up structured JSON logging (re-applied in the startup event — see
+# setup_logging docstring for why)
+setup_logging("api-gateway", getenv("LOG_LEVEL", "INFO"))
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="API Gateway")
 
@@ -85,6 +87,7 @@ def get_service_url(service_name: str) -> str:
 @app.on_event("startup")
 def on_startup():
     """Log startup information"""
+    setup_logging("api-gateway", getenv("LOG_LEVEL", "INFO"))
     service_name = getenv('SERVICE_NAME', 'api-gateway')
     service_port = int(getenv('PORT', '8000'))
     logger.info(f"✅ {service_name} starting on port {service_port}")

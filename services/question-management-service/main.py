@@ -3,7 +3,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import settings
 from src.db.session import close_db, init_db
+from src.utils.logging_config import setup_logging
 from src.v1.routes.question_routes import router as question_router
+
+# Structured JSON logging (re-applied in the startup event — see
+# setup_logging docstring for why)
+setup_logging(settings.SERVICE_NAME, settings.LOG_LEVEL)
 
 app = FastAPI(
     title="Question Management Service",
@@ -32,6 +37,7 @@ def health():
 
 @app.on_event("startup")
 async def on_startup():
+    setup_logging(settings.SERVICE_NAME, settings.LOG_LEVEL)
     await init_db()
 
 @app.on_event("shutdown")

@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     SERVICE_NAME: str = "user-service"
     PORT: int = 8002
     SERVICE_HOSTNAME: str = "user-service"
+    LOG_LEVEL: str = "INFO"
 
     # JWT
     JWT_SECRET: str = "change-me-in-production"
