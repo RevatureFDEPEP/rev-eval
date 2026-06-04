@@ -95,18 +95,20 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
       return;
     }
 
-    setLoadingTranscript(true);
-    setTranscriptError(null);
-    getInterviewTranscript(submissionId)
-      .then((data) => {
+    const fetchTranscript = async () => {
+      setLoadingTranscript(true);
+      setTranscriptError(null);
+      try {
+        const data = await getInterviewTranscript(submissionId);
         setTranscript(data);
-        setLoadingTranscript(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('Failed to load transcript:', err);
         setTranscriptError(err instanceof Error ? err.message : 'Failed to load transcript');
+      } finally {
         setLoadingTranscript(false);
-      });
+      }
+    };
+    fetchTranscript();
   }, [test, open, isQuiz, isCompleted, submissionId, transcript, loadingTranscript]);
 
   // Fetch quiz session data for completed/graded quizzes
@@ -115,10 +117,11 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
       return;
     }
 
-    setLoadingQuizSession(true);
-    setQuizSessionError(null);
-    getTestSessionBySubmission(submissionId)
-      .then((data) => {
+    const fetchQuizSession = async () => {
+      setLoadingQuizSession(true);
+      setQuizSessionError(null);
+      try {
+        const data = await getTestSessionBySubmission(submissionId);
         console.log('📊 Quiz session data received:', {
           part_a: data.part_a,
           part_b: data.part_b,
@@ -128,13 +131,14 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
           part_b_questions_count: data.part_b?.questions?.length,
         });
         setQuizSession(data);
-        setLoadingQuizSession(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('Failed to load quiz session:', err);
         setQuizSessionError(err instanceof Error ? err.message : 'Failed to load quiz session');
+      } finally {
         setLoadingQuizSession(false);
-      });
+      }
+    };
+    fetchQuizSession();
   }, [test, open, isQuiz, isCompleted, submissionId, quizSession, loadingQuizSession]);
 
   // Early return check - AFTER all hooks
@@ -493,16 +497,16 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
                               <div
                                 key={index}
                                 className={`rounded-lg p-3 ${
-                                  message.role === 'assistant'
+                                  message.speaker === 'assistant'
                                     ? 'bg-blue-50 border border-blue-200'
-                                    : message.role === 'user'
+                                    : message.speaker === 'user'
                                       ? 'bg-green-50 border border-green-200'
                                       : 'bg-slate-50 border border-slate-200'
                                 }`}
                               >
                                 <div className="mb-1 flex items-center gap-2">
                                   <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
-                                    {message.role === 'assistant' ? 'AI Interviewer' : message.role === 'user' ? 'You' : 'System'}
+                                    {message.speaker === 'assistant' ? 'AI Interviewer' : message.speaker === 'user' ? 'You' : 'System'}
                                   </span>
                                   {message.timestamp && (
                                     <span className="text-xs text-slate-400">
@@ -510,7 +514,7 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-sm leading-relaxed text-slate-700 wrap-break-word">{message.content}</p>
+                                <p className="text-sm leading-relaxed text-slate-700 wrap-break-word">{message.text}</p>
                               </div>
                             ))}
                           </div>
@@ -578,21 +582,8 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
                                     <div key={skillName} className="rounded-lg border border-purple-200 bg-white p-3">
                                       <div className="mb-2 flex items-center justify-between">
                                         <span className="text-sm font-semibold text-slate-900">{skillName}</span>
-                                        <div className="flex items-center gap-2">
-                                          <Badge
-                                            variant={
-                                              skill.proficiency_level === 'EXPERT' || skill.proficiency_level === 'PROFICIENT' ? 'default' :
-                                              skill.proficiency_level === 'COMPETENT' ? 'secondary' :
-                                              skill.proficiency_level === 'BASIC' ? 'outline' : 'destructive'
-                                            }
-                                            className="text-xs"
-                                          >
-                                            {skill.proficiency_level}
-                                          </Badge>
-                                          <span className="text-sm font-medium text-slate-700">{Math.round(skill.score)}%</span>
-                                    </div>
-                                    </div>
-                                      <p className="text-xs text-slate-600">{skill.feedback}</p>
+                                        <span className="text-sm font-medium text-slate-700">{Math.round(skill.score || 0)}%</span>
+                                      </div>
                                     </div>
                                   ))}
                                 </div>
@@ -663,7 +654,7 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
                           <p className="text-xs text-slate-500 mt-1">
                             {loadingTranscript
                               ? 'Loading evaluation data...'
-                              : transcript?.status === 'COMPLETED'
+                              : test?.status === 'COMPLETED'
                                 ? 'Your interview is being evaluated. This may take a few minutes.'
                                 : 'Complete the interview to receive your evaluation.'}
                           </p>
@@ -701,11 +692,6 @@ function QuestionResultCard({ question, index }: { question: GradedQuizQuestion;
     easy: 'bg-green-100 text-green-800 border-green-200',
     medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     hard: 'bg-red-100 text-red-800 border-red-200',
-  };
-
-  const getOptionText = (optionId: number): string => {
-    const option = question.options?.find((opt) => opt.option_id === optionId);
-    return option?.text || `Option ${optionId}`;
   };
 
   return (

@@ -70,10 +70,19 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
-      - frontend
+      # Fix: nginx previously only waited for frontend, so it started before
+      # api-gateway was ready. Any API request during that window hit a
+      # dead upstream and returned a 502. Now nginx waits for both upstreams
+      # to pass their healthchecks before accepting traffic.
+      frontend:
+        condition: service_started
+      api-gateway:
+        condition: service_healthy
 
   user-service:
     build:
@@ -204,7 +213,8 @@ services:
     restart: unless-stopped
     environment:
       API_GATEWAY_URL: http://api-gateway:8000
-      NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:8000
+      NEXT_PUBLIC_API_GATEWAY_URL: https://localhost
+      NEXT_PUBLIC_SITE_URL: http://frontend:3000
       NODE_ENV: development
     ports:
       - "3000:3000"

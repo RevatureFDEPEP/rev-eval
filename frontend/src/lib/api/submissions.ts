@@ -123,7 +123,7 @@ export async function getSubmissionReviewDetails(submissionId: number): Promise<
     duration_seconds?: number;
     skills: Array<{ id: number; name: string; description?: string }>;
   };
-  transcript: any; // Full transcript from interview service
+  transcript: Record<string, unknown>; // Full transcript from interview service
 }> {
   return api.get(`/v1/api/submissions/${submissionId}/review-details`);
 }
@@ -136,7 +136,7 @@ export async function submitTrainerReview(
   data: {
     trainer_score: number;
     feedback?: string;
-    trainer_evaluation?: any;  // Comprehensive trainer evaluation structure
+    trainer_evaluation?: Record<string, unknown>;  // Comprehensive trainer evaluation structure
   }
 ): Promise<{
   submission_id: number;

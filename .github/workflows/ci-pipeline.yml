@@ -11,9 +11,27 @@ jobs:
   backend-build-test:
     name: Backend (${{ matrix.service }})
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       JWT_SECRET: ${{ secrets.JWT_SIGNING_SECRET }}
       PYTHONPATH: ${{ github.workspace }}/services/${{ matrix.service }}
+      DB_HOST: localhost
+      DB_USERNAME: test
+      DB_PASSWORD: test
+      DB_NAME: test
     strategy:
       fail-fast: false
       matrix:
@@ -46,16 +64,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov
+          pip install pytest pytest-cov aiosqlite
 
       - name: Run pytest
         working-directory: services/${{ matrix.service }}
         run: |
-          # Skip services with known issues
-          if [[ "${{ matrix.service }}" == "test-management-service" ]] || [[ "${{ matrix.service }}" == "user-service" ]]; then
-            echo "⚠️ Skipping tests for ${{ matrix.service }} - requires environment setup"
-            exit 0
-          elif [ -d tests ]; then
+          if [ -d tests ]; then
             pytest --cov --cov-report=xml
           else
             echo "⚠️ No tests found — skipping for ${{ matrix.service }}"
@@ -66,6 +80,10 @@ jobs:
   frontend-build-test:
     name: Frontend
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -84,19 +102,19 @@ jobs:
 
       - name: Lint
         working-directory: frontend
-        run: |
-            # Temporarily skip linting due to pre-existing errors
-            echo "⚠️ Linting temporarily skipped - will be fixed in main branch"
-            exit 0
+        run: pnpm lint
       - name: Build
         working-directory: frontend
         run: pnpm build
 
+      - name: Archive build output
+        run: tar -czf frontend-build.tar.gz -C frontend .next
+
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v2
         with:
-          subject-path: 'frontend/.next/**/*'
+          subject-path: 'frontend-build.tar.gz'
 
       - name: Test
         working-directory: frontend
-        run: pnpm test --if-present
+        run: pnpm test --if-present #Will remove the --if-present flag once we have tests in place
