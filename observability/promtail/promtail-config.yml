@@ -1,0 +1,40 @@
+# Promtail discovers containers via the Docker socket and ships their
+# stdout/stderr (default json-file driver) to Loki. Do NOT switch app
+# services to the Loki logging driver — the `docker` pipeline stage below
+# depends on the json-file envelope.
+server:
+  http_listen_port: 9080
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Compose service name (e.g. "user-service", "nginx") -> service label
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+    pipeline_stages:
+      # Unwrap the docker json-file envelope -> raw application log line
+      - docker: {}
+      # Parse the application JSON line (Python JsonFormatter / nginx
+      # json_combined). Non-JSON lines pass through unparsed — fine.
+      - json:
+          expressions:
+            level: level
+            correlation_id: correlation_id
+      # level is low-cardinality -> safe as a label
+      - labels:
+          level:
+      # correlation_id is per-request unique -> structured metadata, NOT a label
+      - structured_metadata:
+          correlation_id:

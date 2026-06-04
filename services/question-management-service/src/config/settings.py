@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     SERVICE_NAME: str
     PORT: int = 8002
     SERVICE_HOSTNAME: str = "localhost"
+    LOG_LEVEL: str = "INFO"
 
     # Optional MongoDB Connection Settings
     MONGO_TIMEOUT_MS: int = 5000

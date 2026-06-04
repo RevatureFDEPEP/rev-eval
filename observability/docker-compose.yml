@@ -1,0 +1,58 @@
+# Standalone monitoring stack — run independently of the app stack:
+#   docker compose -f observability/docker-compose.yml up -d
+#
+# Promtail discovers ALL containers on the host via the Docker socket
+# (regardless of compose project/network), so no shared network with the
+# app stack is needed. Grafana only talks to Loki on this stack's own
+# default network.
+#
+# NOTE (rootless Docker): the socket lives at $XDG_RUNTIME_DIR/docker.sock
+# instead of /var/run/docker.sock — adjust the promtail volume mount and
+# the `host:` in promtail-config.yml accordingly.
+
+services:
+  loki:
+    image: grafana/loki:3.4.2
+    container_name: rev-eval-loki
+    command: -config.file=/etc/loki/local-config.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yml:ro
+      - loki_data:/loki
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --tries=1 -O- http://localhost:3100/ready | grep -q ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  promtail:
+    image: grafana/promtail:3.4.2
+    container_name: rev-eval-promtail
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      loki:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    container_name: rev-eval-grafana
+    ports:
+      - "3001:3000"   # 3000 is taken by the app frontend
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      loki:
+        condition: service_healthy
+
+volumes:
+  loki_data:
+  grafana_data:

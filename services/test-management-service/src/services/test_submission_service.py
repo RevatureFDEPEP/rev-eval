@@ -17,6 +17,7 @@ from src.schemas.test_submission_schema import (
     TrainerReviewResponse,
 )
 from src.services.test_service import TestService
+from src.utils.logging_config import get_correlation_id
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +198,9 @@ class TestSubmissionService:
         # Direct service-to-service communication (internal network)
         user_service_url = settings.USER_SERVICE_URL
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(
+            timeout=30.0, headers={"X-Correlation-Id": get_correlation_id()}
+        ) as client:
             for email in request.participant_emails:
                 try:
                     # Check if user exists (direct call to user-service)
@@ -301,7 +304,9 @@ class TestSubmissionService:
         user_service_url = settings.USER_SERVICE_URL
         submission_outs = []
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(
+            timeout=30.0, headers={"X-Correlation-Id": get_correlation_id()}
+        ) as client:
             for submission in submissions:
                 submission_out = TestSubmissionOut.from_orm(submission)
 
@@ -398,7 +403,9 @@ class TestSubmissionService:
         user_service_url = settings.USER_SERVICE_URL
         submission_outs = []
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(
+            timeout=30.0, headers={"X-Correlation-Id": get_correlation_id()}
+        ) as client:
             for submission in submissions:
                 submission_out = TestSubmissionOut.from_orm(submission)
 
@@ -456,7 +463,9 @@ class TestSubmissionService:
         transcript_data = None
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(
+                timeout=30.0, headers={"X-Correlation-Id": get_correlation_id()}
+            ) as client:
                 response = await client.get(
                     f"{interview_service_url}/v1/api/interview/submissions/{submission_id}/transcript"
                 )
@@ -541,7 +550,9 @@ class TestSubmissionService:
         if review.trainer_evaluation and submission.test.test_type.value == "INTERVIEW":
             interview_service_url = settings.INTERVIEW_SERVICE_URL
             try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
+                async with httpx.AsyncClient(
+                    timeout=30.0, headers={"X-Correlation-Id": get_correlation_id()}
+                ) as client:
                     mongo_response = await client.patch(
                         f"{interview_service_url}/v1/api/interview/submissions/{submission_id}/trainer-evaluation",
                         json={

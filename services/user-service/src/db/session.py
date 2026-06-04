@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
@@ -7,6 +9,8 @@ from src.db.init_db import Base
 # Import all models to register them with Base.metadata before create_all.
 # Removing this import breaks table creation (the model would never register).
 from src.models.user import User  # noqa: F401
+
+logger = logging.getLogger(__name__)
 
 # Use settings for database URL
 DATABASE_URL = settings.SQLALCHEMY_DATABASE_URL
@@ -38,7 +42,6 @@ def init_db():
         # Test connection
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        print("✅ DB connected successfully and tables are ready.")
-    except OperationalError as e:
-        print("❌ DB connection failed!")
-        print(str(e))
+        logger.info("DB connected successfully and tables are ready.")
+    except OperationalError:
+        logger.error("DB connection failed!", exc_info=True)

@@ -1,8 +1,12 @@
+import logging
+
 from beanie import init_beanie
 from pymongo import AsyncMongoClient
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from src.config.settings import settings
 from src.models.question import Question
+
+logger = logging.getLogger(__name__)
 
 # Global MongoDB client and database
 client: AsyncMongoClient = None
@@ -26,7 +30,7 @@ async def init_db():
     global client, db
 
     try:
-        print(f"🔄 Connecting to MongoDB at {settings.MONGO_CLUSTER}...")
+        logger.info(f"Connecting to MongoDB at {settings.MONGO_CLUSTER}...")
 
         # Create MongoDB async client with connection settings
         client = AsyncMongoClient(
@@ -45,23 +49,24 @@ async def init_db():
 
         # Test the connection with ping
         await client.admin.command('ping')
-        print(f"✅ Successfully connected to MongoDB: {settings.MONGO_DB}")
+        logger.info(f"Successfully connected to MongoDB: {settings.MONGO_DB}")
 
         # Initialize Beanie ODM
         await init_beanie(database=db, document_models=[Question])
-        print("✅ Beanie ODM initialized with Question model")
+        logger.info("Beanie ODM initialized with Question model")
 
     except (ConnectionFailure, ServerSelectionTimeoutError) as e:
-        print(f"❌ Failed to connect to MongoDB: {e}")
-        print(f"   Cluster: {settings.MONGO_CLUSTER}")
-        print(f"   Database: {settings.MONGO_DB}")
-        print(f"   User: {settings.MONGO_USER}")
+        logger.error(
+            f"Failed to connect to MongoDB: {e} "
+            f"(cluster={settings.MONGO_CLUSTER}, database={settings.MONGO_DB}, "
+            f"user={settings.MONGO_USER})"
+        )
         raise
 
     except Exception as e:
-        print(f"❌ Unexpected error during MongoDB initialization: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(
+            f"Unexpected error during MongoDB initialization: {e}", exc_info=True
+        )
         raise
 
 
@@ -75,7 +80,7 @@ async def close_db():
     global client
     if client:
         client.close()
-        print("✅ MongoDB connection closed")
+        logger.info("MongoDB connection closed")
 
 
 async def get_database():
@@ -127,5 +132,5 @@ async def check_connection():
         await client.admin.command('ping')
         return True
     except Exception as e:
-        print(f"⚠️ MongoDB connection check failed: {e}")
+        logger.warning(f"MongoDB connection check failed: {e}")
         return False

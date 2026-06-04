@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     SERVICE_NAME: str
     PORT: int
     SERVICE_HOSTNAME: str
+    LOG_LEVEL: str = "INFO"
 
     # Service-to-Service Communication
     USER_SERVICE_URL: str = "http://localhost:8003"

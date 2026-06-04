@@ -6,10 +6,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import settings
 from src.db.session import init_db
+from src.middleware.correlation import CorrelationIdMiddleware
+from src.utils.logging_config import setup_logging
 from src.v1.routes.auth_route import router as auth_router
 from src.v1.routes.user_route import router as user_router
 
 load_dotenv()
+
+# Structured JSON logging (re-applied in the startup event — see
+# setup_logging docstring for why)
+setup_logging(settings.SERVICE_NAME, settings.LOG_LEVEL)
 
 app = FastAPI(title="User Service", version="1.0.0")
 
@@ -28,6 +34,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Correlation id for distributed log tracing (uses the gateway-forwarded
+# X-Correlation-Id, generating one only for direct calls)
+app.add_middleware(CorrelationIdMiddleware)
+
 # ---- Routes ----
 app.include_router(auth_router, prefix="/v1/api")
 app.include_router(user_router, prefix="/v1/api")
@@ -40,6 +50,7 @@ def health_check():
 # ---- DB Init ----
 @app.on_event("startup")
 def on_startup():
+    setup_logging(settings.SERVICE_NAME, settings.LOG_LEVEL)
     init_db()
 
 # ---- Run server ----
