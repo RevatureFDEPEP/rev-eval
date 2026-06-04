@@ -103,12 +103,20 @@ jobs:
         working-directory: services/${{ matrix.service }}
         run: |
           if [ -d tests ]; then
+            # Coverage source/omit and the fail_under threshold come from the
+            # service's .coveragerc (measured-baseline ratchet, W2 D7 gate).
             pytest --cov --cov-report=xml
           else
             echo "No tests/ directory in services/${{ matrix.service }} — skipping pytest."
           fi
 
-      # NOTE: Trivy container scan still pending (W2 D7) — Ruff lint wired above.
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.service }}
+          path: services/${{ matrix.service }}/coverage.xml
+          if-no-files-found: ignore
 
   frontend-build-test:
     name: Frontend
