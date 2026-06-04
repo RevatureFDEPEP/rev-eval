@@ -1,17 +1,17 @@
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from typing import List, Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.services.test_submission_service import TestSubmissionService
+from src.db.session import get_db
 from src.schemas.test_submission_schema import (
-    TestSubmissionCreate,
-    TestSubmissionUpdate,
-    TestSubmissionOut,
     BulkAssignRequest,
     BulkAssignResult,
+    TestSubmissionCreate,
+    TestSubmissionOut,
+    TestSubmissionUpdate,
     TrainerReviewRequest,
-    TrainerReviewResponse
+    TrainerReviewResponse,
 )
-from src.db.session import get_db
+from src.services.test_submission_service import TestSubmissionService
 from src.utils.dependencies import get_current_user_from_headers
 
 router = APIRouter(prefix="/submissions", tags=["Test Submissions"])
@@ -20,10 +20,10 @@ router = APIRouter(prefix="/submissions", tags=["Test Submissions"])
 async def create_submission(submission_in: TestSubmissionCreate, db: AsyncSession = Depends(get_db)):
     return await TestSubmissionService.create_submission(db, submission_in)
 
-@router.get("/", response_model=List[TestSubmissionOut])
+@router.get("/", response_model=list[TestSubmissionOut])
 async def list_submissions(
-    user_id: Optional[int] = Query(None, description="Filter submissions by user ID"),
-    current_user: Optional[Dict] = Depends(get_current_user_from_headers),
+    user_id: int | None = Query(None, description="Filter submissions by user ID"),
+    current_user: dict | None = Depends(get_current_user_from_headers),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -73,7 +73,7 @@ async def delete_submission(submission_id: int, db: AsyncSession = Depends(get_d
 @router.post("/bulk-assign", response_model=BulkAssignResult, status_code=status.HTTP_201_CREATED)
 async def bulk_assign_test(
     request: BulkAssignRequest,
-    current_user: Dict = Depends(get_current_user_from_headers),
+    current_user: dict = Depends(get_current_user_from_headers),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -84,9 +84,9 @@ async def bulk_assign_test(
     return await TestSubmissionService.bulk_assign_test(db, request, current_user)
 
 
-@router.get("/trainer/evaluated", response_model=List[TestSubmissionOut])
+@router.get("/trainer/evaluated", response_model=list[TestSubmissionOut])
 async def get_evaluated_submissions_for_trainer(
-    current_user: Dict = Depends(get_current_user_from_headers),
+    current_user: dict = Depends(get_current_user_from_headers),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -107,9 +107,9 @@ async def get_evaluated_submissions_for_trainer(
     return await TestSubmissionService.get_evaluated_submissions_for_trainer(db, trainer_id)
 
 
-@router.get("/trainer/all", response_model=List[TestSubmissionOut])
+@router.get("/trainer/all", response_model=list[TestSubmissionOut])
 async def get_all_submissions_for_trainer(
-    current_user: Dict = Depends(get_current_user_from_headers),
+    current_user: dict = Depends(get_current_user_from_headers),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -133,7 +133,7 @@ async def get_all_submissions_for_trainer(
 
 @router.get("/graded")
 async def get_graded_submissions(
-    current_user: Dict = Depends(get_current_user_from_headers),
+    current_user: dict = Depends(get_current_user_from_headers),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -149,7 +149,7 @@ async def get_graded_submissions(
 @router.get("/{submission_id}/review-details")
 async def get_submission_review_details(
     submission_id: int,
-    current_user: Dict = Depends(get_current_user_from_headers),
+    current_user: dict = Depends(get_current_user_from_headers),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -176,7 +176,7 @@ async def get_submission_review_details(
 async def submit_trainer_review(
     submission_id: int,
     review: TrainerReviewRequest,
-    current_user: Dict = Depends(get_current_user_from_headers),
+    current_user: dict = Depends(get_current_user_from_headers),
     db: AsyncSession = Depends(get_db)
 ):
     """

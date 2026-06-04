@@ -2,11 +2,9 @@
 User Management Routes
 """
 import logging
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-
 from src.db.session import get_db
 from src.models.user import User, UserRole
 from src.schemas.user_schema import (
@@ -44,9 +42,9 @@ def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
     return user
 
 
-@router.get("/users/", response_model=List[UserOut])
+@router.get("/users/", response_model=list[UserOut])
 def list_users(
-    role: Optional[UserRole] = Query(None, description="Filter by role"),
+    role: UserRole | None = Query(None, description="Filter by role"),
     limit: int = Query(100, ge=1, le=1000, description="Max number of results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     db: Session = Depends(get_db),

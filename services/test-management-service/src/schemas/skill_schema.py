@@ -1,17 +1,18 @@
-from typing import Optional
+
 from pydantic import BaseModel
+
 
 # ===== SKILL SCHEMAS =====
 class SkillBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
 
 class SkillCreate(SkillBase):
     pass
 
 class SkillUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
 
 class SkillOut(SkillBase):
     id: int

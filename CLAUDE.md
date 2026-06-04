@@ -151,7 +151,7 @@ The frontend uses **shadcn/ui** (Radix + Tailwind v4). All API calls from the br
 
 ## Nginx
 
-`nginx/nginx.conf` is intentionally a stub (returns 502). Wiring Nginx routes to the backend services is a candidate exercise (W2 D6 task).
+`nginx/nginx.conf` listens on port 80. Routes `/v1/api/*` to the API Gateway (port 8000), which enforces JWT auth before forwarding to downstream services. Default `location /` proxies to the frontend (port 3000).
 
 ## Incomplete service
 

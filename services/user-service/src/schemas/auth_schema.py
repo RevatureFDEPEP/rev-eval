@@ -1,6 +1,6 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
 from datetime import datetime
+
+from pydantic import BaseModel, EmailStr, Field
 from src.models.user import UserRole
 
 
@@ -12,14 +12,14 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)
-    full_name: Optional[str] = None
-    role: Optional[UserRole] = UserRole.PARTICIPANT
+    full_name: str | None = None
+    role: UserRole | None = UserRole.PARTICIPANT
 
 
 class UserResponse(BaseModel):
     id: int
     email: str
-    full_name: Optional[str] = None
+    full_name: str | None = None
     role: str
     is_active: bool
     created_at: datetime

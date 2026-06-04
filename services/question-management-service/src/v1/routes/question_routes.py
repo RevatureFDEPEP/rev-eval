@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException, status, Query
+
+from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import ValidationError
-from typing import List, Optional
-from src.schemas.question import QuestionCreate, QuestionUpdate, QuestionResponse
+from src.schemas.question import QuestionCreate, QuestionResponse, QuestionUpdate
 from src.services.question_service import QuestionService
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
@@ -171,7 +171,7 @@ async def delete_question(id: str):
 
 @router.get(
     "/by-type/{question_type}",
-    response_model=List[QuestionResponse],
+    response_model=list[QuestionResponse],
     summary="Get questions by type",
     description="""
     Retrieve questions filtered by type.
@@ -202,7 +202,7 @@ async def get_questions_by_type(
 
 @router.get(
     "/by-skill/{skill}",
-    response_model=List[QuestionResponse],
+    response_model=list[QuestionResponse],
     summary="Get questions by skill",
     description="Retrieve questions that include the specified skill."
 )
@@ -225,7 +225,7 @@ async def get_questions_by_skill(
 
 @router.get(
     "/by-difficulty/{difficulty}",
-    response_model=List[QuestionResponse],
+    response_model=list[QuestionResponse],
     summary="Get questions by difficulty",
     description="""
     Retrieve questions filtered by difficulty level.
@@ -255,7 +255,7 @@ async def get_questions_by_difficulty(
 
 @router.get(
     "/by-tags",
-    response_model=List[QuestionResponse],
+    response_model=list[QuestionResponse],
     summary="Get questions by tags",
     description="""
     Retrieve questions that have any of the specified tags.
@@ -267,7 +267,7 @@ async def get_questions_by_difficulty(
     """
 )
 async def get_questions_by_tags(
-    tags: List[str] = Query(..., description="List of tags to filter by"),
+    tags: list[str] = Query(..., description="List of tags to filter by"),
     limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
 ):
     """Get questions filtered by tags."""
@@ -285,7 +285,7 @@ async def get_questions_by_tags(
 
 @router.get(
     "/filter",
-    response_model=List[QuestionResponse],
+    response_model=list[QuestionResponse],
     summary="Filter questions by multiple criteria",
     description="""
     Advanced filtering endpoint that supports multiple criteria simultaneously.
@@ -304,10 +304,10 @@ async def get_questions_by_tags(
     """
 )
 async def filter_questions(
-    type: Optional[str] = Query(None, description="Question type filter"),
-    skill: Optional[str] = Query(None, description="Skill filter"),
-    difficulty: Optional[str] = Query(None, description="Difficulty filter"),
-    tags: Optional[List[str]] = Query(None, description="Tags filter (OR condition)"),
+    type: str | None = Query(None, description="Question type filter"),
+    skill: str | None = Query(None, description="Skill filter"),
+    difficulty: str | None = Query(None, description="Difficulty filter"),
+    tags: list[str] | None = Query(None, description="Tags filter (OR condition)"),
     limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
 ):
     """
