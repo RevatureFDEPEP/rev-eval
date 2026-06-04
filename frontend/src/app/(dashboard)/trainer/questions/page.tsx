@@ -62,9 +62,9 @@ export default function QuestionsPage() {
       setError(null);
       const data = await getQuestions();
       setQuestions(data);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to load questions:", err);
-      setError(err.message || "Failed to load questions");
+      setError(err instanceof Error ? err.message : "Failed to load questions");
     } finally {
       setLoading(false);
     }

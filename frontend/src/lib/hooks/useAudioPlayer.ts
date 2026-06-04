@@ -48,7 +48,8 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     try {
       // Create audio context if it doesn't exist
       if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioCtxClass = window.AudioContext ?? (window as Window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        audioContextRef.current = new AudioCtxClass();
       }
 
       const audioContext = audioContextRef.current;

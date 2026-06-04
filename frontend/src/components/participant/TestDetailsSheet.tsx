@@ -95,18 +95,20 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
       return;
     }
 
-    setLoadingTranscript(true);
-    setTranscriptError(null);
-    getInterviewTranscript(submissionId)
-      .then((data) => {
+    const fetchTranscript = async () => {
+      setLoadingTranscript(true);
+      setTranscriptError(null);
+      try {
+        const data = await getInterviewTranscript(submissionId);
         setTranscript(data);
-        setLoadingTranscript(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('Failed to load transcript:', err);
         setTranscriptError(err instanceof Error ? err.message : 'Failed to load transcript');
+      } finally {
         setLoadingTranscript(false);
-      });
+      }
+    };
+    fetchTranscript();
   }, [test, open, isQuiz, isCompleted, submissionId, transcript, loadingTranscript]);
 
   // Fetch quiz session data for completed/graded quizzes
@@ -115,10 +117,11 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
       return;
     }
 
-    setLoadingQuizSession(true);
-    setQuizSessionError(null);
-    getTestSessionBySubmission(submissionId)
-      .then((data) => {
+    const fetchQuizSession = async () => {
+      setLoadingQuizSession(true);
+      setQuizSessionError(null);
+      try {
+        const data = await getTestSessionBySubmission(submissionId);
         console.log('📊 Quiz session data received:', {
           part_a: data.part_a,
           part_b: data.part_b,
@@ -128,13 +131,14 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
           part_b_questions_count: data.part_b?.questions?.length,
         });
         setQuizSession(data);
-        setLoadingQuizSession(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('Failed to load quiz session:', err);
         setQuizSessionError(err instanceof Error ? err.message : 'Failed to load quiz session');
+      } finally {
         setLoadingQuizSession(false);
-      });
+      }
+    };
+    fetchQuizSession();
   }, [test, open, isQuiz, isCompleted, submissionId, quizSession, loadingQuizSession]);
 
   // Early return check - AFTER all hooks

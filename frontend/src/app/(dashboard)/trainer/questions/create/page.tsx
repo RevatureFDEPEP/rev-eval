@@ -42,6 +42,17 @@ import {
   getSkills,
   SkillInfo,
 } from "@/lib/api";
+
+interface QuestionFormValues {
+  question_text: string;
+  difficulty?: "easy" | "medium" | "hard";
+  skills: string[];
+  tags?: string | string[];
+  answer_explanation?: string;
+  options?: Array<{ text: string; is_correct: boolean }>;
+  true_false_answer?: boolean;
+  sample_answer?: string;
+}
 import { toast } from "sonner";
 
 // Base fields common to all question types
@@ -129,7 +140,7 @@ export default function CreateQuestionPage() {
   };
 
   // Get default values based on question type
-  const getDefaultValues = (): any => {
+  const getDefaultValues = (): QuestionFormValues => {
     const base = {
       question_text: "",
       difficulty: undefined,
@@ -162,7 +173,7 @@ export default function CreateQuestionPage() {
     }
   };
 
-  const form = useForm<any>({
+  const form = useForm<QuestionFormValues>({
     resolver: zodResolver(getSchema()),
     defaultValues: getDefaultValues(),
   });
@@ -200,7 +211,7 @@ export default function CreateQuestionPage() {
     loadSkills();
   }, []);
 
-  const transformFormData = (values: any): QuestionCreate => {
+  const transformFormData = (values: QuestionFormValues): QuestionCreate => {
     // For MCQ type, determine if it's actually MCQ (single answer) or MULTI (multiple answers)
     let actualType: QuestionType = questionType;
     let correct_answers: (number | boolean | string)[] | undefined = undefined;
@@ -208,9 +219,9 @@ export default function CreateQuestionPage() {
 
     if (questionType === "mcq") {
       // Get all correct answers
-      const correctAnswerIndices = values.options
-        .map((opt: any, idx: number) => (opt.is_correct ? idx + 1 : null))
-        .filter((id: any): id is number => id !== null);
+      const correctAnswerIndices = (values.options ?? [])
+        .map((opt, idx) => (opt.is_correct ? idx + 1 : null))
+        .filter((id): id is number => id !== null);
 
       // Determine if it's MCQ (1 answer) or MULTI (2+ answers)
       if (correctAnswerIndices.length === 1) {
@@ -220,7 +231,7 @@ export default function CreateQuestionPage() {
       }
 
       correct_answers = correctAnswerIndices;
-      options = values.options.map((opt: any) => ({ text: opt.text }));
+      options = (values.options ?? []).map((opt) => ({ text: opt.text }));
     } else if (questionType === "true_false") {
       // For TRUE_FALSE, send boolean in correct_answers, no options
       correct_answers = [values.true_false_answer];
@@ -254,9 +265,9 @@ export default function CreateQuestionPage() {
         description: `"${values.question_text.slice(0, 50)}..." has been added to your question bank.`,
       });
       router.push("/trainer/questions");
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to create question:", err);
-      const errorMessage = err.message || "Failed to create question";
+      const errorMessage = err instanceof Error ? err.message : "Failed to create question";
       setError(errorMessage);
       toast.error("Failed to create question", {
         description: errorMessage,
