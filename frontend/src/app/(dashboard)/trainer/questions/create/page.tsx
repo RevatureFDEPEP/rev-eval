@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { ArrowLeft, Check, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,72 +36,17 @@ import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   createQuestion,
-  QuestionCreate,
   QuestionType,
   getSkills,
   SkillInfo,
 } from "@/lib/api";
+import {
+  getQuestionDefaultValues,
+  getQuestionFormSchema,
+  transformQuestionFormData,
+  type QuestionFormValues,
+} from "@/lib/schemas/question-form-schema";
 import { toast } from "sonner";
-
-// Base fields common to all question types
-const baseSchema = {
-  question_text: z
-    .string()
-    .min(10, "Question must be at least 10 characters"),
-  difficulty: z.enum(["easy", "medium", "hard"]).optional(),
-  skills: z
-    .array(z.string())
-    .min(1, "Select at least one skill")
-    .max(20, "Maximum 20 skills allowed"),
-  tags: z
-    .string()
-    .optional()
-    .transform((val) => (val ? val.split(",").map((t) => t.trim()) : [])),
-  answer_explanation: z.string().optional(),
-};
-
-// MCQ-specific schema
-const mcqSchema = z
-  .object({
-    ...baseSchema,
-    options: z.array(
-      z.object({
-        text: z.string().min(1, "Option text is required"),
-        is_correct: z.boolean(),
-      })
-    ),
-  })
-  .refine(
-    (data) => {
-      if (data.options.length < 2 || data.options.length > 5) {
-        return false;
-      }
-      return data.options.some((opt) => opt.is_correct);
-    },
-    {
-      message: "MCQ questions require 2-5 options with at least one marked correct",
-      path: ["options"],
-    }
-  );
-
-// True/False schema
-const trueFalseSchema = z.object({
-  ...baseSchema,
-  true_false_answer: z.boolean(),
-});
-
-// Text schema
-const textSchema = z.object({
-  ...baseSchema,
-  sample_answer: z
-    .string()
-    .min(10, "Sample answer must be at least 10 characters"),
-});
-
-type McqFormValues = z.infer<typeof mcqSchema>;
-type TrueFalseFormValues = z.infer<typeof trueFalseSchema>;
-type TextFormValues = z.infer<typeof textSchema>;
-type QuestionFormValues = McqFormValues | TrueFalseFormValues | TextFormValues;
 
 export default function CreateQuestionPage() {
   const router = useRouter();
@@ -114,62 +58,14 @@ export default function CreateQuestionPage() {
 
   const questionType = (searchParams.get("type") as QuestionType) || "mcq";
 
-  // Select the appropriate schema based on question type
-  const getSchema = () => {
-    switch (questionType) {
-      case "mcq":
-        return mcqSchema;
-      case "true_false":
-        return trueFalseSchema;
-      case "text":
-        return textSchema;
-      default:
-        return mcqSchema;
-    }
-  };
-
-  // Get default values based on question type
-  const getDefaultValues = (): any => {
-    const base = {
-      question_text: "",
-      difficulty: undefined,
-      skills: [],
-      tags: "",
-      answer_explanation: "",
-    };
-
-    switch (questionType) {
-      case "mcq":
-        return {
-          ...base,
-          options: [
-            { text: "", is_correct: false },
-            { text: "", is_correct: false },
-          ],
-        };
-      case "true_false":
-        return {
-          ...base,
-          true_false_answer: undefined,
-        };
-      case "text":
-        return {
-          ...base,
-          sample_answer: "",
-        };
-      default:
-        return base;
-    }
-  };
-
-  const form = useForm<any>({
-    resolver: zodResolver(getSchema()),
-    defaultValues: getDefaultValues(),
+  const form = useForm<QuestionFormValues>({
+    resolver: zodResolver(getQuestionFormSchema(questionType)) as Resolver<QuestionFormValues>,
+    defaultValues: getQuestionDefaultValues(questionType) as never,
   });
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
-    name: "options",
+    name: "options" as never,
   });
 
   const watchSkills = form.watch("skills");
@@ -200,63 +96,19 @@ export default function CreateQuestionPage() {
     loadSkills();
   }, []);
 
-  const transformFormData = (values: any): QuestionCreate => {
-    // For MCQ type, determine if it's actually MCQ (single answer) or MULTI (multiple answers)
-    let actualType: QuestionType = questionType;
-    let correct_answers: (number | boolean | string)[] | undefined = undefined;
-    let options: { text: string }[] | undefined = undefined;
-
-    if (questionType === "mcq") {
-      // Get all correct answers
-      const correctAnswerIndices = values.options
-        .map((opt: any, idx: number) => (opt.is_correct ? idx + 1 : null))
-        .filter((id: any): id is number => id !== null);
-
-      // Determine if it's MCQ (1 answer) or MULTI (2+ answers)
-      if (correctAnswerIndices.length === 1) {
-        actualType = "mcq";
-      } else if (correctAnswerIndices.length > 1) {
-        actualType = "multi";
-      }
-
-      correct_answers = correctAnswerIndices;
-      options = values.options.map((opt: any) => ({ text: opt.text }));
-    } else if (questionType === "true_false") {
-      // For TRUE_FALSE, send boolean in correct_answers, no options
-      correct_answers = [values.true_false_answer];
-      options = undefined;
-    } else if (questionType === "text") {
-      // For TEXT, no options or correct_answers
-      correct_answers = undefined;
-      options = undefined;
-    }
-
-    return {
-      type: actualType,
-      question_text: values.question_text,
-      difficulty: values.difficulty,
-      skills: values.skills,
-      tags: typeof values.tags === "string" ? [] : values.tags || [],
-      options,
-      correct_answers,
-      sample_answer: values.sample_answer || undefined,
-      answer_explanation: values.answer_explanation || undefined,
-    };
-  };
-
   const onSubmit = async (values: QuestionFormValues) => {
     try {
       setSubmitting(true);
       setError(null);
-      const data = transformFormData(values);
+      const data = transformQuestionFormData(values, questionType);
       await createQuestion(data);
       toast.success("Question created successfully!", {
         description: `"${values.question_text.slice(0, 50)}..." has been added to your question bank.`,
       });
       router.push("/trainer/questions");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to create question:", err);
-      const errorMessage = err.message || "Failed to create question";
+      const errorMessage = err instanceof Error ? err.message : "Failed to create question";
       setError(errorMessage);
       toast.error("Failed to create question", {
         description: errorMessage,
@@ -687,11 +539,7 @@ export default function CreateQuestionPage() {
                       <Input
                         placeholder="e.g., loops, arrays, basics"
                         {...field}
-                        value={
-                          typeof field.value === "string"
-                            ? field.value
-                            : field.value?.join(", ") || ""
-                        }
+                        value={field.value || ""}
                       />
                     </FormControl>
                     <FormDescription>

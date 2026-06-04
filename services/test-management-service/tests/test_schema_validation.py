@@ -1,9 +1,4 @@
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
-
-# Ensure pytest can import src modules from the service root.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.schemas.skill_schema import SkillCreate, SkillUpdate
 from src.schemas.test_schema import TestCreate as TestCreateSchema
