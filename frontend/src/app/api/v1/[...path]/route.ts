@@ -37,6 +37,10 @@ async function handleRequest(
     headers: {
       Authorization: `Bearer ${session.token}`,
       'Content-Type': 'application/json',
+      // Start (or continue) the distributed trace at the browser-origin hop;
+      // the BFF path bypasses nginx, so the id must be set here.
+      'X-Correlation-Id':
+        request.headers.get('x-correlation-id') ?? crypto.randomUUID(),
     },
     body,
   });

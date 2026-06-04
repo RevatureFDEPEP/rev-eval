@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import settings
 from src.db.session import init_db
+from src.middleware.correlation import CorrelationIdMiddleware
 from src.utils.logging_config import setup_logging
 from src.v1.routes.auth_route import router as auth_router
 from src.v1.routes.user_route import router as user_router
@@ -32,6 +33,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Correlation id for distributed log tracing (uses the gateway-forwarded
+# X-Correlation-Id, generating one only for direct calls)
+app.add_middleware(CorrelationIdMiddleware)
 
 # ---- Routes ----
 app.include_router(auth_router, prefix="/v1/api")

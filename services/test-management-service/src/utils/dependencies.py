@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 
 import httpx
 from fastapi import Depends, Header, HTTPException, status
+from src.utils.logging_config import get_correlation_id
 
 
 async def get_current_user_from_headers(
@@ -36,7 +37,9 @@ async def get_current_user_from_headers(
         endpoint = f"{user_service_url}/v1/api/users/by-email/{x_user_email}"
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(
+            timeout=10.0, headers={"X-Correlation-Id": get_correlation_id()}
+        ) as client:
             response = await client.get(endpoint)
     except httpx.RequestError as e:
         raise HTTPException(
