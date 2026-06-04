@@ -22,7 +22,7 @@ interface InterviewTranscriptMessage {
 interface InterviewTranscriptEvaluation {
   overall_score: number;
   score_breakdown: Record<string, number>;
-  skill_breakdown: Record<string, { score?: number }>;
+  skill_breakdown: Record<string, { score?: number; proficiency_level?: string; feedback?: string }>;
   feedback?: string;
   strengths?: string[];
   improvements?: string[];
@@ -33,6 +33,7 @@ interface InterviewTranscriptEvaluation {
 interface InterviewTranscript {
   messages: InterviewTranscriptMessage[];
   lambda_evaluation?: InterviewTranscriptEvaluation;
+  status?: string;
 }
 
 async function getInterviewTranscript(_submissionId: number): Promise<InterviewTranscript> {
@@ -595,7 +596,7 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
                                           >
                                             {skill.proficiency_level}
                                           </Badge>
-                                          <span className="text-sm font-medium text-slate-700">{Math.round(skill.score)}%</span>
+                                          <span className="text-sm font-medium text-slate-700">{skill.score != null ? Math.round(skill.score) : '—'}%</span>
                                     </div>
                                     </div>
                                       <p className="text-xs text-slate-600">{skill.feedback}</p>
