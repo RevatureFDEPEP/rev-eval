@@ -217,6 +217,7 @@ __marimo__/
 .trainer-notes/
 package
 *.zip
+CLAUDE.md
 
 # Next.js ignore
 
