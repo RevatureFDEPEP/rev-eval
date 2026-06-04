@@ -126,7 +126,7 @@ jobs:
         run: docker build -t ${{ matrix.service }}:${{ github.sha }} .
 
       - name: Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           image-ref: ${{ matrix.service }}:${{ github.sha }}
           format: sarif
@@ -155,10 +155,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No explicit version: action-setup reads the packageManager field from
+      # frontend/package.json (pnpm 9.x). The previous hardcoded pnpm 8 could
+      # not read the v9 lockfile, so CI silently re-resolved dependencies and
+      # linted against different plugin versions than local dev.
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 8
+          package_json_file: frontend/package.json
 
       - name: Set up Node
         uses: actions/setup-node@v4
