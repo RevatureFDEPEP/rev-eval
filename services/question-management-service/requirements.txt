@@ -12,3 +12,4 @@ pymongo[srv]
 beanie
 motor
 boto3
+ruff

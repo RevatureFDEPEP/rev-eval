@@ -3,17 +3,17 @@ User Schemas
 
 Pydantic models for API request/response validation.
 """
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
 from datetime import datetime
+
+from pydantic import BaseModel, EmailStr, Field
 from src.models.user import UserRole
 
 
 class UserBase(BaseModel):
     """Base user schema with common fields"""
     email: EmailStr
-    first_name: Optional[str] = Field(None, max_length=100)
-    last_name: Optional[str] = Field(None, max_length=100)
+    first_name: str | None = Field(None, max_length=100)
+    last_name: str | None = Field(None, max_length=100)
     role: UserRole
 
 
@@ -24,22 +24,22 @@ class UserCreate(UserBase):
 
 class UserUpdate(BaseModel):
     """Schema for updating user fields"""
-    email: Optional[EmailStr] = None
-    first_name: Optional[str] = Field(None, max_length=100)
-    last_name: Optional[str] = Field(None, max_length=100)
-    role: Optional[UserRole] = None
-    is_active: Optional[bool] = None
+    email: EmailStr | None = None
+    first_name: str | None = Field(None, max_length=100)
+    last_name: str | None = Field(None, max_length=100)
+    role: UserRole | None = None
+    is_active: bool | None = None
 
 
 class UserOut(UserBase):
     """Schema for user response"""
     id: int
-    full_name: Optional[str]
+    full_name: str | None
     is_active: bool
-    organization_id: Optional[str]
+    organization_id: str | None
     created_at: datetime
     updated_at: datetime
-    last_login: Optional[datetime]
+    last_login: datetime | None
 
     class Config:
         from_attributes = True
@@ -48,9 +48,9 @@ class UserOut(UserBase):
 class InviteUserRequest(BaseModel):
     """Schema for inviting a new user"""
     email: EmailStr
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    role: Optional[UserRole] = UserRole.PARTICIPANT
+    first_name: str | None = None
+    last_name: str | None = None
+    role: UserRole | None = UserRole.PARTICIPANT
 
 
 class InviteUserResponse(BaseModel):

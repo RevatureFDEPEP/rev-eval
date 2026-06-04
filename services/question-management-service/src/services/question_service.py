@@ -1,9 +1,9 @@
-from typing import List, Optional
-from src.schemas.question import QuestionCreate, QuestionUpdate
-from src.repositories.question_repository import QuestionRepository
-from src.models.question import Question, QuestionType, Option, OptionCreate
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from fastapi import HTTPException
+from src.models.question import Option, OptionCreate, Question, QuestionType
+from src.repositories.question_repository import QuestionRepository
+from src.schemas.question import QuestionCreate, QuestionUpdate
 
 
 class QuestionService:
@@ -15,7 +15,7 @@ class QuestionService:
     """
 
     @staticmethod
-    def convert_options_to_stored_format(options: Optional[List[OptionCreate]]) -> Optional[List[Option]]:
+    def convert_options_to_stored_format(options: list[OptionCreate] | None) -> list[Option] | None:
         """
         Convert OptionCreate (without option_id) to Option (with auto-generated option_id).
 
@@ -65,12 +65,12 @@ class QuestionService:
             question = Question(**question_data)
             return await QuestionRepository.create(question)
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from e
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error creating question: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error creating question: {str(e)}") from e
 
     @staticmethod
-    async def get_all_questions() -> List[Question]:
+    async def get_all_questions() -> list[Question]:
         """
         Retrieve all questions from the database.
 
@@ -80,7 +80,7 @@ class QuestionService:
         return await QuestionRepository.get_all()
 
     @staticmethod
-    async def get_question_by_id(qid: str) -> Optional[Question]:
+    async def get_question_by_id(qid: str) -> Question | None:
         """
         Retrieve a specific question by its ID.
 
@@ -139,10 +139,10 @@ class QuestionService:
                 update_data=update_data
             )
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from e
 
         # Add updated timestamp
-        update_data["updated_at"] = datetime.now(timezone.utc)
+        update_data["updated_at"] = datetime.now(UTC)
 
         # Perform the update
         return await QuestionRepository.update(qid, update_data)
@@ -259,7 +259,7 @@ class QuestionService:
         return await QuestionRepository.delete(qid)
 
     @staticmethod
-    async def find_by_type(question_type: str, limit: int = 100) -> List[Question]:
+    async def find_by_type(question_type: str, limit: int = 100) -> list[Question]:
         """
         Find questions by type.
 
@@ -284,7 +284,7 @@ class QuestionService:
         return await QuestionRepository.find_by_type(question_type, limit)
 
     @staticmethod
-    async def find_by_skill(skill: str, limit: int = 100) -> List[Question]:
+    async def find_by_skill(skill: str, limit: int = 100) -> list[Question]:
         """
         Find questions by skill.
 
@@ -301,7 +301,7 @@ class QuestionService:
         return await QuestionRepository.find_by_skill(skill.strip(), limit)
 
     @staticmethod
-    async def find_by_difficulty(difficulty: str, limit: int = 100) -> List[Question]:
+    async def find_by_difficulty(difficulty: str, limit: int = 100) -> list[Question]:
         """
         Find questions by difficulty level.
 
@@ -325,7 +325,7 @@ class QuestionService:
         return await QuestionRepository.find_by_difficulty(difficulty, limit)
 
     @staticmethod
-    async def find_by_tags(tags: List[str], limit: int = 100) -> List[Question]:
+    async def find_by_tags(tags: list[str], limit: int = 100) -> list[Question]:
         """
         Find questions that have any of the specified tags.
 
@@ -348,12 +348,12 @@ class QuestionService:
 
     @staticmethod
     async def filter_questions(
-        question_type: Optional[str] = None,
-        skill: Optional[str] = None,
-        difficulty: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        question_type: str | None = None,
+        skill: str | None = None,
+        difficulty: str | None = None,
+        tags: list[str] | None = None,
         limit: int = 100
-    ) -> List[Question]:
+    ) -> list[Question]:
         """
         Filter questions by multiple criteria.
 
@@ -378,7 +378,8 @@ class QuestionService:
             )
 
         # Build query conditions for Beanie
-        from beanie.operators import And, In as BeanieIn
+        from beanie.operators import And
+        from beanie.operators import In as BeanieIn
 
         conditions = []
 
