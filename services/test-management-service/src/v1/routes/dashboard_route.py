@@ -8,8 +8,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Logging is configured centrally in main.py via src.utils.logging_config
 logger = logging.getLogger(__name__)
 
 router = APIRouter()

@@ -1,4 +1,5 @@
 # src/db/session.py
+import logging
 import os
 
 from sqlalchemy import text
@@ -6,6 +7,8 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from src.config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 # ===== Base declarative class =====
 Base = declarative_base()
@@ -62,7 +65,6 @@ async def init_db():
         # Test async connection
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-        print("✅ Async DB connected successfully and tables are ready.")
-    except OperationalError as e:
-        print("❌ Async DB connection failed!")
-        print(str(e))
+        logger.info("Async DB connected successfully and tables are ready.")
+    except OperationalError:
+        logger.error("Async DB connection failed!", exc_info=True)

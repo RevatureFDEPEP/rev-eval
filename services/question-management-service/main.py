@@ -1,3 +1,5 @@
+import logging
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,7 +48,7 @@ async def on_shutdown():
     try:
         await close_db()
     except Exception as e:
-        print(f"⚠️ MongoDB connection close failed: {e}")
+        logging.getLogger(__name__).warning(f"MongoDB connection close failed: {e}")
 
 # ---- Run server ----
 if __name__ == "__main__":

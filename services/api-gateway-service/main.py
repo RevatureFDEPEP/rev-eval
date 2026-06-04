@@ -248,9 +248,7 @@ async def smart_gateway(
             detail=f"Cannot connect to service '{service_name}': {str(e)}"
         ) from e
     except Exception as e:
-        logger.error(f"❌ ERROR: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"❌ ERROR: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Gateway error: {str(e)}"
@@ -294,8 +292,8 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
                 timeout=30.0
             )
 
-        print(f"✅ Response: {resp.status_code}")
-        print("=" * 80)
+        logger.info(f"✅ Response: {resp.status_code}")
+        logger.info("=" * 80)
 
         if resp.headers.get("content-type", "").startswith("application/json"):
             return JSONResponse(content=resp.json(), status_code=resp.status_code)
@@ -309,12 +307,10 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
     except HTTPException:
         raise
     except httpx.ConnectError as e:
-        print(f"❌ Connection Error: {str(e)}")
+        logger.error(f"❌ Connection Error: {str(e)}")
         raise HTTPException(status_code=503, detail=f"Cannot connect to service: {str(e)}") from e
     except Exception as e:
-        print(f"❌ ERROR: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"❌ ERROR: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Gateway error: {str(e)}") from e
 
 if __name__ == "__main__":
