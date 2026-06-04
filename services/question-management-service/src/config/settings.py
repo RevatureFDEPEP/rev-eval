@@ -1,7 +1,7 @@
 # src/config/settings.py
-from typing import Optional
-from pydantic_settings import BaseSettings
 from urllib.parse import quote_plus
+
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -12,11 +12,12 @@ class Settings(BaseSettings):
     or any non-Atlas deployment); falls back to assembling a `mongodb+srv://`
     URL from MONGO_USER + MONGODB_PASSWORD + MONGO_CLUSTER for Atlas use.
     """
+
     # MongoDB Configuration
-    MONGO_URI: Optional[str] = None  # If set, used directly (e.g. mongodb://mongo:27017/evalai)
-    MONGO_USER: Optional[str] = None
-    MONGODB_PASSWORD: Optional[str] = None
-    MONGO_CLUSTER: Optional[str] = None
+    MONGO_URI: str | None = None  # If set, used directly (e.g. mongodb://mongo:27017/evalai)
+    MONGO_USER: str | None = None
+    MONGODB_PASSWORD: str | None = None
+    MONGO_CLUSTER: str | None = None
     MONGO_APPNAME: str = "EvalAI"
     MONGO_DB: str = "evalai"
 

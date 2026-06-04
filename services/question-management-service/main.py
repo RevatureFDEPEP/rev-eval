@@ -1,8 +1,9 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from src.config.settings import settings
-from src.db.session import init_db, close_db
+from src.db.session import close_db, init_db
 from src.v1.routes.question_routes import router as question_router
 
 app = FastAPI(
@@ -10,7 +11,7 @@ app = FastAPI(
     version="1.0.0",
     description="Microservice for managing questions with MongoDB storage",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
 )
 
 # ---- CORS ----
@@ -25,14 +26,17 @@ app.add_middleware(
 # routes
 app.include_router(question_router, prefix="/v1/api")
 
+
 # ---- Health Endpoint ----
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
+
 @app.on_event("startup")
 async def on_startup():
     await init_db()
+
 
 @app.on_event("shutdown")
 async def on_shutdown():
@@ -41,6 +45,7 @@ async def on_shutdown():
         await close_db()
     except Exception as e:
         print(f"⚠️ MongoDB connection close failed: {e}")
+
 
 # ---- Run server ----
 if __name__ == "__main__":

@@ -1,13 +1,17 @@
 # src/models/test.py
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Interval, Enum
-from sqlalchemy.orm import relationship
-from datetime import datetime
-from src.db.session import Base
 import enum
+from datetime import datetime
 
-class TestType(str, enum.Enum):
+from sqlalchemy import Boolean, Column, DateTime, Enum, Integer, Interval, String
+from sqlalchemy.orm import relationship
+
+from src.db.session import Base
+
+
+class TestType(enum.StrEnum):
     QUIZ = "QUIZ"
     INTERVIEW = "INTERVIEW"
+
 
 class Test(Base):
     __tablename__ = "tests"
@@ -33,5 +37,7 @@ class Test(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    submissions = relationship("TestSubmission", back_populates="test", cascade="all, delete-orphan")
+    submissions = relationship(
+        "TestSubmission", back_populates="test", cascade="all, delete-orphan"
+    )
     test_skills = relationship("TestSkill", back_populates="test", cascade="all, delete-orphan")

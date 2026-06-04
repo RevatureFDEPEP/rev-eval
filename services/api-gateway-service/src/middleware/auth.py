@@ -4,8 +4,8 @@ JWT authentication middleware for the API Gateway.
 Verifies HS256 tokens issued by user-service, extracts the user context,
 and injects it as X-User-* headers for downstream services.
 """
+
 import os
-from typing import Dict, Optional
 
 import jwt
 from fastapi import Header, HTTPException, status
@@ -25,7 +25,7 @@ def _get_secret() -> str:
     return secret
 
 
-async def verify_jwt_token(authorization: Optional[str] = Header(None)) -> Dict[str, str]:
+async def verify_jwt_token(authorization: str | None = Header(None)) -> dict[str, str]:
     """Verify a Bearer JWT and return a user-context dict (user_id, email, role)."""
     if not authorization:
         raise HTTPException(
@@ -74,7 +74,7 @@ async def verify_jwt_token(authorization: Optional[str] = Header(None)) -> Dict[
     }
 
 
-def add_user_context_headers(headers: dict, user_context: Dict[str, str]) -> dict:
+def add_user_context_headers(headers: dict, user_context: dict[str, str]) -> dict:
     """Inject X-User-* headers for downstream services."""
     headers_copy = headers.copy()
     headers_copy["X-User-Id"] = str(user_context.get("user_id") or "")
