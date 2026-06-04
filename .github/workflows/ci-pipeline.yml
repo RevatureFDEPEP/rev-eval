@@ -71,7 +71,7 @@ jobs:
       matrix:
         service: ${{ fromJSON(needs.changes.outputs.backend) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -103,12 +103,45 @@ jobs:
         working-directory: services/${{ matrix.service }}
         run: |
           if [ -d tests ]; then
+            # Coverage source/omit and the fail_under threshold come from the
+            # service's .coveragerc (measured-baseline ratchet, W2 D7 gate).
             pytest --cov --cov-report=xml
           else
             echo "No tests/ directory in services/${{ matrix.service }} — skipping pytest."
           fi
 
-      # NOTE: Trivy container scan still pending (W2 D7) — Ruff lint wired above.
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.service }}
+          path: services/${{ matrix.service }}/coverage.xml
+          if-no-files-found: ignore
+
+      # W2-D7 quality gate: scan the built image for vulnerabilities.
+      # ignore-unfixed keeps the gate actionable — base images ship CVEs
+      # with no published fix, which would otherwise dead-lock the pipeline.
+      - name: Build Docker image
+        working-directory: services/${{ matrix.service }}
+        run: docker build -t ${{ matrix.service }}:${{ github.sha }} .
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ matrix.service }}:${{ github.sha }}
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-${{ matrix.service }}
+          path: trivy-${{ matrix.service }}.sarif
+          if-no-files-found: ignore
 
   frontend-build-test:
     name: Frontend
@@ -122,10 +155,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No explicit version: action-setup reads the packageManager field from
+      # frontend/package.json (pnpm 9.x). The previous hardcoded pnpm 8 could
+      # not read the v9 lockfile, so CI silently re-resolved dependencies and
+      # linted against different plugin versions than local dev.
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 8
+          package_json_file: frontend/package.json
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -138,7 +175,7 @@ jobs:
 
       - name: Lint
         working-directory: frontend
-        run: pnpm lint || echo "Linting failed, attempting build anyway."
+        run: pnpm lint
 
       - name: Build
         working-directory: frontend

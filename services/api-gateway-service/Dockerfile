@@ -12,7 +12,11 @@ RUN apt-get update && apt-get install -y \
 
 # Copy requirements first for better caching
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Upgrade base-image Python tooling first: python:3.11-slim ships pip,
+# wheel and jaraco.context versions with fixable CVEs that the Trivy CI
+# gate (CRITICAL/HIGH, ignore-unfixed) rejects.
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel "jaraco.context>=6.1.0" && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
