@@ -50,7 +50,7 @@ ROUTES = [
 ]
 
 # Paths that bypass JWT verification (login, register). under what criteria do we bypass jwt??
-#why is it designed this way 
+#why is it designed this way
 PUBLIC_PATH_PREFIXES = (
     "/v1/api/auth/login",
     "/v1/api/auth/register",
@@ -111,7 +111,7 @@ def list_routes():
 
 # ===== PUBLIC AUTH PASS-THROUGH (no JWT required) =====
 # why do we have three types of routing instead of just one unified smart routing system with JWT verification
-#do we need load balancing if we convert this to a single routing system?? 
+#do we need load balancing if we convert this to a single routing system??
 @app.api_route(
     "/v1/api/auth/{auth_path:path}",
     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
