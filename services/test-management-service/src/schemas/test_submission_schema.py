@@ -1,12 +1,12 @@
 # src/schemas/test_submission_schema.py
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, field_validator
 
 
-class SubmissionStatus(str, Enum):
+class SubmissionStatus(StrEnum):
     ASSIGNED = "ASSIGNED"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"

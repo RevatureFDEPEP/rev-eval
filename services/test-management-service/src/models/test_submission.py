@@ -6,7 +6,7 @@ from sqlalchemy.orm import relationship
 from src.db.session import Base
 
 
-class SubmissionStatus(str, enum.Enum):
+class SubmissionStatus(enum.StrEnum):
     ASSIGNED = "ASSIGNED"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"

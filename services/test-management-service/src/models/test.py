@@ -7,7 +7,7 @@ from sqlalchemy.orm import relationship
 from src.db.session import Base
 
 
-class TestType(str, enum.Enum):
+class TestType(enum.StrEnum):
     QUIZ = "QUIZ"
     INTERVIEW = "INTERVIEW"
 

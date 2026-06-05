@@ -1,11 +1,11 @@
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 
 from beanie import Document
 from pydantic import BaseModel, Field, field_validator
 
 
-class QuestionType(str, Enum):
+class QuestionType(StrEnum):
     """Enumeration of supported question types."""
     MCQ = "mcq"
     MULTI = "multi"
