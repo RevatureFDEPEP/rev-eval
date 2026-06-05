@@ -1,4 +1,3 @@
-
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from src.models.test_skill import TestSkill
@@ -6,7 +5,6 @@ from src.schemas.test_skill_schema import TestSkillCreate
 
 
 class TestSkillRepository:
-
     @staticmethod
     async def get_by_id(db: AsyncSession, ts_id: int) -> TestSkill | None:
         result = await db.execute(select(TestSkill).where(TestSkill.id == ts_id))
@@ -19,7 +17,9 @@ class TestSkillRepository:
 
     @staticmethod
     async def list_by_skill(db: AsyncSession, skill_id: int) -> list[TestSkill]:
-        result = await db.execute(select(TestSkill).where(TestSkill.skill_id == skill_id))
+        result = await db.execute(
+            select(TestSkill).where(TestSkill.skill_id == skill_id)
+        )
         return result.scalars().all()
 
     @staticmethod

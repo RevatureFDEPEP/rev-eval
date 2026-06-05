@@ -4,6 +4,7 @@ FastAPI dependencies for test-management-service.
 The API Gateway verifies the JWT and injects X-User-* headers; this module
 resolves those headers to a full user record by calling user-service.
 """
+
 import os
 from typing import Any
 

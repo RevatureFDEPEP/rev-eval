@@ -1,6 +1,7 @@
 import logging
 import re
 from os import getenv
+from typing import Optional
 
 import httpx
 import uvicorn
@@ -63,7 +64,7 @@ COMPILED_ROUTES = [
     for r in ROUTES
 ]
 
-def find_service_for_path(path: str) -> str | None:
+def find_service_for_path(path: str) -> Optional[str]:
     """Find service based on endpoint pattern"""
     full_path = f"/{path}" if not path.startswith("/") else path
 

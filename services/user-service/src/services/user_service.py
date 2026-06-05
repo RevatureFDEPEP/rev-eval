@@ -4,6 +4,7 @@ User Service
 Business logic for user management (read/list/invite).
 Authentication-specific logic lives in AuthService.
 """
+
 import logging
 
 from sqlalchemy.orm import Session
@@ -32,12 +33,7 @@ class UserService:
         query = db.query(User)
         if role:
             query = query.filter(User.role == role)
-        return (
-            query.order_by(User.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-            .all()
-        )
+        return query.order_by(User.created_at.desc()).limit(limit).offset(offset).all()
 
     @staticmethod
     def invite_user(

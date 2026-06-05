@@ -7,8 +7,6 @@ from src.schemas.test_schema import TestCreate, TestUpdate
 
 
 class TestRepository:
-
-
     @staticmethod
     async def get_by_id(db: AsyncSession, test_id: int) -> Test | None:
         result = await db.execute(select(Test).where(Test.id == test_id))
@@ -18,6 +16,7 @@ class TestRepository:
         else:
             test.duration_seconds = None
         return test
+
     @staticmethod
     async def list_all(db: AsyncSession) -> list[Test]:
         result = await db.execute(select(Test))
@@ -28,6 +27,7 @@ class TestRepository:
             else:
                 test.duration_seconds = None
         return tests
+
     @staticmethod
     async def create(db: AsyncSession, test_in: TestCreate) -> Test:
         test_data = test_in.dict(exclude={"skill_ids", "duration_seconds"})
@@ -42,14 +42,15 @@ class TestRepository:
         await db.refresh(test)
         return test
 
-
     @staticmethod
     async def update(db: AsyncSession, test: Test, test_in: TestUpdate) -> Test:
         update_data = test_in.dict(exclude_unset=True, exclude={"skill_ids"})
 
         # Convert seconds → timedelta
         if "duration_seconds" in update_data:
-            update_data["duration"] = timedelta(seconds=update_data.pop("duration_seconds"))
+            update_data["duration"] = timedelta(
+                seconds=update_data.pop("duration_seconds")
+            )
 
         for field, value in update_data.items():
             setattr(test, field, value)
@@ -57,6 +58,7 @@ class TestRepository:
         await db.commit()
         await db.refresh(test)
         return test
+
     @staticmethod
     async def delete(db: AsyncSession, test: Test) -> None:
         await db.delete(test)
@@ -77,6 +79,3 @@ class TestRepository:
             else:
                 test.duration_seconds = None
         return tests
-
-
-

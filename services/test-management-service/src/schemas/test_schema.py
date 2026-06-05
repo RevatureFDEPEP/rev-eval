@@ -15,9 +15,11 @@ class TestBase(BaseModel):
     number_of_questions: int | None = 20  # Total number of questions
     active: bool | None = True
 
+
 class TestCreate(TestBase):
     skill_ids: list[int] | None = []  # Skills linked to test
     created_by_id: int | None = None  # User Service ID
+
 
 class TestUpdate(BaseModel):
     name: str | None = None
@@ -28,6 +30,7 @@ class TestUpdate(BaseModel):
     number_of_questions: int | None = None
     active: bool | None = None
     skill_ids: list[int] | None = None
+
 
 class TestOut(TestBase):
     id: int

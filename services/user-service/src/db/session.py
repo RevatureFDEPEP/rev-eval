@@ -12,6 +12,7 @@ DATABASE_URL = settings.SQLALCHEMY_DATABASE_URL
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
 # ===== Dependency for FastAPI =====
 def get_db():
     """Dependency to get database session"""
@@ -20,6 +21,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
 
 # ===== Initialize DB =====
 def init_db():

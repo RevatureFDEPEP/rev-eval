@@ -12,8 +12,11 @@ class Settings(BaseSettings):
     or any non-Atlas deployment); falls back to assembling a `mongodb+srv://`
     URL from MONGO_USER + MONGODB_PASSWORD + MONGO_CLUSTER for Atlas use.
     """
+
     # MongoDB Configuration
-    MONGO_URI: str | None = None  # If set, used directly (e.g. mongodb://mongo:27017/evalai)
+    MONGO_URI: str | None = (
+        None  # If set, used directly (e.g. mongodb://mongo:27017/evalai)
+    )
     MONGO_USER: str | None = None
     MONGODB_PASSWORD: str | None = None
     MONGO_CLUSTER: str | None = None

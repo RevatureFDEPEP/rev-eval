@@ -10,7 +10,9 @@ class Skill(Base):
     description = Column(Text, nullable=True)
 
     # Relationship to TestSkill association object
-    test_skills = relationship("TestSkill", back_populates="skill", cascade="all, delete-orphan")
+    test_skills = relationship(
+        "TestSkill", back_populates="skill", cascade="all, delete-orphan"
+    )
 
     # Convenience read-only relationship to Tests
     tests = relationship("Test", secondary="test_skills", viewonly=True)
