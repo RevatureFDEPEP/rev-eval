@@ -11,6 +11,11 @@ import { toast } from 'sonner';
 const WARNING_5_MIN_SECONDS = 5 * 60; // 5 minutes in seconds
 const WARNING_1_MIN_SECONDS = 1 * 60; // 1 minute in seconds
 
+interface StoredTimer {
+  timeRemaining: number;
+  timestamp: number;
+}
+
 interface UseTimerOptions {
   durationSeconds: number;  // Total duration in seconds
   testId: string;           // Test ID for localStorage key
@@ -45,7 +50,7 @@ export function useTimer(options: UseTimerOptions): UseTimerReturn {
 
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      const { timeRemaining, timestamp } = JSON.parse(stored);
+      const { timeRemaining, timestamp } = JSON.parse(stored) as StoredTimer;
       const now = Date.now();
       const elapsedSeconds = Math.floor((now - timestamp) / 1000);
       const remaining = Math.max(0, timeRemaining - elapsedSeconds);
@@ -54,13 +59,19 @@ export function useTimer(options: UseTimerOptions): UseTimerReturn {
     return durationSeconds;
   };
 
-  const [timeRemaining, setTimeRemaining] = useState<number>(getInitialTime);
-  const [isRunning, setIsRunning] = useState<boolean>(autoStart);
-  const [isExpired, setIsExpired] = useState<boolean>(false);
+  const [initialTimeRemaining] = useState<number>(() => getInitialTime());
+  const [timeRemaining, setTimeRemaining] = useState<number>(initialTimeRemaining);
+  const [isRunning, setIsRunning] = useState<boolean>(autoStart && initialTimeRemaining > 0);
+  const [isExpired, setIsExpired] = useState<boolean>(initialTimeRemaining === 0);
 
   const warning5MinShown = useRef<boolean>(false);
   const warning1MinShown = useRef<boolean>(false);
   const expiredCallbackFired = useRef<boolean>(false);
+  const latestTimeRemaining = useRef<number>(timeRemaining);
+
+  useEffect(() => {
+    latestTimeRemaining.current = timeRemaining;
+  }, [timeRemaining]);
 
   // Save time to localStorage
   const saveToLocalStorage = useCallback((remaining: number) => {
@@ -94,6 +105,14 @@ export function useTimer(options: UseTimerOptions): UseTimerReturn {
       });
     }
   }, [timeRemaining]);
+
+  useEffect(() => {
+    if (!autoStart || timeRemaining !== 0 || expiredCallbackFired.current) return;
+
+    clearLocalStorage();
+    expiredCallbackFired.current = true;
+    setTimeout(() => onTimeExpired(), 100);
+  }, [autoStart, timeRemaining, onTimeExpired, clearLocalStorage]);
 
   // Timer countdown
   useEffect(() => {
@@ -149,7 +168,7 @@ export function useTimer(options: UseTimerOptions): UseTimerReturn {
 
     setTimeRemaining(nextDuration);
     setIsRunning(autoStart && nextDuration > 0);
-    setIsExpired(false);
+    setIsExpired(nextDuration === 0);
     warning5MinShown.current = false;
     warning1MinShown.current = false;
     expiredCallbackFired.current = false;
@@ -159,11 +178,11 @@ export function useTimer(options: UseTimerOptions): UseTimerReturn {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (timeRemaining > 0) {
-        saveToLocalStorage(timeRemaining);
+      if (latestTimeRemaining.current > 0) {
+        saveToLocalStorage(latestTimeRemaining.current);
       }
     };
-  }, [timeRemaining, saveToLocalStorage]);
+  }, [saveToLocalStorage]);
 
   return {
     timeRemaining,
