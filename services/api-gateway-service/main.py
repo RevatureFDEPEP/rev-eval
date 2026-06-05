@@ -1,13 +1,14 @@
-from fastapi import FastAPI, Request, HTTPException, Depends
-from fastapi.responses import JSONResponse, Response
-from fastapi.middleware.cors import CORSMiddleware
+import logging
+import re
+from os import getenv
+from typing import Dict, Optional
+
 import httpx
 import uvicorn
-import re
-import logging
-from os import getenv
-from typing import Optional, Dict
 from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, Response
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Import JWT middleware
-from src.middleware.auth import verify_jwt_token, add_user_context_headers
+from src.middleware.auth import add_user_context_headers, verify_jwt_token  # noqa: E402
 
 app = FastAPI(title="API Gateway")
 
@@ -89,7 +90,7 @@ def on_startup():
     service_name = getenv('SERVICE_NAME', 'api-gateway')
     service_port = int(getenv('PORT', '8000'))
     logger.info(f"✅ {service_name} starting on port {service_port}")
-    logger.info(f"📍 Service discovery: compose-internal DNS")
+    logger.info("📍 Service discovery: compose-internal DNS")
 
 @app.on_event("shutdown")
 def on_shutdown():
@@ -213,17 +214,17 @@ async def smart_gateway(
             )
 
         logger.info(f"✅ Response: {resp.status_code}")
-        
+
         # Log errors
         if resp.status_code >= 400:
-            logger.error(f"❌ Error Response:")
+            logger.error("❌ Error Response:")
             try:
                 logger.error(f"   {resp.json()}")
-            except:
+            except Exception:
                 logger.error(f"   {resp.text[:200]}")
-        
+
         logger.info("=" * 80)
-        
+
         # Return response with correct status code
         if resp.headers.get("content-type", "").startswith("application/json"):
             return JSONResponse(
@@ -236,7 +237,7 @@ async def smart_gateway(
                 status_code=resp.status_code,
                 media_type=resp.headers.get("content-type")
             )
-            
+
     except HTTPException:
         raise
     except httpx.ConnectError as e:
@@ -244,7 +245,7 @@ async def smart_gateway(
         raise HTTPException(
             status_code=503,
             detail=f"Cannot connect to service '{service_name}': {str(e)}"
-        )
+        ) from e
     except Exception as e:
         logger.error(f"❌ ERROR: {str(e)}")
         import traceback
@@ -252,7 +253,7 @@ async def smart_gateway(
         raise HTTPException(
             status_code=500,
             detail=f"Gateway error: {str(e)}"
-        )
+        ) from e
 
 # ===== LEGACY ROUTE (WITH SERVICE NAME) =====
 @app.api_route("/{service_name}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
@@ -278,15 +279,15 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
             method = request.method
             body = await request.body()
             headers = dict(request.headers)
-            
+
             headers.pop('host', None)
             headers.pop('content-length', None)
             headers.pop('x-forwarded-proto', None)
             headers.pop('x-forwarded-scheme', None)
-            
+
             resp = await client.request(
-                method, 
-                target_url, 
+                method,
+                target_url,
                 content=body if body else None,
                 headers=headers,
                 timeout=30.0
@@ -294,7 +295,7 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
 
         print(f"✅ Response: {resp.status_code}")
         print("=" * 80)
-        
+
         if resp.headers.get("content-type", "").startswith("application/json"):
             return JSONResponse(content=resp.json(), status_code=resp.status_code)
         else:
@@ -303,17 +304,17 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
                 status_code=resp.status_code,
                 media_type=resp.headers.get("content-type")
             )
-            
+
     except HTTPException:
         raise
     except httpx.ConnectError as e:
         print(f"❌ Connection Error: {str(e)}")
-        raise HTTPException(status_code=503, detail=f"Cannot connect to service: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Cannot connect to service: {str(e)}") from e
     except Exception as e:
         print(f"❌ ERROR: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Gateway error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Gateway error: {str(e)}") from e
 
 if __name__ == "__main__":
     port = int(getenv("PORT", "8000"))

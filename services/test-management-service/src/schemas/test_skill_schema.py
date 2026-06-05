@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 
+
 # ===== TEST-SKILL SCHEMAS =====
 class TestSkillBase(BaseModel):
     test_id: int
