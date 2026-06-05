@@ -162,7 +162,8 @@ export default function CreateQuestionPage() {
     }
   };
 
-  const form = useForm<Record<string, unknown>>({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const form = useForm<any>({
     resolver: zodResolver(getSchema()),
     defaultValues: getDefaultValues(),
   });
