@@ -5,7 +5,6 @@ Verifies HS256 tokens issued by user-service, extracts the user context,
 and injects it as X-User-* headers for downstream services.
 """
 import os
-from typing import Dict, Optional
 
 import jwt
 from fastapi import Header, HTTPException, status
@@ -49,18 +48,18 @@ async def verify_jwt_token(
 
     try:
         payload = jwt.decode(token, _get_secret(), algorithms=[algorithm])
-    except jwt.ExpiredSignatureError:
+    except jwt.ExpiredSignatureError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token expired",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
     except jwt.PyJWTError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid token: {e}",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
 
     user_id = payload.get("sub")
     if not user_id:

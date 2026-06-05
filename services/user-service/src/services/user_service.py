@@ -5,10 +5,8 @@ Business logic for user management (read/list/invite).
 Authentication-specific logic lives in AuthService.
 """
 import logging
-from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
-
 from src.models.user import User, UserRole
 from src.services.auth_service import AuthService
 
@@ -17,20 +15,20 @@ logger = logging.getLogger(__name__)
 
 class UserService:
     @staticmethod
-    def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
+    def get_user_by_id(db: Session, user_id: int) -> User | None:
         return AuthService.get_user_by_id(db, user_id)
 
     @staticmethod
-    def get_user_by_email(db: Session, email: str) -> Optional[User]:
+    def get_user_by_email(db: Session, email: str) -> User | None:
         return AuthService.get_user_by_email(db, email)
 
     @staticmethod
     def list_users(
         db: Session,
-        role: Optional[UserRole] = None,
+        role: UserRole | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[User]:
+    ) -> list[User]:
         query = db.query(User)
         if role:
             query = query.filter(User.role == role)
@@ -45,10 +43,10 @@ class UserService:
     def invite_user(
         db: Session,
         email: str,
-        first_name: Optional[str] = None,
-        last_name: Optional[str] = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
         role: UserRole = UserRole.PARTICIPANT,
-    ) -> Dict:
+    ) -> dict:
         """
         Create an inactive user record. Out-of-band credential delivery is
         the admin's responsibility (notification-service was removed for PEP).
