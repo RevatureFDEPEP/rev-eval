@@ -38,10 +38,11 @@ jobs:
           echo "✅ JWT_SECRET length: ${#JWT_SECRET}"
 
       - name: Install dependencies
-        working-directory: services/${{ matrix.service }}/src
+        working-directory: services/${{ matrix.service }}
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install -r dev-requirements.txt
           pip install pytest pytest-cov
 
       - name: Lint with Ruff

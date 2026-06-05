@@ -13,4 +13,3 @@ python-jose[cryptography]
 python-multipart
 asyncpg
 httpx
-ruff

@@ -12,7 +12,6 @@ select = [
     "UP",  # pyupgrade (modernize syntax)
 ]
 ignore = [
-    "E501",  # line too long — handled by formatter, not linter
     "B008",  # Depends()/Query() in FastAPI route signatures is idiomatic, not a bug
     "E402",  # module-level import not at top — intentional in service entry points
 ]
