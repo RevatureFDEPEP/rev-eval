@@ -14,6 +14,8 @@ import { getTestSessionBySubmission } from '@/lib/api/quiz-sessions';
 interface InterviewTranscriptMessage {
   speaker?: string;
   text?: string;
+  role?: string;
+  content?: string;
   timestamp?: string;
 }
 
