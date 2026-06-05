@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from os import getenv
 
 from fastapi import FastAPI
@@ -13,7 +14,14 @@ from src.config.settings import settings
 
 load_dotenv()
 
-app = FastAPI(title="Test Management Service", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    yield
+
+
+app = FastAPI(title="Test Management Service", version="1.0.0", lifespan=lifespan)
 
 # ---- CORS ----
 origins = settings.ALLOW_ORIGINS or "*"
@@ -39,11 +47,6 @@ app.include_router(test_submission_router, prefix="/v1/api")
 @app.get("/health", tags=["health"])
 def health_check():
     return {"status": "ok"}
-
-# ---- DB Init ----
-@app.on_event("startup")
-async def on_startup():
-    await init_db()
 
 # ---- Run server ----
 if __name__ == "__main__":
