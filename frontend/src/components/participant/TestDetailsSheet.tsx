@@ -14,13 +14,15 @@ import { getTestSessionBySubmission } from '@/lib/api/quiz-sessions';
 interface InterviewTranscriptMessage {
   speaker?: string;
   text?: string;
+  role?: string;
+  content?: string;
   timestamp?: string;
 }
 
 interface InterviewTranscriptEvaluation {
   overall_score: number;
   score_breakdown: Record<string, number>;
-  skill_breakdown: Record<string, { score?: number }>;
+  skill_breakdown: Record<string, { score?: number; proficiency_level?: string; feedback?: string }>;
   feedback?: string;
   strengths?: string[];
   improvements?: string[];
@@ -30,6 +32,7 @@ interface InterviewTranscriptEvaluation {
 
 interface InterviewTranscript {
   messages: InterviewTranscriptMessage[];
+  status?: string;
   lambda_evaluation?: InterviewTranscriptEvaluation;
 }
 
@@ -589,7 +592,7 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
                                           >
                                             {skill.proficiency_level}
                                           </Badge>
-                                          <span className="text-sm font-medium text-slate-700">{Math.round(skill.score)}%</span>
+                                          <span className="text-sm font-medium text-slate-700">{Math.round(skill.score ?? 0)}%</span>
                                     </div>
                                     </div>
                                       <p className="text-xs text-slate-600">{skill.feedback}</p>
