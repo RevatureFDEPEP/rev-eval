@@ -6,7 +6,6 @@ python-dotenv
 email-validator
 psycopg2-binary
 passlib[bcrypt]
-python-jose[cryptography]
 python-multipart
 pymongo[srv]
 beanie

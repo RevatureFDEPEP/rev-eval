@@ -1,6 +1,5 @@
 import pytest
 from pydantic import ValidationError
-
 from src.schemas.auth_schema import LoginRequest, RegisterRequest
 from src.schemas.user_schema import InviteUserRequest, UserCreate
 

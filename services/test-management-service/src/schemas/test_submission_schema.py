@@ -1,8 +1,10 @@
 # src/schemas/test_submission_schema.py
-from pydantic import BaseModel, field_validator
 from datetime import datetime
-from typing import Optional, Any
 from enum import Enum
+from typing import Any, Optional
+
+from pydantic import BaseModel, field_validator
+
 
 class SubmissionStatus(str, Enum):
     ASSIGNED = "ASSIGNED"
@@ -21,7 +23,7 @@ class TestSubmissionBase(BaseModel):
 
 class TestSubmissionCreate(TestSubmissionBase):
     """Create schema with timezone stripping for POC"""
-    
+
     @field_validator('due_date', mode='before')
     @classmethod
     def strip_timezone_from_due_date(cls, v: Any) -> Any:
@@ -29,7 +31,7 @@ class TestSubmissionCreate(TestSubmissionBase):
         if v is not None and isinstance(v, datetime) and v.tzinfo is not None:
             return v.replace(tzinfo=None)
         return v
-    
+
     class Config:
         from_attributes = True
 
@@ -42,28 +44,28 @@ class TestSubmissionUpdate(BaseModel):
     trainer_score: Optional[int] = None
     final_score: Optional[int] = None
     feedback: Optional[str] = None
-    
+
     @field_validator('due_date', mode='before')
     @classmethod
     def strip_timezone_from_due_date(cls, v: Any) -> Any:
         if v is not None and isinstance(v, datetime) and v.tzinfo is not None:
             return v.replace(tzinfo=None)
         return v
-    
+
     @field_validator('started_at', mode='before')
     @classmethod
     def strip_timezone_from_started_at(cls, v: Any) -> Any:
         if v is not None and isinstance(v, datetime) and v.tzinfo is not None:
             return v.replace(tzinfo=None)
         return v
-    
+
     @field_validator('submitted_at', mode='before')
     @classmethod
     def strip_timezone_from_submitted_at(cls, v: Any) -> Any:
         if v is not None and isinstance(v, datetime) and v.tzinfo is not None:
             return v.replace(tzinfo=None)
         return v
-    
+
     class Config:
         from_attributes = True
 

@@ -6,9 +6,13 @@ from src.schemas.test_schema import TestUpdate as TestUpdateSchema
 from src.schemas.test_submission_schema import (
     BulkAssignRequest,
     SubmissionStatus,
-    TestSubmissionCreate as TestSubmissionCreateSchema,
-    TestSubmissionUpdate as TestSubmissionUpdateSchema,
     TrainerReviewRequest,
+)
+from src.schemas.test_submission_schema import (
+    TestSubmissionCreate as TestSubmissionCreateSchema,
+)
+from src.schemas.test_submission_schema import (
+    TestSubmissionUpdate as TestSubmissionUpdateSchema,
 )
 
 

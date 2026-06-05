@@ -1,6 +1,8 @@
 # src/config/settings.py
 from typing import Optional
+
 from pydantic_settings import BaseSettings
+
 
 class Settings(BaseSettings):
     DB_HOST: str

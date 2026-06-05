@@ -426,7 +426,7 @@ def seed_test_submissions(conn):
                 started_at = None
                 submitted_at = None
 
-            feedback = f"Good performance" if status == 'COMPLETED' else None
+            feedback = "Good performance" if status == 'COMPLETED' else None
 
             submissions_data.append((
                 test_id,
