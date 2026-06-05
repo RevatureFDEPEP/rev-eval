@@ -1,25 +1,19 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { toast } from "sonner";
 
 import { useTimer } from "./useTimer";
-
-const mockToastWarning = jest.fn();
-
-jest.mock("sonner", () => ({
-  toast: {
-    warning: mockToastWarning,
-  },
-}));
 
 describe("useTimer", () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date("2026-06-04T12:00:00Z"));
     localStorage.clear();
-    mockToastWarning.mockReset();
+    jest.spyOn(toast, "warning").mockImplementation(() => undefined as never);
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     jest.useRealTimers();
   });
 
@@ -128,7 +122,50 @@ describe("useTimer", () => {
     expect(onTimeExpired).toHaveBeenCalledTimes(1);
   });
 
-  it("hydrates remaining time from localStorage", () => {
+  it("shows 5-minute and 1-minute warnings once when thresholds are crossed", async () => {
+    renderHook(() =>
+      useTimer({
+        durationSeconds: 301,
+        testId: "warnings",
+        onTimeExpired: jest.fn(),
+      })
+    );
+
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+
+    await waitFor(() => {
+      expect(toast.warning).toHaveBeenCalledWith(
+        "5 Minutes Remaining",
+        expect.objectContaining({
+          description: "Please review your answers.",
+        })
+      );
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(240000);
+    });
+
+    await waitFor(() => {
+      expect(toast.warning).toHaveBeenCalledWith(
+        "1 Minute Remaining!",
+        expect.objectContaining({
+          description: "Test will auto-submit when time expires.",
+        })
+      );
+      expect(toast.warning).toHaveBeenCalledTimes(2);
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+
+    expect(toast.warning).toHaveBeenCalledTimes(2);
+  });
+
+  it("hydrates remaining time from localStorage", async () => {
     localStorage.setItem(
       "quiz-timer-stored",
       JSON.stringify({
@@ -146,7 +183,43 @@ describe("useTimer", () => {
       })
     );
 
-    expect(result.current.timeRemaining).toBe(15);
+    await waitFor(() => {
+      expect(result.current.timeRemaining).toBe(15);
+    });
     expect(result.current.formatTime()).toBe("00:15");
+  });
+
+  it("expires once when stored time has already elapsed", async () => {
+    const onTimeExpired = jest.fn();
+    localStorage.setItem(
+      "quiz-timer-expired-stored",
+      JSON.stringify({
+        timeRemaining: 20,
+        timestamp: Date.now() - 30000,
+      })
+    );
+
+    const { result } = renderHook(() =>
+      useTimer({
+        durationSeconds: 60,
+        testId: "expired-stored",
+        onTimeExpired,
+      })
+    );
+
+    await waitFor(() => {
+      expect(result.current.timeRemaining).toBe(0);
+    });
+    expect(result.current.formatTime()).toBe("00:00");
+    expect(result.current.isExpired).toBe(true);
+    await waitFor(() => {
+      expect(localStorage.getItem("quiz-timer-expired-stored")).toBeNull();
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(100);
+    });
+
+    expect(onTimeExpired).toHaveBeenCalledTimes(1);
   });
 });

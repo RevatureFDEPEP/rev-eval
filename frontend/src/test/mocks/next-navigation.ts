@@ -8,6 +8,14 @@ export const mockRouter = {
   prefetch: jest.fn(),
 };
 
+export function resetMockRouter() {
+  mockRouter.push.mockReset();
+  mockRouter.refresh.mockReset();
+  mockRouter.back.mockReset();
+  mockRouter.replace.mockReset();
+  mockRouter.prefetch.mockReset();
+}
+
 export function useRouter() {
   return mockRouter;
 }
