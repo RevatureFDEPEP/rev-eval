@@ -5,6 +5,7 @@ __pycache__/
 
 #Graphify-out
 graphify-out/
+project-graphify-summary.json
 
 # C extensions
 *.so
