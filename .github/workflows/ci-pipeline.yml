@@ -112,7 +112,7 @@ jobs:
           scan-type: fs
           scan-ref: services/${{ matrix.service }}
           format: table
-          exit-code: 0
+          exit-code: 1
           severity: CRITICAL,HIGH
           ignore-unfixed: true
 
@@ -158,23 +158,30 @@ jobs:
       - name: Test
         working-directory: frontend
         run: pnpm test --if-present
-
   ci-gate:
-    name: CI Gate
-    runs-on: ubuntu-latest
-    needs: [backend-build-test, frontend-build-test, trivy-scan]
-    if: always()
-    steps:
-      - name: Check all required jobs passed
-        run: |
-          backend="${{ needs.backend-build-test.result }}"
-          frontend="${{ needs.frontend-build-test.result }}"
-          trivy="${{ needs.trivy-scan.result }}"
-          echo "backend-build-test: $backend"
-          echo "frontend-build-test: $frontend"
-          echo "trivy-scan:          $trivy"
-          if [[ "$backend" != "success" || "$frontend" != "success" || "$trivy" != "success" ]]; then
-            echo "❌ One or more required checks failed"
-            exit 1
-          fi
-          echo "✅ All checks passed"
+      name: CI Gate
+      runs-on: ubuntu-latest
+      needs: [backend-build-test, frontend-build-test, trivy-scan]
+      if: always()
+      steps:
+        - name: Check all required jobs passed
+          run: |
+            echo "=== Job Results ==="
+            echo "backend-build-test: ${{ needs.backend-build-test.result }}"
+            echo "frontend-build-test: ${{ needs.frontend-build-test.result }}"
+            echo "trivy-scan: ${{ needs.trivy-scan.result }}"
+            echo "=================="
+            
+            if [[ "${{ needs.backend-build-test.result }}" == "failure" ]]; then
+              echo "❌ Backend tests failed"
+              exit 1
+            fi
+            if [[ "${{ needs.frontend-build-test.result }}" == "failure" ]]; then
+              echo "❌ Frontend tests failed"
+              exit 1
+            fi
+            if [[ "${{ needs.trivy-scan.result }}" == "failure" ]]; then
+              echo "❌ Trivy scan failed"
+              exit 1
+            fi
+            echo "✅ All checks passed"

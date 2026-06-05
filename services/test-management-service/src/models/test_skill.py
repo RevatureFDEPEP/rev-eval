@@ -13,7 +13,7 @@ class TestSkill(Base):
     test_id = Column(Integer, ForeignKey("tests.id"), nullable=False)
     skill_id = Column(Integer, ForeignKey("skills.id"), nullable=False)
 
-    __table_args__ = (UniqueConstraint("test_id", "skill_id", name="uq_test_skill"),)
+    __table_args__ = (UniqueConstraint("test_id", "skill_id", name="uq_test_skill"), {"extend_existing": True})
 
     # Relationships
     test = relationship("Test", back_populates="test_skills")
