@@ -122,7 +122,9 @@ def test_protected_route_no_auth_returns_401():
 
 
 def _make_token(
-    payload: dict, secret: str = "test-secret-key", expired: bool = False
+    payload: dict,
+    secret: str = "test-secret-key-for-gateway-tests-only",
+    expired: bool = False,
 ) -> str:
     if expired:
         payload["exp"] = 0
