@@ -6,7 +6,6 @@ import { useAuth } from '@/lib/auth/useAuth';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { AssociateCharts } from '@/components/associate/AssociateCharts';
 import { getAssociateDashboardStats, getAssignedTests } from '@/lib/api';
 import type { AssignedTestInfo, ParticipantDashboardStats } from '@/lib/api/types';

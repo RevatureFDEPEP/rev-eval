@@ -69,7 +69,7 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
       if (sourceRef.current) {
         try {
           sourceRef.current.disconnect();
-        } catch (e) {
+        } catch {
           // Ignore disconnect errors
         }
       }

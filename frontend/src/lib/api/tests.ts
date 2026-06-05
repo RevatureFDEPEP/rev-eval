@@ -10,7 +10,6 @@ import {
   TestCreate,
   TestUpdate,
   BulkTestAssignmentCreate,
-  TestAssignment,
 } from './types';
 
 /**

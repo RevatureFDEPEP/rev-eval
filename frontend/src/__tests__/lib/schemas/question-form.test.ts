@@ -96,6 +96,7 @@ describe('trueFalseSchema', () => {
   })
 
   it('rejects when true_false_answer is missing', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { true_false_answer: _, ...rest } = VALID_TF
     const result = trueFalseSchema.safeParse(rest)
     expect(result.success).toBe(false)
@@ -126,6 +127,7 @@ describe('textSchema', () => {
   })
 
   it('rejects when sample_answer is missing', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { sample_answer: _, ...rest } = VALID_TEXT
     const result = textSchema.safeParse(rest)
     expect(result.success).toBe(false)

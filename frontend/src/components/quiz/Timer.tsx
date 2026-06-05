@@ -24,7 +24,7 @@ interface TimerProps {
   isCritical: boolean;  // < 1 minute
 }
 
-export function Timer({ timeRemaining, formatTime, isWarning, isCritical }: TimerProps) {
+export function Timer({ formatTime, isWarning, isCritical }: TimerProps) {
   // Determine styling based on time remaining
   const getTimerColor = () => {
     if (isCritical) {

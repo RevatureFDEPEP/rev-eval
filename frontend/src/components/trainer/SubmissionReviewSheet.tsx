@@ -13,9 +13,8 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getSubmissionReviewDetails, submitTrainerReview } from '@/lib/api';
 import type { TestSubmission } from '@/lib/api/types';
-import { CheckCircle2, Star, Play, Pause, RotateCcw, Loader2, Copy, Lightbulb } from 'lucide-react';
+import { CheckCircle2, Play, Pause, RotateCcw, Loader2, Copy, Lightbulb } from 'lucide-react';
 import { useAudioPlayer } from '@/lib/hooks/useAudioPlayer';
-import { formatTableDate } from '@/lib/utils/date';
 
 interface SubmissionReviewSheetProps {
   submission: TestSubmission | null;
@@ -182,6 +181,7 @@ export function SubmissionReviewSheet({
     };
 
     loadDetails();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submission, open]);
 
   const handlePlayAudio = async (audioUrl: string, messageIndex: number) => {
@@ -205,10 +205,6 @@ export function SubmissionReviewSheet({
     await audioPlayer.play(audioUrl);
   };
 
-  const handlePauseAudio = () => {
-    audioPlayer.pause();
-  };
-
   const handleRestartAudio = () => {
     audioPlayer.restart();
   };
@@ -227,6 +223,7 @@ export function SubmissionReviewSheet({
       audioPlayer.stop();
       setPlayingAudioIndex(null);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const handleUseAIValue = (setter: (value: string) => void, value: string | string[] | undefined) => {

@@ -26,7 +26,7 @@ import { TestDetailsSheet } from '@/components/trainer/TestDetailsSheet';
 import { SubmissionReviewSheet } from '@/components/trainer/SubmissionReviewSheet';
 import { QuizSubmissionSheet } from '@/components/trainer/QuizSubmissionSheet';
 import { BasicSubmissionSheet } from '@/components/trainer/BasicSubmissionSheet';
-import { getTrainerTests, getCurrentUser, getEvaluatedSubmissionsForTrainer, getGradedSubmissions, getAllSubmissionsForTrainer } from '@/lib/api';
+import { getTrainerTests, getCurrentUser, getEvaluatedSubmissionsForTrainer, getAllSubmissionsForTrainer } from '@/lib/api';
 import type { TrainerTestInfo, TestSubmission } from '@/lib/api/types';
 import { Calendar, ClipboardCheck, ClipboardList, Layers, PlusCircle, Star } from 'lucide-react';
 import { formatTableDate } from '@/lib/utils/date';

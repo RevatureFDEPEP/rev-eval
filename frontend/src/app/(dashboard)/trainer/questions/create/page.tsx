@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { mcqSchema, trueFalseSchema, textSchema, type McqFormValues, type TrueFalseFormValues, type TextFormValues, type QuestionFormValues } from "@/lib/schemas/question-form";
+import { mcqSchema, trueFalseSchema, textSchema, type QuestionFormValues } from "@/lib/schemas/question-form";
 import { ArrowLeft, Check, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -151,7 +151,6 @@ export default function CreateQuestionPage() {
 
     if (questionType === "mcq") {
       // Get all correct answers
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const correctAnswerIndices = values.options
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((opt: any, idx: number) => (opt.is_correct ? idx + 1 : null))
