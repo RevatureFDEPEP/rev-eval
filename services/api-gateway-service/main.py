@@ -155,11 +155,7 @@ async def public_auth_proxy(auth_path: str, request: Request):
 async def smart_gateway(
     path: str,
     request: Request,
-<<<<<<< Updated upstream
-    user_context: Dict[str, str] = Depends(verify_jwt_token)
-=======
     user_context: dict[str, str] = Depends(verify_jwt_token),
->>>>>>> Stashed changes
 ):
     """
     Smart routing based on endpoint pattern with JWT authentication.
