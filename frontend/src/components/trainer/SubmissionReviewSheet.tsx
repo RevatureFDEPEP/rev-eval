@@ -140,38 +140,33 @@ export function SubmissionReviewSheet({
   const audioPlayer = useAudioPlayer();
 
   useEffect(() => {
-    if (!submission || !open) {
-      setDetails(null);
-      setError(null);
-      // Reset all form fields
-      setTrainerScore('');
-      setOverallFeedback('');
-      setStrengths('');
-      setImprovements('');
-      setTechnicalKnowledge('');
-      setProblemSolving('');
-      setCommunication('');
-      setCodeQuality('');
-      setEngagement('');
-      setSkillsAssessment({});
-      return;
-    }
-
     const loadDetails = async () => {
+      if (!submission || !open) {
+        setDetails(null);
+        setError(null);
+        setTrainerScore('');
+        setOverallFeedback('');
+        setStrengths('');
+        setImprovements('');
+        setTechnicalKnowledge('');
+        setProblemSolving('');
+        setCommunication('');
+        setCodeQuality('');
+        setEngagement('');
+        setSkillsAssessment({});
+        return;
+      }
       try {
         setLoading(true);
         setError(null);
         const data = await getSubmissionReviewDetails(submission.id);
         setDetails(data);
 
-        // In read-only mode, pre-fill with existing trainer evaluation
         if (readOnly && submission.trainer_score) {
           setTrainerScore(submission.trainer_score.toString());
           if (submission.feedback) {
             setOverallFeedback(submission.feedback);
           }
-          // Note: Full trainer_evaluation structure would need to be fetched from MongoDB
-          // For now, we show basic fields from submission
         }
       } catch (err) {
         console.error('Failed to load review details:', err);
@@ -223,9 +218,13 @@ export function SubmissionReviewSheet({
   };
 
   useEffect(() => {
+    if (!open) {
+      setPlayingAudioIndex(null);
+      audioPlayer.stop();
+      return;
+    }
     return () => {
       audioPlayer.stop();
-      setPlayingAudioIndex(null);
     };
   }, [open]);
 

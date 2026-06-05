@@ -58,9 +58,12 @@ export function AssignTestModal({ tests, onSuccess, triggerClassName, defaultTes
   ).padStart(2, '0')}`;
 
   useEffect(() => {
-    if (defaultTestId) {
-      setSelectedTestId(`${defaultTestId}`);
-    }
+    const syncDefaultTest = () => {
+      if (defaultTestId) {
+        setSelectedTestId(`${defaultTestId}`);
+      }
+    };
+    syncDefaultTest();
   }, [defaultTestId, open]);
 
   useEffect(() => {

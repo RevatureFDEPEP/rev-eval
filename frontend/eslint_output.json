@@ -1,0 +1,11 @@
+﻿npx : npx: installed 69 in 8.555s
+At line:1 char:74
++ ... l\frontend"; npx eslint src --ext .ts,.tsx --format json 2>&1 | Out-F ...
++                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npx: installed 69 in 8.555s:String) [], Re 
+   moteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Cannot find module 'node:module'
+Require stack:
+- C:\Users\mauri\AppData\Roaming\npm-cache\_npx\18460\node_modules\eslint\bin\eslint.js

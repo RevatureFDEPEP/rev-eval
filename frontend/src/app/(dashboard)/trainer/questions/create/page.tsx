@@ -129,7 +129,7 @@ export default function CreateQuestionPage() {
   };
 
   // Get default values based on question type
-  const getDefaultValues = (): any => {
+  const getDefaultValues = (): QuestionFormValues => {
     const base = {
       question_text: "",
       difficulty: undefined,
@@ -162,7 +162,7 @@ export default function CreateQuestionPage() {
     }
   };
 
-  const form = useForm<any>({
+  const form = useForm<QuestionFormValues>({
     resolver: zodResolver(getSchema()),
     defaultValues: getDefaultValues(),
   });

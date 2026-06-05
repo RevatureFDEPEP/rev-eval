@@ -92,13 +92,12 @@ export function GradedSubmissionSheet({
   const audioPlayer = useAudioPlayer();
 
   useEffect(() => {
-    if (!submission || !open) {
-      setDetails(null);
-      setError(null);
-      return;
-    }
-
     const loadDetails = async () => {
+      if (!submission || !open) {
+        setDetails(null);
+        setError(null);
+        return;
+      }
       try {
         setLoading(true);
         setError(null);
@@ -150,9 +149,13 @@ export function GradedSubmissionSheet({
   };
 
   useEffect(() => {
+    if (!open) {
+      setPlayingAudioIndex(null);
+      audioPlayer.stop();
+      return;
+    }
     return () => {
       audioPlayer.stop();
-      setPlayingAudioIndex(null);
     };
   }, [open]);
 
