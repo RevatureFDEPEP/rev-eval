@@ -3,7 +3,7 @@
 **Status:** ✅ Completed
 **Spec:** `days_6_10_features.md` §5 (Days 8–9)
 **Unblocks:** W3-F1 (Quiz Session Creation Backend — needs seeded question documents for `$sample` aggregation)
-**Last updated:** 2026-06-05 (branch `richardh-feat-minio-uploads`)
+**Last updated:** 2026-06-05 (PR #49 / branch `richardh-feat-minio-uploads`)
 
 Let question authors upload diagrams/screenshots directly from the browser to
 MinIO via pre-signed PUT URLs, storing the object key on the question document.

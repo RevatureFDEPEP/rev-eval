@@ -13,7 +13,7 @@ This file stays at summary level only.
 > start, advance, or finish a feature, update its detail file (check off steps,
 > add evidence) **and** its status row here, in the same PR as the code change.
 
-**Last assessed:** 2026-06-05 (branch `richardh-feat-minio-uploads`)
+**Last assessed:** 2026-06-05 (PR #49 / branch `richardh-feat-minio-uploads`)
 
 ## Status values
 
@@ -39,7 +39,7 @@ This file stays at summary level only.
 ## Suggested order of attack
 
 1. ~~**F4 finish**~~ — done (PR #40).
-2. ~~**F5 pre-signed uploads**~~ — done (branch `richardh-feat-minio-uploads`).
+2. ~~**F5 pre-signed uploads**~~ — done (PR #49).
 3. **F7 Alembic + Category** — W3-F1 sessions migration and W4-F1 reporting migrations build on it.
 4. **F2 deepen** — multi-stage Dockerfiles + model/repo test depth.
 5. **M10 reporting scaffold** — pairs naturally with F7's Alembic work.
