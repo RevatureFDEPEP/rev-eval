@@ -78,18 +78,11 @@ jobs:
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ matrix.service }}:ci
-          format: sarif
-          output: trivy-results-${{ matrix.service }}.sarif
+          format: table
           exit-code: '1'
           severity: CRITICAL,HIGH
           ignore-unfixed: true
 
-      - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: trivy-results-${{ matrix.service }}.sarif
-          category: trivy-${{ matrix.service }}
 
 
   frontend-build-test:
