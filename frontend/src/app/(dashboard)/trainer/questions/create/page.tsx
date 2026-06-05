@@ -69,6 +69,7 @@ export default function CreateQuestionPage() {
   };
 
   // Get default values based on question type
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getDefaultValues = (): any => {
     const base = {
       question_text: "",
@@ -102,6 +103,7 @@ export default function CreateQuestionPage() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const form = useForm<any>({
     resolver: zodResolver(getSchema()),
     defaultValues: getDefaultValues(),
@@ -140,6 +142,7 @@ export default function CreateQuestionPage() {
     loadSkills();
   }, []);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const transformFormData = (values: any): QuestionCreate => {
     // For MCQ type, determine if it's actually MCQ (single answer) or MULTI (multiple answers)
     let actualType: QuestionType = questionType;
@@ -148,9 +151,11 @@ export default function CreateQuestionPage() {
 
     if (questionType === "mcq") {
       // Get all correct answers
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const correctAnswerIndices = values.options
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((opt: any, idx: number) => (opt.is_correct ? idx + 1 : null))
-        .filter((id: any): id is number => id !== null);
+        .filter((id: number | null): id is number => id !== null);
 
       // Determine if it's MCQ (1 answer) or MULTI (2+ answers)
       if (correctAnswerIndices.length === 1) {
@@ -160,6 +165,7 @@ export default function CreateQuestionPage() {
       }
 
       correct_answers = correctAnswerIndices;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       options = values.options.map((opt: any) => ({ text: opt.text }));
     } else if (questionType === "true_false") {
       // For TRUE_FALSE, send boolean in correct_answers, no options
@@ -194,9 +200,9 @@ export default function CreateQuestionPage() {
         description: `"${values.question_text.slice(0, 50)}..." has been added to your question bank.`,
       });
       router.push("/trainer/questions");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to create question:", err);
-      const errorMessage = err.message || "Failed to create question";
+      const errorMessage = err instanceof Error ? err.message : "Failed to create question";
       setError(errorMessage);
       toast.error("Failed to create question", {
         description: errorMessage,
