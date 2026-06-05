@@ -1,8 +1,7 @@
 import pytest
-from sqlalchemy.future import select
 from src.repositories.test_repository import TestRepository
 from src.schemas.test_schema import TestCreate, TestUpdate
-from src.models.test import Test, TestType
+from src.models.test import TestType
 
 
 class TestTestRepository:

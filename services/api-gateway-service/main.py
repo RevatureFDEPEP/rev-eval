@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Import JWT middleware
-from src.middleware.auth import verify_jwt_token, add_user_context_headers
+from src.middleware.auth import verify_jwt_token, add_user_context_headers  # noqa: E402
 
 app = FastAPI(title="API Gateway")
 
@@ -89,7 +89,7 @@ def on_startup():
     service_name = getenv('SERVICE_NAME', 'api-gateway')
     service_port = int(getenv('PORT', '8000'))
     logger.info(f"✅ {service_name} starting on port {service_port}")
-    logger.info(f"📍 Service discovery: compose-internal DNS")
+    logger.info("📍 Service discovery: compose-internal DNS")
 
 @app.on_event("shutdown")
 def on_shutdown():
@@ -216,10 +216,10 @@ async def smart_gateway(
         
         # Log errors
         if resp.status_code >= 400:
-            logger.error(f"❌ Error Response:")
+            logger.error("❌ Error Response:")
             try:
                 logger.error(f"   {resp.json()}")
-            except:
+            except Exception:
                 logger.error(f"   {resp.text[:200]}")
         
         logger.info("=" * 80)

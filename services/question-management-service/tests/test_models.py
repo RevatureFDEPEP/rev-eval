@@ -1,6 +1,6 @@
 import pytest
 from pydantic import ValidationError
-from src.models.question import Question, Option, OptionCreate, QuestionType
+from src.models.question import Option, OptionCreate, QuestionType
 
 
 class TestQuestionTypeEnum:

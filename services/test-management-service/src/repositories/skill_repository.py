@@ -1,7 +1,6 @@
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import delete as sql_delete
 from src.models.skill import Skill
 from src.schemas.skill_schema import SkillCreate, SkillUpdate
 

@@ -1,4 +1,3 @@
-from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from src.repositories.test_repository import (

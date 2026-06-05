@@ -49,7 +49,7 @@ async def init_db():
 
         # Initialize Beanie ODM
         await init_beanie(database=db, document_models=[Question])
-        print(f"✅ Beanie ODM initialized with Question model")
+        print("✅ Beanie ODM initialized with Question model")
 
     except (ConnectionFailure, ServerSelectionTimeoutError) as e:
         print(f"❌ Failed to connect to MongoDB: {e}")

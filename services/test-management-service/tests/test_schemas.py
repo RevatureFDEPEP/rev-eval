@@ -1,6 +1,5 @@
 import pytest
 from datetime import datetime, timezone
-from pydantic import ValidationError
 from src.schemas.test_schema import TestCreate, TestUpdate
 from src.schemas.skill_schema import SkillCreate, SkillUpdate
 from src.schemas.test_submission_schema import (

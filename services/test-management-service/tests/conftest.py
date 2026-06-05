@@ -12,17 +12,12 @@ os.environ.setdefault("SERVICE_HOSTNAME", "localhost")
 # Override DATABASE_URL so session.py picks up SQLite instead of Postgres
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 
-import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from src.db.session import Base
 # Import all models to register table metadata
-from src.models.test import Test, TestType
-from src.models.skill import Skill
-from src.models.test_skill import TestSkill
-from src.models.test_submission import TestSubmission, SubmissionStatus
 
 
 @pytest_asyncio.fixture(scope="function")
