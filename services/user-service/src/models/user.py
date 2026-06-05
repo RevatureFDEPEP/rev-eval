@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum
-from datetime import datetime
-from src.db.session import Base
 import enum
+from datetime import datetime
+
+from sqlalchemy import Boolean, Column, DateTime, Enum, Integer, String
+from src.db.session import Base
 
 
 class UserRole(str, enum.Enum):
