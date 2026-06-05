@@ -155,7 +155,11 @@ async def public_auth_proxy(auth_path: str, request: Request):
 async def smart_gateway(
     path: str,
     request: Request,
+<<<<<<< Updated upstream
     user_context: Dict[str, str] = Depends(verify_jwt_token)
+=======
+    user_context: dict[str, str] = Depends(verify_jwt_token),
+>>>>>>> Stashed changes
 ):
     """
     Smart routing based on endpoint pattern with JWT authentication.
@@ -256,7 +260,9 @@ async def smart_gateway(
 
 # ===== LEGACY ROUTE (WITH SERVICE NAME) =====
 @app.api_route("/{service_name}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
-async def legacy_gateway(service_name: str, path: str, request: Request):
+async def legacy_gateway(
+    service_name: str, path: str, request: Request
+):
     """
     Legacy routing with service name in URL.
     Example: GET /test-management-service/v1/api/tests
