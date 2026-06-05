@@ -90,9 +90,9 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov ruff
 
-      - name: Ruff lint
+      - name: Lint
         working-directory: services/${{ matrix.service }}
-        run: ruff check . || echo "ruff linting failed and skip for next step"
+        run: ruff check .
 
       - name: Run pytest
         working-directory: services/${{ matrix.service }}

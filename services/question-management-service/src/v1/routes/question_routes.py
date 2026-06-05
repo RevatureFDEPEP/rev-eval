@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, status, Query
-from pydantic import ValidationError
 from typing import List, Optional
-from src.schemas.question import QuestionCreate, QuestionUpdate, QuestionResponse
+
+from fastapi import APIRouter, HTTPException, Query, status
+from pydantic import ValidationError
+from src.schemas.question import QuestionCreate, QuestionResponse, QuestionUpdate
 from src.services.question_service import QuestionService
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
@@ -42,12 +43,12 @@ async def create_question(question: QuestionCreate):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"validation_errors": e.errors()}
-        )
+        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while creating the question: {str(e)}"
-        )
+        ) from e
 
 
 @router.get(
@@ -66,7 +67,7 @@ async def get_all_questions():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while fetching questions: {str(e)}"
-        )
+        ) from e
 
 
 @router.get(
@@ -92,7 +93,7 @@ async def get_question_by_id(id: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while fetching the question: {str(e)}"
-        )
+        ) from e
 
 
 @router.put(
@@ -127,12 +128,12 @@ async def update_question(id: str, question_update: QuestionUpdate):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"validation_errors": e.errors()}
-        )
+        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while updating the question: {str(e)}"
-        )
+        ) from e
 
 
 @router.delete(
@@ -161,7 +162,7 @@ async def delete_question(id: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while deleting the question: {str(e)}"
-        )
+        ) from e
 
 
 # ============================================================================
@@ -197,7 +198,7 @@ async def get_questions_by_type(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred: {str(e)}"
-        )
+        ) from e
 
 
 @router.get(
@@ -220,7 +221,7 @@ async def get_questions_by_skill(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred: {str(e)}"
-        )
+        ) from e
 
 
 @router.get(
@@ -250,7 +251,7 @@ async def get_questions_by_difficulty(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred: {str(e)}"
-        )
+        ) from e
 
 
 @router.get(
@@ -280,7 +281,7 @@ async def get_questions_by_tags(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred: {str(e)}"
-        )
+        ) from e
 
 
 @router.get(
@@ -331,4 +332,4 @@ async def filter_questions(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred: {str(e)}"
-        )
+        ) from e

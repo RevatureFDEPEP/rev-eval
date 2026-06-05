@@ -3,7 +3,6 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWTError
 from sqlalchemy.orm import Session
-
 from src.db.session import get_db
 from src.models.user import User
 from src.services.auth_service import AuthService
@@ -23,7 +22,7 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from None
 
     sub = payload.get("sub")
     if sub is None:

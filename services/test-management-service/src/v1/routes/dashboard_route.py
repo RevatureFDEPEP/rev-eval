@@ -6,6 +6,9 @@ Provides aggregated statistics for trainer and participant dashboards.
 from fastapi import APIRouter, Header, HTTPException
 from typing import Optional
 import logging
+from typing import Optional
+
+from fastapi import APIRouter, Header, HTTPException
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -190,7 +193,7 @@ def get_user_context(
 #         average_score=average_score,
 #         tests_due_this_week=tests_due_this_week
 #     )
-    
+
 #     logger.info(f"✅ Returning participant stats: {stats}")
 #     return stats
 

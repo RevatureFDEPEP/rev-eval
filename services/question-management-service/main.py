@@ -2,7 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import settings
-from src.db.session import init_db, close_db
+from src.db.session import close_db, init_db
 from src.v1.routes.question_routes import router as question_router
 
 app = FastAPI(

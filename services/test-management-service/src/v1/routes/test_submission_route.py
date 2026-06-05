@@ -1,17 +1,18 @@
+from typing import Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from typing import List, Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.services.test_submission_service import TestSubmissionService
+from src.db.session import get_db
 from src.schemas.test_submission_schema import (
-    TestSubmissionCreate,
-    TestSubmissionUpdate,
-    TestSubmissionOut,
     BulkAssignRequest,
     BulkAssignResult,
+    TestSubmissionCreate,
+    TestSubmissionOut,
+    TestSubmissionUpdate,
     TrainerReviewRequest,
-    TrainerReviewResponse
+    TrainerReviewResponse,
 )
-from src.db.session import get_db
+from src.services.test_submission_service import TestSubmissionService
 from src.utils.dependencies import get_current_user_from_headers
 
 router = APIRouter(prefix="/submissions", tags=["Test Submissions"])
@@ -54,21 +55,21 @@ async def get_submission(submission_id: int, db: AsyncSession = Depends(get_db))
     try:
         return await TestSubmissionService.get_submission_by_id(db, submission_id)
     except ValueError:
-        raise HTTPException(status_code=404, detail="Submission not found")
+        raise HTTPException(status_code=404, detail="Submission not found") from None
 
 @router.put("/{submission_id}/", response_model=TestSubmissionOut)
 async def update_submission(submission_id: int, submission_in: TestSubmissionUpdate, db: AsyncSession = Depends(get_db)):
     try:
         return await TestSubmissionService.update_submission(db, submission_id, submission_in)
     except ValueError:
-        raise HTTPException(status_code=404, detail="Submission not found")
+        raise HTTPException(status_code=404, detail="Submission not found") from None
 
 @router.delete("/{submission_id}/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_submission(submission_id: int, db: AsyncSession = Depends(get_db)):
     try:
         await TestSubmissionService.delete_submission(db, submission_id)
     except ValueError:
-        raise HTTPException(status_code=404, detail="Submission not found")
+        raise HTTPException(status_code=404, detail="Submission not found") from None
 
 @router.post("/bulk-assign", response_model=BulkAssignResult, status_code=status.HTTP_201_CREATED)
 async def bulk_assign_test(
@@ -167,9 +168,9 @@ async def get_submission_review_details(
     try:
         return await TestSubmissionService.get_submission_review_details(db, submission_id)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching review details: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching review details: {str(e)}") from e
 
 
 @router.post("/{submission_id}/trainer-review", response_model=TrainerReviewResponse)
@@ -202,6 +203,6 @@ async def submit_trainer_review(
             db, submission_id, review, trainer_id
         )
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error submitting review: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error submitting review: {str(e)}") from e

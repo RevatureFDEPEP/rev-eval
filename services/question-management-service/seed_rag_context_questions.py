@@ -14,9 +14,9 @@ Requirements:
 """
 
 import asyncio
-import httpx
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
+import httpx
 
 # Base URL for the question management service
 BASE_URL = "https://automatic-system-p55wjj9v6xjcr765-8002.app.github.dev:443/v1/api"

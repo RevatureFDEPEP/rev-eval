@@ -2,20 +2,24 @@ from typing import List, Dict, Any
 import httpx
 import logging
 from datetime import datetime, timezone
+from typing import Any, Dict, List
+
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
+from src.config import settings
 from src.repositories.test_submission_repository import TestSubmissionRepository
 from src.services.test_service import TestService
 from src.schemas.test_submission_schema import (
-    TestSubmissionCreate,
-    TestSubmissionUpdate,
-    TestSubmissionOut,
     BulkAssignRequest,
     BulkAssignResult,
+    SubmissionStatus,
+    TestSubmissionCreate,
+    TestSubmissionOut,
+    TestSubmissionUpdate,
     TrainerReviewRequest,
     TrainerReviewResponse,
-    SubmissionStatus
 )
-from src.config import settings
+from src.services.test_service import TestService
 
 logger = logging.getLogger(__name__)
 
@@ -279,8 +283,8 @@ class TestSubmissionService:
         """
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
-        from src.models.test_submission import TestSubmission
         from src.models.test import Test
+        from src.models.test_submission import TestSubmission
 
         # Get all EVALUATED submissions (any trainer can review any interview)
         query = (
@@ -341,8 +345,8 @@ class TestSubmissionService:
         """
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
-        from src.models.test_submission import TestSubmission
         from src.models.test import Test
+        from src.models.test_submission import TestSubmission
 
         # Get all GRADED submissions
         query = (
@@ -373,8 +377,8 @@ class TestSubmissionService:
         """
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
-        from src.models.test_submission import TestSubmission
         from src.models.test import Test
+        from src.models.test_submission import TestSubmission
 
         # Get all submissions for tests created by this trainer (exclude EVALUATED)
         query = (

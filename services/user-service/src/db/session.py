@@ -1,9 +1,8 @@
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import OperationalError
-
-from src.db.init_db import Base
+from sqlalchemy.orm import sessionmaker
 from src.config.settings import settings
+from src.db.init_db import Base
 
 # Import all models to register them with Base metadata
 
