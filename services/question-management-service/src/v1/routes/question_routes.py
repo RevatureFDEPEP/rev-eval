@@ -2,10 +2,30 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import ValidationError
-from src.schemas.question import QuestionCreate, QuestionResponse, QuestionUpdate
+from src.models.question import Question
+from src.schemas.question import (
+    PresignedUploadResponse,
+    QuestionCreate,
+    QuestionResponse,
+    QuestionUpdate,
+)
 from src.services.question_service import QuestionService
+from src.services.upload_service import UploadService
+from src.utils.s3_client import generate_presigned_get_url
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
+
+
+def _to_response(question: Question) -> QuestionResponse:
+    """Convert a Beanie document to the response schema.
+
+    mode='json' converts ObjectId to string. When an image is attached,
+    enrich with a pre-signed GET URL so clients can render it directly.
+    """
+    data = question.model_dump(by_alias=True, mode='json')
+    if data.get("image_object_key"):
+        data["image_url"] = generate_presigned_get_url(data["image_object_key"])
+    return QuestionResponse(**data)
 
 
 @router.post(
@@ -62,11 +82,44 @@ async def get_all_questions():
     try:
         questions = await QuestionService.get_all_questions()
         # Convert Beanie documents to response schema (mode='json' converts ObjectId to string)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return [_to_response(q) for q in questions]
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while fetching questions: {str(e)}"
+        ) from e
+
+
+# NOTE: must be declared before "/{id}" or the path parameter captures it.
+@router.get(
+    "/presigned-upload-url",
+    response_model=PresignedUploadResponse,
+    summary="Get a pre-signed PUT URL for a question image",
+    description="""
+    Generate a pre-signed MinIO PUT URL for uploading a question diagram or
+    screenshot directly from the browser.
+
+    **Flow:**
+    1. Client requests this endpoint with the file's `content_type`
+    2. Client PUTs the file bytes to the returned `upload_url`
+       (the `Content-Type` request header must match exactly)
+    3. Client stores `object_key` on the question via create/update
+
+    **Allowed content types:** `image/png`, `image/jpeg`
+    """
+)
+async def get_presigned_upload_url(
+    content_type: str = Query(..., description="MIME type of the file to upload (image/png or image/jpeg)")
+):
+    """Generate a pre-signed PUT URL for a question image upload."""
+    try:
+        return UploadService.presigned_question_image_upload(content_type)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while generating the upload URL: {str(e)}"
         ) from e
 
 
@@ -86,7 +139,7 @@ async def get_question_by_id(id: str):
                 detail=f"Question with ID '{id}' not found"
             )
         # Convert Beanie document to response schema (mode='json' converts ObjectId to string)
-        return QuestionResponse(**question.model_dump(by_alias=True, mode='json'))
+        return _to_response(question)
     except HTTPException:
         raise
     except Exception as e:
@@ -191,7 +244,7 @@ async def get_questions_by_type(
     """Get questions filtered by type."""
     try:
         questions = await QuestionService.find_by_type(question_type, limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return [_to_response(q) for q in questions]
     except HTTPException:
         raise
     except Exception as e:
@@ -214,7 +267,7 @@ async def get_questions_by_skill(
     """Get questions filtered by skill."""
     try:
         questions = await QuestionService.find_by_skill(skill, limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return [_to_response(q) for q in questions]
     except HTTPException:
         raise
     except Exception as e:
@@ -244,7 +297,7 @@ async def get_questions_by_difficulty(
     """Get questions filtered by difficulty."""
     try:
         questions = await QuestionService.find_by_difficulty(difficulty, limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return [_to_response(q) for q in questions]
     except HTTPException:
         raise
     except Exception as e:
@@ -274,7 +327,7 @@ async def get_questions_by_tags(
     """Get questions filtered by tags."""
     try:
         questions = await QuestionService.find_by_tags(tags, limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return [_to_response(q) for q in questions]
     except HTTPException:
         raise
     except Exception as e:
@@ -325,7 +378,7 @@ async def filter_questions(
             tags=tags,
             limit=limit
         )
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return [_to_response(q) for q in questions]
     except HTTPException:
         raise
     except Exception as e:

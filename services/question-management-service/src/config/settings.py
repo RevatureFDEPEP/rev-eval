@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str = "question-images"
     S3_REGION: str = "us-east-1"
     S3_PRESIGN_EXPIRY_SECONDS: int = 3600
+    # Browser-resolvable endpoint used ONLY when signing pre-signed URLs.
+    # SigV4 binds the Host header into the signature, so URLs signed against
+    # the internal endpoint (http://minio:9000) would fail when the browser
+    # uploads via the host-published port (localhost:9000).
+    S3_PUBLIC_ENDPOINT_URL: str = "http://localhost:9000"
 
     @property
     def mongo_url(self) -> str:

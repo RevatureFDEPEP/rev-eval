@@ -7,6 +7,7 @@ from src.config.settings import settings
 from src.db.session import close_db, init_db
 from src.middleware.correlation import CorrelationIdMiddleware
 from src.utils.logging_config import setup_logging
+from src.utils.s3_client import ensure_bucket
 from src.v1.routes.question_routes import router as question_router
 
 # Structured JSON logging (re-applied in the startup event — see
@@ -46,6 +47,12 @@ def health():
 async def on_startup():
     setup_logging(settings.SERVICE_NAME, settings.LOG_LEVEL)
     await init_db()
+    # Create the question-images bucket if missing (no mc init container in
+    # compose). Non-fatal: uploads degrade, the rest of the service still runs.
+    try:
+        ensure_bucket()
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"S3 bucket init skipped: {e}")
 
 @app.on_event("shutdown")
 async def on_shutdown():
