@@ -69,7 +69,7 @@ def test_question_type_true_false_value():
 
 
 def test_question_type_membership():
-    assert "mcq" in QuestionType
+    assert "mcq" in [e.value for e in QuestionType]
 
 
 # --- QuestionCreate validation ---
