@@ -210,6 +210,9 @@ marimo/_lsp/
 __marimo__/
 
 
+# Local TLS certs (self-signed, do not commit)
+nginx/certs/
+
 #custom
 
 .vscode

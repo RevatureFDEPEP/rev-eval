@@ -8,7 +8,7 @@ import os
 from typing import Dict, Optional
 
 import jwt
-from fastapi import Header, HTTPException, status
+from fastapi import Cookie, Header, HTTPException, status
 
 _JWT_SECRET_ENV = "JWT_SECRET"
 _JWT_ALGORITHM_ENV = "JWT_ALGORITHM"
@@ -25,24 +25,29 @@ def _get_secret() -> str:
     return secret
 
 
-async def verify_jwt_token(authorization: Optional[str] = Header(None)) -> Dict[str, str]:
-    """Verify a Bearer JWT and return a user-context dict (user_id, email, role)."""
-    if not authorization:
+async def verify_jwt_token(
+    authorization: Optional[str] = Header(None),
+    auth_token: Optional[str] = Cookie(None),
+) -> Dict[str, str]:
+    """Verify a JWT and return a user-context dict (user_id, email, role)."""
+    if authorization:
+        parts = authorization.split()
+        if len(parts) != 2 or parts[0].lower() != "bearer":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Authorization header format. Expected: Bearer {token}",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        token = parts[1]
+    elif auth_token:
+        token = auth_token
+    else:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing Authorization header",
+            detail="Missing credentials: Authorization header or auth_token cookie",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Authorization header format. Expected: Bearer {token}",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    token = parts[1]
     algorithm = os.getenv(_JWT_ALGORITHM_ENV, _DEFAULT_ALGORITHM)
 
     try:
