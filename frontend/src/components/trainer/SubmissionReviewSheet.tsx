@@ -162,7 +162,7 @@ export function SubmissionReviewSheet({
         setLoading(true);
         setError(null);
         const data = await getSubmissionReviewDetails(submission.id);
-        setDetails(data);
+        setDetails(data as ReviewDetails);
 
         // In read-only mode, pre-fill with existing trainer evaluation
         if (readOnly && submission.trainer_score) {
