@@ -1,7 +1,9 @@
 from typing import List
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.repositories.skill_repository import SkillRepository
-from src.schemas.skill_schema import SkillCreate, SkillUpdate, SkillOut
+from src.schemas.skill_schema import SkillCreate, SkillOut, SkillUpdate
+
 
 class SkillService:
 

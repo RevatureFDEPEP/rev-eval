@@ -8,7 +8,6 @@ import logging
 from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
-
 from src.models.user import User, UserRole
 from src.services.auth_service import AuthService
 

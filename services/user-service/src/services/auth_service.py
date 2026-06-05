@@ -7,10 +7,8 @@ from typing import Optional
 import jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
-
 from src.config.settings import settings
 from src.models.user import User, UserRole
-
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
