@@ -15,6 +15,7 @@ os.environ.setdefault("SERVICE_HOSTNAME", "test-management-service")
 
 import asyncio
 import pytest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -269,3 +270,319 @@ class TestSubmissions:
         # Confirm deleted
         get_resp = client.get(f"/v1/api/submissions/{submission_id}/")
         assert get_resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Helpers for mocking httpx.AsyncClient
+# ---------------------------------------------------------------------------
+
+class _FakeResp:
+    def __init__(self, status_code: int, data: dict = None):
+        self.status_code = status_code
+        self._data = data or {}
+
+    def json(self):
+        return self._data
+
+
+def _mock_client(get_data=None, get_status=200, post_data=None, post_status=201, patch_status=200):
+    """Return a class that can replace httpx.AsyncClient in any context manager usage."""
+    _get = _FakeResp(get_status, get_data or {})
+    _post = _FakeResp(post_status, post_data or {})
+    _patch = _FakeResp(patch_status, {})
+
+    class _Client:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            pass
+
+        async def get(self, *a, **k):
+            return _get
+
+        async def post(self, *a, **k):
+            return _post
+
+        async def patch(self, *a, **k):
+            return _patch
+
+    return _Client
+
+
+# ---------------------------------------------------------------------------
+# Extended tests — test_service.py branches
+# ---------------------------------------------------------------------------
+
+class TestTestsExtended:
+    """Cover skill-loop and skills-update branches in test_service.py."""
+
+    def test_get_test_by_id_with_skills_covers_loop(self):
+        skill = client.post("/v1/api/skills/", json={"name": "LoopSkill", "description": "loop"}).json()
+        test = client.post("/v1/api/tests/", json={
+            "name": "LoopTest", "test_type": "QUIZ", "skill_ids": [skill["id"]]
+        }).json()
+        resp = client.get(f"/v1/api/tests/{test['id']}/")
+        assert resp.status_code == 200
+        assert any(s["id"] == skill["id"] for s in resp.json()["skills"])
+
+    def test_update_test_with_skill_ids(self):
+        s1 = client.post("/v1/api/skills/", json={"name": "OldSkillU", "description": "o"}).json()
+        s2 = client.post("/v1/api/skills/", json={"name": "NewSkillU", "description": "n"}).json()
+        test = client.post("/v1/api/tests/", json={
+            "name": "SkillSwap", "test_type": "QUIZ", "skill_ids": [s1["id"]]
+        }).json()
+        resp = client.put(f"/v1/api/tests/{test['id']}/", json={
+            "name": "SkillSwap Updated", "skill_ids": [s2["id"]]
+        })
+        assert resp.status_code == 200
+        assert any(s["id"] == s2["id"] for s in resp.json()["skills"])
+
+    def test_list_tests_with_submissions_by_user(self):
+        test = client.post("/v1/api/tests/", json={"name": "ParticipantTest", "test_type": "QUIZ"}).json()
+        client.post("/v1/api/submissions/", json={"test_id": test["id"], "user_id": 77})
+        resp = client.get("/v1/api/tests/submissions-by/77/")
+        assert resp.status_code == 200
+        assert any(t["id"] == test["id"] for t in resp.json())
+
+
+# ---------------------------------------------------------------------------
+# Extended tests — test_submission_service.py + route branches
+# ---------------------------------------------------------------------------
+
+class TestSubmissionsExtended:
+    """Cover not-found branches, trainer endpoints, bulk-assign, and trainer review."""
+
+    def _create_test(self) -> int:
+        return client.post("/v1/api/tests/", json={"name": "ExtTest", "test_type": "QUIZ"}).json()["id"]
+
+    def test_update_submission_not_found(self):
+        resp = client.put("/v1/api/submissions/99999/", json={"status": "IN_PROGRESS"})
+        assert resp.status_code == 404
+
+    def test_delete_submission_not_found(self):
+        resp = client.delete("/v1/api/submissions/99999/")
+        assert resp.status_code == 404
+
+    def test_graded_submissions_endpoint(self):
+        resp = client.get("/v1/api/submissions/graded")
+        assert resp.status_code == 200
+        assert isinstance(resp.json(), list)
+
+    def test_review_details_not_found(self):
+        resp = client.get("/v1/api/submissions/99999/review-details")
+        assert resp.status_code == 404
+
+    def test_review_details_existing(self):
+        tid = self._create_test()
+        sub = client.post("/v1/api/submissions/", json={"test_id": tid, "user_id": 70}).json()
+        resp = client.get(f"/v1/api/submissions/{sub['id']}/review-details")
+        assert resp.status_code == 200
+        assert "submission" in resp.json()
+
+    def test_submit_trainer_review(self):
+        tid = self._create_test()
+        sub = client.post("/v1/api/submissions/", json={"test_id": tid, "user_id": 80}).json()
+        client.put(f"/v1/api/submissions/{sub['id']}/", json={"status": "EVALUATED"})
+        resp = client.post(f"/v1/api/submissions/{sub['id']}/trainer-review", json={
+            "trainer_score": 88,
+            "feedback": "Well done"
+        })
+        assert resp.status_code == 200
+        assert resp.json()["trainer_score"] == 88
+        assert resp.json()["status"] == "GRADED"
+
+    def test_submit_trainer_review_wrong_status(self):
+        tid = self._create_test()
+        sub = client.post("/v1/api/submissions/", json={"test_id": tid, "user_id": 81}).json()
+        resp = client.post(f"/v1/api/submissions/{sub['id']}/trainer-review", json={
+            "trainer_score": 75
+        })
+        assert resp.status_code == 404
+
+    def test_trainer_evaluated_endpoint(self):
+        Mock = _mock_client(get_data={"id": 9, "first_name": "Alice", "last_name": "S", "email": "a@t.com"})
+        with patch("httpx.AsyncClient", Mock):
+            resp = client.get("/v1/api/submissions/trainer/evaluated")
+        assert resp.status_code == 200
+        assert isinstance(resp.json(), list)
+
+    def test_trainer_all_endpoint(self):
+        Mock = _mock_client(get_data={"id": 9, "first_name": "Bob", "last_name": "J", "email": "b@t.com"})
+        with patch("httpx.AsyncClient", Mock):
+            resp = client.get("/v1/api/submissions/trainer/all")
+        assert resp.status_code == 200
+        assert isinstance(resp.json(), list)
+
+    def test_bulk_assign_existing_user(self):
+        tid = self._create_test()
+        Mock = _mock_client(get_data={"id": 50, "email": "bulk@test.com"})
+        with patch("httpx.AsyncClient", Mock):
+            resp = client.post("/v1/api/submissions/bulk-assign", json={
+                "test_id": tid,
+                "participant_emails": ["bulk@test.com"]
+            })
+        assert resp.status_code == 201
+        assert resp.json()["success_count"] == 1
+
+    def test_bulk_assign_new_user_invite(self):
+        tid = self._create_test()
+        Mock = _mock_client(
+            get_status=404,
+            post_data={"id": 51, "email": "new@test.com"},
+            post_status=201
+        )
+        with patch("httpx.AsyncClient", Mock):
+            resp = client.post("/v1/api/submissions/bulk-assign", json={
+                "test_id": tid,
+                "participant_emails": ["new@test.com"]
+            })
+        assert resp.status_code == 201
+        assert resp.json()["success_count"] == 1
+
+    def test_bulk_assign_invite_failure(self):
+        tid = self._create_test()
+        Mock = _mock_client(get_status=404, post_status=500)
+        with patch("httpx.AsyncClient", Mock):
+            resp = client.post("/v1/api/submissions/bulk-assign", json={
+                "test_id": tid,
+                "participant_emails": ["fail@test.com"]
+            })
+        assert resp.status_code == 201
+        assert resp.json()["failure_count"] == 1
+
+    def test_bulk_assign_user_service_unexpected_status(self):
+        tid = self._create_test()
+        Mock = _mock_client(get_status=503)
+        with patch("httpx.AsyncClient", Mock):
+            resp = client.post("/v1/api/submissions/bulk-assign", json={
+                "test_id": tid,
+                "participant_emails": ["err@test.com"]
+            })
+        assert resp.status_code == 201
+        assert resp.json()["failure_count"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for src/utils/dependencies.py
+# ---------------------------------------------------------------------------
+
+class TestDependencies:
+    """Call dependency functions directly to cover auth/role logic."""
+
+    def test_missing_headers_raises_401(self):
+        from fastapi import HTTPException
+        from src.utils.dependencies import get_current_user_from_headers
+
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(get_current_user_from_headers(None, None, None))
+        assert exc.value.status_code == 401
+
+    def test_resolve_by_user_id(self):
+        from src.utils.dependencies import get_current_user_from_headers
+
+        Mock = _mock_client(get_data={"id": 1, "role": "TRAINER"})
+
+        async def call():
+            with patch("httpx.AsyncClient", Mock):
+                return await get_current_user_from_headers("1", None, None)
+
+        result = asyncio.run(call())
+        assert result["role"] == "TRAINER"
+
+    def test_resolve_by_email(self):
+        from src.utils.dependencies import get_current_user_from_headers
+
+        Mock = _mock_client(get_data={"id": 2, "role": "PARTICIPANT"})
+
+        async def call():
+            with patch("httpx.AsyncClient", Mock):
+                return await get_current_user_from_headers(None, "x@test.com", None)
+
+        result = asyncio.run(call())
+        assert result["id"] == 2
+
+    def test_user_not_found_raises_401(self):
+        from fastapi import HTTPException
+        from src.utils.dependencies import get_current_user_from_headers
+
+        Mock = _mock_client(get_status=404)
+
+        async def call():
+            with patch("httpx.AsyncClient", Mock):
+                return await get_current_user_from_headers("9", None, None)
+
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(call())
+        assert exc.value.status_code == 401
+
+    def test_service_5xx_raises_503(self):
+        from fastapi import HTTPException
+        from src.utils.dependencies import get_current_user_from_headers
+
+        Mock = _mock_client(get_status=500)
+
+        async def call():
+            with patch("httpx.AsyncClient", Mock):
+                return await get_current_user_from_headers("1", None, None)
+
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(call())
+        assert exc.value.status_code == 503
+
+    def test_request_error_raises_503(self):
+        import httpx as _httpx
+        from fastapi import HTTPException
+        from src.utils.dependencies import get_current_user_from_headers
+
+        class ErrClient:
+            def __init__(self, **kw):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                pass
+
+            async def get(self, *a, **k):
+                raise _httpx.RequestError("refused")
+
+        async def call():
+            with patch("httpx.AsyncClient", ErrClient):
+                return await get_current_user_from_headers("1", None, None)
+
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(call())
+        assert exc.value.status_code == 503
+
+    def test_get_current_trainer_ok(self):
+        from src.utils.dependencies import get_current_trainer
+
+        result = asyncio.run(get_current_trainer({"id": 1, "role": "TRAINER"}))
+        assert result["role"] == "TRAINER"
+
+    def test_get_current_trainer_forbidden(self):
+        from fastapi import HTTPException
+        from src.utils.dependencies import get_current_trainer
+
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(get_current_trainer({"id": 1, "role": "PARTICIPANT"}))
+        assert exc.value.status_code == 403
+
+    def test_get_current_participant_ok(self):
+        from src.utils.dependencies import get_current_participant
+
+        result = asyncio.run(get_current_participant({"id": 2, "role": "PARTICIPANT"}))
+        assert result["role"] == "PARTICIPANT"
+
+    def test_get_current_participant_forbidden(self):
+        from fastapi import HTTPException
+        from src.utils.dependencies import get_current_participant
+
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(get_current_participant({"id": 1, "role": "TRAINER"}))
+        assert exc.value.status_code == 403

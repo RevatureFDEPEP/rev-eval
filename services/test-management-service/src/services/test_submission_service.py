@@ -246,6 +246,7 @@ class TestSubmissionService:
                     )
 
                     submission = await TestSubmissionRepository.create(db, submission_data)
+                    submission = await TestSubmissionRepository.get_by_id(db, submission.id)
                     submission_out = TestSubmissionOut.from_orm(submission)
                     created_submissions.append(submission_out)
                     submission_ids.append(submission.id)
