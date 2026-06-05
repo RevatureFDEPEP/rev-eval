@@ -51,11 +51,17 @@ def test_get_service_url_user():
 
 
 def test_get_service_url_test_management():
-    assert get_service_url("test-management-service") == "http://test-management-service:8001"
+    assert (
+        get_service_url("test-management-service")
+        == "http://test-management-service:8001"
+    )
 
 
 def test_get_service_url_question_management():
-    assert get_service_url("question-management-service") == "http://question-management-service:8003"
+    assert (
+        get_service_url("question-management-service")
+        == "http://question-management-service:8003"
+    )
 
 
 def test_get_service_url_unknown_raises():
@@ -76,7 +82,9 @@ def test_header_injection_all_fields():
 
 def test_header_injection_preserves_existing():
     existing = {"Content-Type": "application/json"}
-    result = add_user_context_headers(existing, {"user_id": "1", "email": "", "role": ""})
+    result = add_user_context_headers(
+        existing, {"user_id": "1", "email": "", "role": ""}
+    )
     assert result["Content-Type"] == "application/json"
     assert result["X-User-Id"] == "1"
 
@@ -113,7 +121,9 @@ def test_protected_route_no_auth_returns_401():
 # --- verify_jwt_token (called directly, no FastAPI DI needed) ---
 
 
-def _make_token(payload: dict, secret: str = "test-secret-key", expired: bool = False) -> str:
+def _make_token(
+    payload: dict, secret: str = "test-secret-key", expired: bool = False
+) -> str:
     if expired:
         payload["exp"] = 0
     return pyjwt.encode(payload, secret, algorithm="HS256")
@@ -174,8 +184,12 @@ def _mock_httpx(status: int = 200, body: dict | None = None):
 
 
 def test_public_auth_proxy_forwards_login():
-    with patch("httpx.AsyncClient", return_value=_mock_httpx(200, {"access_token": "tok"})):
-        resp = client.post("/v1/api/auth/login", json={"email": "t@t.com", "password": "pass"})
+    with patch(
+        "httpx.AsyncClient", return_value=_mock_httpx(200, {"access_token": "tok"})
+    ):
+        resp = client.post(
+            "/v1/api/auth/login", json={"email": "t@t.com", "password": "pass"}
+        )
     assert resp.status_code == 200
 
 
