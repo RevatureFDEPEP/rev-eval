@@ -1,7 +1,9 @@
-from typing import List
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.repositories.skill_repository import SkillRepository
-from src.schemas.skill_schema import SkillCreate, SkillUpdate, SkillOut
+from src.schemas.skill_schema import SkillCreate, SkillOut, SkillUpdate
+
 
 class SkillService:
 
@@ -26,6 +28,6 @@ class SkillService:
         await SkillRepository.delete(db, skill)
 
     @staticmethod
-    async def list_skills(db: AsyncSession) -> List[SkillOut]:
+    async def list_skills(db: AsyncSession) -> list[SkillOut]:
         skills = await SkillRepository.list_all(db)
         return [SkillOut.from_orm(skill) for skill in skills]

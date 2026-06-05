@@ -1,0 +1,22 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "SIM"]
+ignore = [
+  "E501",   # line length — handled by formatter
+  "B008",   # Depends() in default args — FastAPI pattern throughout
+  "B904",   # raise-without-from-inside-except — TODO: fix across services incrementally
+  "SIM102", # nested-if-statements — nested ifs are often more readable than long and-chains
+  "UP007",  # X | Y unions — not fully adopted in codebase yet
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "test"]
+addopts = "--cov-fail-under=0"
+# TODO(team): Raise --cov-fail-under to 50 once test suites are established

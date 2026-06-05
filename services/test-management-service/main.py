@@ -1,15 +1,15 @@
 from os import getenv
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from src.v1.routes.test_route import router as test_router
-from src.v1.routes.skill_route import router as skill_router
-from src.v1.routes.test_submission_route import router as test_submission_router
-from src.db.session import init_db
 from src.config.settings import settings
+from src.db.session import init_db
+from src.v1.routes.skill_route import router as skill_router
+from src.v1.routes.test_route import router as test_router
+from src.v1.routes.test_submission_route import router as test_submission_router
 
 load_dotenv()
 
@@ -17,10 +17,7 @@ app = FastAPI(title="Test Management Service", version="1.0.0")
 
 # ---- CORS ----
 origins = settings.ALLOW_ORIGINS or "*"
-if origins == "*":
-    allow_origins = ["*"]
-else:
-    allow_origins = [o.strip() for o in origins.split(",") if o.strip()]
+allow_origins = ["*"] if origins == "*" else [o.strip() for o in origins.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,

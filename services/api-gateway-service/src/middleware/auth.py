@@ -5,7 +5,6 @@ Verifies HS256 tokens issued by user-service, extracts the user context,
 and injects it as X-User-* headers for downstream services.
 """
 import os
-from typing import Dict, Optional
 
 import jwt
 from fastapi import Cookie, Header, HTTPException, status
@@ -28,9 +27,9 @@ def _get_secret() -> str:
 
 
 async def verify_jwt_token(
-    authorization: Optional[str] = Header(None),
-    auth_token: Optional[str] = Cookie(None),
-) -> Dict[str, str]:
+    authorization: str | None = Header(None),
+    auth_token: str | None = Cookie(None),
+) -> dict[str, str]:
     """Verify a JWT and return a user-context dict (user_id, email, role).
 
     Accepts a Bearer header (BFF path) or auth_token cookie (direct nginx path).
@@ -83,7 +82,7 @@ async def verify_jwt_token(
     }
 
 
-def add_user_context_headers(headers: dict, user_context: Dict[str, str]) -> dict:
+def add_user_context_headers(headers: dict, user_context: dict[str, str]) -> dict:
     """Inject X-User-* headers for downstream services."""
     headers_copy = headers.copy()
     headers_copy["X-User-Id"] = str(user_context.get("user_id") or "")

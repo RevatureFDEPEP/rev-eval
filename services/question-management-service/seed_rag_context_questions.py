@@ -14,16 +14,16 @@ Requirements:
 """
 
 import asyncio
-import httpx
-from typing import List, Dict, Any
+from typing import Any
 
+import httpx
 
 # Base URL for the question management service
 BASE_URL = "https://automatic-system-p55wjj9v6xjcr765-8002.app.github.dev:443/v1/api"
 
 
 # RAG and Context Engineering questions
-QUESTIONS: List[Dict[str, Any]] = [
+QUESTIONS: list[dict[str, Any]] = [
     # ============================================================================
     # RAG (Retrieval Augmented Generation) - EASY Questions
     # ============================================================================
@@ -474,7 +474,7 @@ QUESTIONS: List[Dict[str, Any]] = [
 ]
 
 
-async def create_question(question_data: Dict[str, Any]) -> Dict[str, Any]:
+async def create_question(question_data: dict[str, Any]) -> dict[str, Any]:
     """
     Create a single question via the API.
 
@@ -517,7 +517,7 @@ async def seed_questions():
             result = await create_question(question)
             created_count += 1
             print(f"✅ Created question ID: {result.get('_id', 'unknown')}\n")
-        except Exception as e:
+        except Exception:
             failed_count += 1
             print(f"❌ Failed to create question {i}\n")
             continue

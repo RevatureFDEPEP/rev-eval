@@ -1,12 +1,11 @@
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import sessionmaker
 
-from src.db.init_db import Base
 from src.config.settings import settings
+from src.db.init_db import Base
 
 # Import all models to register them with Base metadata
-from src.models.user import User
 
 # Use settings for database URL
 DATABASE_URL = settings.SQLALCHEMY_DATABASE_URL
@@ -31,7 +30,6 @@ def init_db():
     """
     try:
         # Import all models here so they are registered with Base
-        from src.models.user import User
 
         # Create tables
         Base.metadata.create_all(bind=engine)

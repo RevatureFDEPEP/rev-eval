@@ -1,11 +1,13 @@
 # src/repositories/test_submission_repository.py
-from typing import List, Optional
+from datetime import datetime
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from datetime import datetime
+
 from src.models.test_submission import TestSubmission
 from src.schemas.test_submission_schema import TestSubmissionCreate, TestSubmissionUpdate
+
 
 class TestSubmissionRepository:
 
@@ -20,7 +22,7 @@ class TestSubmissionRepository:
         return data
 
     @staticmethod
-    async def get_by_id(db: AsyncSession, submission_id: int) -> Optional[TestSubmission]:
+    async def get_by_id(db: AsyncSession, submission_id: int) -> TestSubmission | None:
         result = await db.execute(
             select(TestSubmission)
             .options(selectinload(TestSubmission.test))  # Eagerly load test relationship
@@ -29,7 +31,7 @@ class TestSubmissionRepository:
         return result.scalars().first()
 
     @staticmethod
-    async def list_all(db: AsyncSession) -> List[TestSubmission]:
+    async def list_all(db: AsyncSession) -> list[TestSubmission]:
         result = await db.execute(
             select(TestSubmission)
             .options(selectinload(TestSubmission.test))  # Eagerly load test relationship
@@ -38,7 +40,7 @@ class TestSubmissionRepository:
         return list(result.scalars().all())
 
     @staticmethod
-    async def list_by_user(db: AsyncSession, user_id: int) -> List[TestSubmission]:
+    async def list_by_user(db: AsyncSession, user_id: int) -> list[TestSubmission]:
         """Get all test submissions by a specific user"""
         result = await db.execute(
             select(TestSubmission)
@@ -47,9 +49,9 @@ class TestSubmissionRepository:
             .order_by(TestSubmission.created_at.desc())
         )
         return list(result.scalars().all())
-    
+
     @staticmethod
-    async def list_by_test(db: AsyncSession, test_id: int) -> List[TestSubmission]:
+    async def list_by_test(db: AsyncSession, test_id: int) -> list[TestSubmission]:
         """Get all submissions for a specific test"""
         result = await db.execute(
             select(TestSubmission)
@@ -58,13 +60,13 @@ class TestSubmissionRepository:
             .order_by(TestSubmission.created_at.desc())
         )
         return list(result.scalars().all())
-    
+
     @staticmethod
     async def get_by_user_and_test(
         db: AsyncSession,
         user_id: int,
         test_id: int
-    ) -> Optional[TestSubmission]:
+    ) -> TestSubmission | None:
         """Get a user's submission for a specific test (most recent if multiple)"""
         result = await db.execute(
             select(TestSubmission)
@@ -82,7 +84,7 @@ class TestSubmissionRepository:
         # Convert to dict and strip timezones (POC fix)
         submission_data = submission_in.model_dump() if hasattr(submission_in, 'model_dump') else submission_in.dict()
         submission_data = TestSubmissionRepository._strip_timezone_from_dict(submission_data)
-        
+
         submission = TestSubmission(**submission_data)
         db.add(submission)
         await db.commit()
@@ -94,7 +96,7 @@ class TestSubmissionRepository:
         # Convert to dict and strip timezones (POC fix)
         update_data = submission_in.model_dump(exclude_unset=True) if hasattr(submission_in, 'model_dump') else submission_in.dict(exclude_unset=True)
         update_data = TestSubmissionRepository._strip_timezone_from_dict(update_data)
-        
+
         for field, value in update_data.items():
             setattr(submission, field, value)
         await db.commit()

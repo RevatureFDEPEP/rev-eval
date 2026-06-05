@@ -1,11 +1,12 @@
-from beanie import Document, Indexed
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Union
+
+from beanie import Document
 from pydantic import BaseModel, Field, field_validator
-from enum import Enum
-from typing import List, Optional, Union
-from datetime import datetime, timezone
 
 
-class QuestionType(str, Enum):
+class QuestionType(StrEnum):
     """Enumeration of supported question types."""
     MCQ = "mcq"
     MULTI = "multi"
@@ -67,15 +68,15 @@ class Question(Document):
     """
     type: QuestionType
     question_text: str = Field(..., min_length=10, max_length=2000)
-    options: Optional[List[Option]] = None
-    correct_answers: Optional[List[Union[int, bool, str]]] = None
-    sample_answer: Optional[str] = Field(None, max_length=5000)
-    answer_explanation: Optional[str] = Field(None, max_length=2000)
-    difficulty: Optional[str] = Field(default="medium", pattern="^(easy|medium|hard)$")
-    skills: List[str] = Field(default_factory=list, max_length=20)
-    tags: List[str] = Field(default_factory=list, max_length=30)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    options: list[Option] | None = None
+    correct_answers: list[Union[int, bool, str]] | None = None
+    sample_answer: str | None = Field(None, max_length=5000)
+    answer_explanation: str | None = Field(None, max_length=2000)
+    difficulty: str | None = Field(default="medium", pattern="^(easy|medium|hard)$")
+    skills: list[str] = Field(default_factory=list, max_length=20)
+    tags: list[str] = Field(default_factory=list, max_length=30)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @field_validator('question_text')
     @classmethod

@@ -1,14 +1,14 @@
 from os import getenv
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+from src.config.settings import settings
+from src.db.session import init_db
 from src.v1.routes.auth_route import router as auth_router
 from src.v1.routes.user_route import router as user_router
-from src.db.session import init_db
-from src.config.settings import settings
 
 load_dotenv()
 
@@ -16,10 +16,7 @@ app = FastAPI(title="User Service", version="1.0.0")
 
 # ---- CORS ----
 origins = settings.ALLOW_ORIGINS or "*"
-if origins == "*":
-    allow_origins = ["*"]
-else:
-    allow_origins = [o.strip() for o in origins.split(",") if o.strip()]
+allow_origins = ["*"] if origins == "*" else [o.strip() for o in origins.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,

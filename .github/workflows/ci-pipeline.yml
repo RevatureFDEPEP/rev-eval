@@ -6,24 +6,63 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  id-token: write  # required for attest-build-provenance
+
 jobs:
-  backend-build-test:
-    name: Backend (${{ matrix.service }})
+  # ─── STAGE 1: Detect which paths changed ─────────────────────────────────────
+  detect-changes:
+    name: Detect Changes
     runs-on: ubuntu-latest
-    env:
-      JWT_SECRET: ${{ secrets.JWT_SIGNING_SECRET }}
+    outputs:
+      backend-services: ${{ github.event_name == 'workflow_dispatch' && steps.manual.outputs.services || steps.filter.outputs.changes }}
+      frontend-changed: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # dorny/paths-filter needs full history for PR diffs
+
+      # On workflow_dispatch there is no diff — run everything.
+      - name: Full run (workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        id: manual
+        run: |
+          echo 'services=["user-service","question-management-service","test-management-service","api-gateway-service"]' >> $GITHUB_OUTPUT
+
+      - name: Detect changed paths
+        if: github.event_name != 'workflow_dispatch'
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            user-service:
+              - 'services/user-service/**'
+            question-management-service:
+              - 'services/question-management-service/**'
+            test-management-service:
+              - 'services/test-management-service/**'
+            api-gateway-service:
+              - 'services/api-gateway-service/**'
+            frontend:
+              - 'frontend/**'
+
+  # ─── STAGE 2: Backend quality (lint → scan → test) ───────────────────────────
+  backend-quality:
+    name: Backend (${{ matrix.service }})
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.backend-services != '[]' && needs.detect-changes.outputs.backend-services != '' }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        service:
-          - user-service
-          - question-management-service
-          - test-management-service
-          - api-gateway-service
+        service: ${{ fromJson(needs.detect-changes.outputs.backend-services) }}
+    env:
+      JWT_SECRET: ${{ secrets.JWT_SIGNING_SECRET }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -43,49 +82,104 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov
+          pip install ruff pytest pytest-cov
 
+      # Quality gate 1: Ruff linting
+      - name: Ruff lint
+        working-directory: services/${{ matrix.service }}
+        run: ruff check src/
+
+      # Quality gate 2: Trivy dependency vulnerability scan
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: services/${{ matrix.service }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          format: table
+          trivyignores: .trivyignore
+
+      # Quality gate 3: pytest with coverage
       - name: Run pytest
         working-directory: services/${{ matrix.service }}
         run: |
-          if [ -d tests ]; then
-            pytest --cov --cov-report=xml
-          else
-            echo "No tests/ directory in services/${{ matrix.service }} — skipping pytest."
+          # Support both test/ and tests/ directory conventions.
+          TEST_DIRS=""
+          [ -d tests ] && TEST_DIRS="$TEST_DIRS tests"
+          [ -d test ]  && TEST_DIRS="$TEST_DIRS test"
+
+          if [ -z "$TEST_DIRS" ]; then
+            echo "No test directory found in services/${{ matrix.service }} — skipping pytest."
+            exit 0
           fi
 
-      # NOTE: Trivy + Ruff scans added in W2 D7 by candidates (not seeded here)
+          pytest $TEST_DIRS \
+            --ignore=src \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-fail-under=0 \
+            -v
+          # TODO(team): Raise --cov-fail-under to 50 once test suites are established.
 
-  frontend-build-test:
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.service }}
+          path: services/${{ matrix.service }}/coverage.xml
+          if-no-files-found: ignore
+
+  # ─── STAGE 2: Frontend quality (lint → scan → build → test) ─────────────────
+  frontend-quality:
     name: Frontend
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.frontend-changed == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 8
+          version: 9.15.0
 
-      - name: Set up Node
+      - name: Set up Node 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Install dependencies
         working-directory: frontend
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
-      - name: Lint
+      # Quality gate 1: ESLint
+      - name: Lint (ESLint)
         working-directory: frontend
         run: pnpm lint
+
+      # Quality gate 2: Trivy dependency vulnerability scan
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: frontend
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          format: table
+          trivyignores: .trivyignore
 
       - name: Build
         working-directory: frontend
         run: pnpm build
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v2
         with:
           subject-path: 'frontend/.next/**/*'
 
