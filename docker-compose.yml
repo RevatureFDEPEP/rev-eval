@@ -60,10 +60,15 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
     depends_on:
-      - frontend
+      frontend:
+        condition: service_started
+      api-gateway:
+        condition: service_healthy
 
   user-service:
     build:
@@ -168,7 +173,7 @@ services:
       PORT: 8000
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
-      ALLOW_ORIGINS: http://localhost:3000
+      ALLOW_ORIGINS: https://localhost
     ports:
       - "8000:8000"
     depends_on:
@@ -194,7 +199,6 @@ services:
     restart: unless-stopped
     environment:
       API_GATEWAY_URL: http://api-gateway:8000
-      NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:8000
       NODE_ENV: development
     ports:
       - "3000:3000"
