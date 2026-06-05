@@ -19,7 +19,24 @@ export interface QuestionFormInitial {
   options?: { text: string; is_correct: boolean }[]; // mcq/multi
   true_false_answer?: boolean; // true_false
   sample_answer?: string; // text
+  image_object_key?: string; // MinIO key of an already-attached diagram
+  image_url?: string; // pre-signed GET URL for previewing it
 }
+
+// Client-side validation for diagram uploads (spec: .png/.jpg only, ≤ 5 MB)
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+export const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg"];
+
+export const imageFileSchema = z
+  .instanceof(File)
+  .refine(
+    (file) => ALLOWED_IMAGE_TYPES.includes(file.type),
+    "Only .png or .jpg images are allowed"
+  )
+  .refine(
+    (file) => file.size <= MAX_IMAGE_BYTES,
+    "Image must be 5MB or smaller"
+  );
 
 // Base fields common to all question types
 const baseSchema = {
@@ -36,6 +53,8 @@ const baseSchema = {
     .optional()
     .transform((val) => (val ? val.split(",").map((t) => t.trim()) : [])),
   answer_explanation: z.string().optional(),
+  // Set by the file-upload flow after a successful direct PUT to MinIO
+  image_object_key: z.string().optional(),
 };
 
 const optionsShape = z.array(
@@ -135,6 +154,7 @@ export function getDefaultValues(questionType: QuestionType): FieldValues {
     skills: [],
     tags: "",
     answer_explanation: "",
+    image_object_key: undefined,
   };
 
   switch (questionType) {
@@ -213,6 +233,7 @@ export function transformFormData(
     correct_answers,
     sample_answer: values.sample_answer || undefined,
     answer_explanation: values.answer_explanation || undefined,
+    image_object_key: values.image_object_key || undefined,
   };
 }
 
@@ -227,6 +248,8 @@ export function toInitial(q: Question): {
     skills: q.skills ?? [],
     tags: (q.tags ?? []).join(", "),
     answer_explanation: q.answer_explanation ?? "",
+    image_object_key: q.image_object_key,
+    image_url: q.image_url,
   };
 
   if (q.type === "mcq" || q.type === "multi") {

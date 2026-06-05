@@ -75,6 +75,8 @@ export interface Question {
   difficulty?: QuestionDifficulty;
   skills: string[];
   tags: string[];
+  image_object_key?: string; // MinIO object key for an attached diagram
+  image_url?: string; // Pre-signed GET URL (populated by the backend when an image is attached)
   created_at: string;
   updated_at: string;
 }
@@ -89,9 +91,16 @@ export interface QuestionCreate {
   difficulty?: QuestionDifficulty;
   skills: string[];
   tags: string[];
+  image_object_key?: string; // Set after a direct-to-MinIO upload
 }
 
 export type QuestionUpdate = Partial<QuestionCreate>;
+
+export interface PresignedUpload {
+  upload_url: string; // Pre-signed PUT URL the browser uploads to directly
+  object_key: string; // Server-generated key to store on the question
+  expires_in: number; // URL validity window in seconds
+}
 
 // ===== TEST =====
 
