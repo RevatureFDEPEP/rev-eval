@@ -47,7 +47,7 @@ for i in "${!CONTAINERS[@]}"; do
 
     # ruff format --check
     echo -n "   ruff format ... "
-    if docker exec "$CONTAINER" python -m ruff format --check /app 2>&1 | grep -q "already formatted\|no files"; then
+    if docker exec "$CONTAINER" python -m ruff format --check /app 2>&1; then
         echo -e "${GREEN}✓ passed${NC}"
         FORMAT_OK=true
     else
