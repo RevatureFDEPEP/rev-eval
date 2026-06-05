@@ -1,7 +1,7 @@
 import pytest
+from src.models.test import TestType
 from src.repositories.test_repository import TestRepository
 from src.schemas.test_schema import TestCreate, TestUpdate
-from src.models.test import TestType
 
 
 class TestTestRepository:

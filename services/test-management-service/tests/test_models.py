@@ -1,7 +1,7 @@
 import pytest
-from src.models.test import Test, TestType
 from src.models.skill import Skill
-from src.models.test_submission import TestSubmission, SubmissionStatus
+from src.models.test import Test, TestType
+from src.models.test_submission import SubmissionStatus, TestSubmission
 
 
 class TestTestTypeEnum:

@@ -13,10 +13,10 @@ os.environ.setdefault("SERVICE_HOSTNAME", "localhost")
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-
 from src.db.session import Base
+
 # Import all models to register table metadata
 
 

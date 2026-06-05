@@ -1,8 +1,8 @@
 import pytest
 from pydantic import ValidationError
+from src.models.user import UserRole
 from src.schemas.auth_schema import LoginRequest, RegisterRequest
 from src.schemas.user_schema import UserCreate, UserUpdate
-from src.models.user import UserRole
 
 
 class TestLoginRequest:

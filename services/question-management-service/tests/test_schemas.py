@@ -2,7 +2,6 @@ import pytest
 from pydantic import ValidationError
 from src.schemas.question import QuestionCreate, QuestionUpdate
 
-
 # ── Shared valid payloads ──────────────────────────────────────────────────────
 
 _MCQ_OPTIONS = [

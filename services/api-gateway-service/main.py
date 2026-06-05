@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Import JWT middleware
-from src.middleware.auth import verify_jwt_token, add_user_context_headers  # noqa: E402
+from src.middleware.auth import add_user_context_headers, verify_jwt_token  # noqa: E402
 
 app = FastAPI(title="API Gateway")
 

@@ -1,6 +1,4 @@
 from sqlalchemy.orm import Session
-
-from sqlalchemy.orm import Session
 from src.repositories.test_repository import (
     add_participant_by_email,
     create_test,

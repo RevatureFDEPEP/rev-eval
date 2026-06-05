@@ -1,6 +1,6 @@
 import pytest
-from src.services.auth_service import AuthService
 from src.models.user import UserRole
+from src.services.auth_service import AuthService
 
 
 class TestPasswordHashing:

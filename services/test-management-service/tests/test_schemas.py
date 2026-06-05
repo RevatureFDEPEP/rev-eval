@@ -1,15 +1,16 @@
-import pytest
 from datetime import datetime, timezone
-from src.schemas.test_schema import TestCreate, TestUpdate
+
+import pytest
+from src.models.test import TestType
 from src.schemas.skill_schema import SkillCreate, SkillUpdate
+from src.schemas.test_schema import TestCreate, TestUpdate
 from src.schemas.test_submission_schema import (
+    BulkAssignRequest,
+    SubmissionStatus,
     TestSubmissionCreate,
     TestSubmissionUpdate,
-    BulkAssignRequest,
     TrainerReviewRequest,
-    SubmissionStatus,
 )
-from src.models.test import TestType
 
 
 class TestTestCreateSchema:

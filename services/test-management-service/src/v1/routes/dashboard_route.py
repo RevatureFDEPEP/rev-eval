@@ -3,8 +3,6 @@ Dashboard Statistics Endpoints
 
 Provides aggregated statistics for trainer and participant dashboards.
 """
-from fastapi import APIRouter, Header, HTTPException
-from typing import Optional
 import logging
 from typing import Optional
 

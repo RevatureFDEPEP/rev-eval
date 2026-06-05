@@ -1,6 +1,6 @@
 import pytest
+from src.models.question import Option, Question, QuestionType
 from src.repositories.question_repository import QuestionRepository
-from src.models.question import Question, Option, QuestionType
 
 
 def _mcq(**overrides) -> Question:
