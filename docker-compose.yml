@@ -43,8 +43,9 @@ services:
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
-      # Browser uploads PUT directly to MinIO from the frontend origin
-      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_API_CORS_ALLOW_ORIGIN:-http://localhost:3000}
+      # Browser uploads PUT directly to MinIO. Allow both frontend origins:
+      # https://localhost (nginx TLS entrypoint) and http://localhost:3000 (next dev)
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_API_CORS_ALLOW_ORIGIN:-https://localhost,http://localhost:3000}
     ports:
       - "9000:9000"
       - "9001:9001"

@@ -49,8 +49,13 @@ Implementation plan: [docs/plans/f5-minio-presigned-uploads.md](../plans/f5-mini
   presigning is offline, so the unreachable-from-container host is fine. The
   internal client still handles `ensure_bucket()`, which now runs at service
   startup (no `mc` init container exists).
-- **CORS:** `MINIO_API_CORS_ALLOW_ORIGIN` pinned to the frontend origin in
-  `docker-compose.yml`.
+- **CORS:** `MINIO_API_CORS_ALLOW_ORIGIN` pinned in `docker-compose.yml` to
+  both frontend origins — `https://localhost` (nginx TLS entrypoint, the
+  normal way the app is browsed since F1) and `http://localhost:3000`
+  (next dev). The browser PUTs cross-origin to `localhost:9000`, so a missing
+  origin here fails the preflight with no `Access-Control-Allow-Origin`.
+  (`http://localhost:9000` from an `https://` page is allowed — browsers
+  exempt localhost from mixed-content blocking.)
 - The `Content-Type` header on the browser PUT must exactly match the signed
   content type or MinIO returns `SignatureDoesNotMatch`.
 
