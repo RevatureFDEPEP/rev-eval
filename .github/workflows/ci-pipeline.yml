@@ -10,6 +10,8 @@ jobs:
   backend-build-test:
     name: Backend (${{ matrix.service }})
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
     env:
       JWT_SECRET: ${{ secrets.JWT_SIGNING_SECRET }}
     strategy:
@@ -68,8 +70,27 @@ jobs:
           name: coverage-${{ matrix.service }}
           path: services/${{ matrix.service }}/coverage.xml
 
-      # NOTE: Trivy scans added in W2 D7 by candidates (not seeded here)
-      
+      - name: Build production image
+        working-directory: services/${{ matrix.service }}
+        run: docker build --target production -t ${{ matrix.service }}:ci .
+
+      - name: Scan for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ matrix.service }}:ci
+          format: sarif
+          output: trivy-results-${{ matrix.service }}.sarif
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results-${{ matrix.service }}.sarif
+          category: trivy-${{ matrix.service }}
+
 
   frontend-build-test:
     name: Frontend

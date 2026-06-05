@@ -1,32 +1,44 @@
 # API Gateway Service Dockerfile
 
-FROM python:3.11-slim
+FROM python:3.11-slim AS base
 
 WORKDIR /app
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# ---- test stage ----
+FROM base AS test
+
+COPY requirements.txt dev-requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -r dev-requirements.txt
+
 COPY . .
 
-# Create a non-root user
+RUN if [ -d tests ]; then pytest tests/ --tb=short || [ "$?" -eq 5 ]; fi
+
+
+# ---- production stage ----
+FROM base AS production
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --upgrade wheel setuptools && \
+    apt-get purge -y --auto-remove gcc linux-libc-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=test /app/src ./src
+COPY --from=test /app/main.py .
+
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Expose port
 EXPOSE 8000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the application
 CMD ["python", "main.py"]
