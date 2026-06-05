@@ -1,11 +1,13 @@
 # src/models/test.py
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Interval, Enum
-from sqlalchemy.orm import relationship
-from datetime import datetime
-from src.db.session import Base
 import enum
+from datetime import datetime
 
-class TestType(str, enum.Enum):
+from sqlalchemy import Boolean, Column, DateTime, Enum, Integer, Interval, String
+from sqlalchemy.orm import relationship
+from src.db.session import Base
+
+
+class TestType(enum.StrEnum):
     QUIZ = "QUIZ"
     INTERVIEW = "INTERVIEW"
 

@@ -1,6 +1,7 @@
 # src/config/settings.py
-from typing import Optional
+
 from pydantic_settings import BaseSettings
+
 
 class Settings(BaseSettings):
     DB_HOST: str
@@ -8,8 +9,8 @@ class Settings(BaseSettings):
     DB_USERNAME: str
     DB_PASSWORD: str
     DB_NAME: str
-    MONGO_USER: Optional[str] = None  # Optional - service uses PostgreSQL only
-    MONGODB_PASSWORD: Optional[str] = None  # Optional - service uses PostgreSQL only
+    MONGO_USER: str | None = None  # Optional - service uses PostgreSQL only
+    MONGODB_PASSWORD: str | None = None  # Optional - service uses PostgreSQL only
     ALLOW_ORIGINS: str
     SERVICE_NAME: str
     PORT: int

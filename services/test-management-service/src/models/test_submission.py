@@ -1,10 +1,12 @@
-from sqlalchemy import Column, Integer, ForeignKey, DateTime, Enum, Text
-from sqlalchemy.orm import relationship
-from datetime import datetime
-from src.db.session import Base
 import enum
+from datetime import datetime
 
-class SubmissionStatus(str, enum.Enum):
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, Text
+from sqlalchemy.orm import relationship
+from src.db.session import Base
+
+
+class SubmissionStatus(enum.StrEnum):
     ASSIGNED = "ASSIGNED"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"

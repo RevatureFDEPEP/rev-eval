@@ -3,7 +3,6 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWTError
 from sqlalchemy.orm import Session
-
 from src.db.session import get_db
 from src.models.user import User
 from src.services.auth_service import AuthService
