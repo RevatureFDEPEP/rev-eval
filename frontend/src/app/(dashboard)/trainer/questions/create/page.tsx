@@ -129,7 +129,8 @@ export default function CreateQuestionPage() {
   };
 
   // Get default values based on question type
-  const getDefaultValues = (): Record<string, unknown> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getDefaultValues = (): any => {
     const base = {
       question_text: "",
       difficulty: undefined,
@@ -201,7 +202,8 @@ export default function CreateQuestionPage() {
     loadSkills();
   }, []);
 
-  const transformFormData = (values: Record<string, unknown>): QuestionCreate => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const transformFormData = (values: any): QuestionCreate => {
     // For MCQ type, determine if it's actually MCQ (single answer) or MULTI (multiple answers)
     let actualType: QuestionType = questionType;
     let correct_answers: (number | boolean | string)[] | undefined = undefined;
@@ -210,7 +212,9 @@ export default function CreateQuestionPage() {
     if (questionType === "mcq") {
       // Get all correct answers
       const correctAnswerIndices = values.options
-        .map((opt: { text: string; is_correct: boolean }, idx: number) => (opt.is_correct ? idx + 1 : null))
+        .map((opt: { text: string; is_correct: boolean }, idx: number) =>
+          opt.is_correct ? idx + 1 : null
+        )
         .filter((id: number | null): id is number => id !== null);
 
       // Determine if it's MCQ (1 answer) or MULTI (2+ answers)
@@ -221,7 +225,7 @@ export default function CreateQuestionPage() {
       }
 
       correct_answers = correctAnswerIndices;
-      options = (values.options as { text: string; is_correct: boolean }[]).map((opt) => ({ text: opt.text }));
+      options = values.options.map((opt: { text: string }) => ({ text: opt.text }));
     } else if (questionType === "true_false") {
       // For TRUE_FALSE, send boolean in correct_answers, no options
       correct_answers = [values.true_false_answer];
