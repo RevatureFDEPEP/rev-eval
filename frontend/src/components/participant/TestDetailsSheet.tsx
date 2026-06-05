@@ -22,7 +22,7 @@ interface InterviewTranscriptMessage {
 interface InterviewTranscriptEvaluation {
   overall_score: number;
   score_breakdown: Record<string, number>;
-  skill_breakdown: Record<string, { score?: number }>;
+  skill_breakdown: Record<string, { score: number; proficiency_level?: string; feedback?: string }>;
   feedback?: string;
   strengths?: string[];
   improvements?: string[];
@@ -31,6 +31,7 @@ interface InterviewTranscriptEvaluation {
 }
 
 interface InterviewTranscript {
+  status?: string;
   messages: InterviewTranscriptMessage[];
   lambda_evaluation?: InterviewTranscriptEvaluation;
 }
