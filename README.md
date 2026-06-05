@@ -17,8 +17,11 @@ You need Docker (or Colima / Docker Desktop) running.
 
 ```bash
 cp .env.example .env             # adjust JWT_SECRET, secrets if needed
+bash nginx/gen-certs.sh          # generate self-signed TLS cert (one-time)
 docker compose up --build
 ```
+
+> **Browser cert warning** — the cert is self-signed. Click "Advanced → Proceed" once per browser session. To silence the warning permanently, trust the cert in your OS keychain.
 
 Once the stack is healthy:
 
@@ -31,7 +34,7 @@ Once the stack is healthy:
 | http://localhost:8002/docs | user-service Swagger |
 | http://localhost:8003/docs | question-management-service Swagger |
 | http://localhost:9001 | MinIO console (`minioadmin` / `minioadmin`) |
-| http://localhost | Nginx — returns 502 by design (W2 D6 target) |
+| https://localhost | Nginx — HTTPS reverse proxy (HTTP :80 redirects here) |
 
 Default seeded users share password `password123` (see
 `services/test-management-service/seed_db.py`).
