@@ -10,12 +10,10 @@ W2 D8 candidate task: wire this into a question-image upload endpoint
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
-
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -35,7 +33,7 @@ def _build_client():
 s3_client = _build_client()
 
 
-def ensure_bucket(bucket_name: Optional[str] = None) -> None:
+def ensure_bucket(bucket_name: str | None = None) -> None:
     """Create the configured bucket if it doesn't already exist."""
     name = bucket_name or settings.S3_BUCKET_NAME
     try:
@@ -53,8 +51,8 @@ def ensure_bucket(bucket_name: Optional[str] = None) -> None:
 def generate_presigned_put_url(
     key: str,
     content_type: str = "application/octet-stream",
-    expires_in: Optional[int] = None,
-    bucket_name: Optional[str] = None,
+    expires_in: int | None = None,
+    bucket_name: str | None = None,
 ) -> str:
     """Generate a pre-signed URL that clients can PUT directly to."""
     return s3_client.generate_presigned_url(
@@ -70,8 +68,8 @@ def generate_presigned_put_url(
 
 def generate_presigned_get_url(
     key: str,
-    expires_in: Optional[int] = None,
-    bucket_name: Optional[str] = None,
+    expires_in: int | None = None,
+    bucket_name: str | None = None,
 ) -> str:
     """Generate a pre-signed URL for read-only access to an existing object."""
     return s3_client.generate_presigned_url(

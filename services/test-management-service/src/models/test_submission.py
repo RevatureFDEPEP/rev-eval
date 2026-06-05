@@ -1,8 +1,10 @@
-from sqlalchemy import Column, Integer, ForeignKey, DateTime, Enum, Text
-from sqlalchemy.orm import relationship
-from datetime import datetime
-from src.db.session import Base
 import enum
+from datetime import datetime
+
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, Text
+from sqlalchemy.orm import relationship
+from src.db.session import Base
+
 
 class SubmissionStatus(str, enum.Enum):
     ASSIGNED = "ASSIGNED"

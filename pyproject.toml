@@ -1,0 +1,30 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes (undefined names, unused imports)
+    "I",   # isort (import ordering)
+    "B",   # flake8-bugbear (common bugs)
+    "UP",  # pyupgrade (modernize syntax)
+]
+ignore = [
+    "B008",  # Depends()/Query() in FastAPI route signatures is idiomatic, not a bug
+    "E402",  # module-level import not at top — intentional in service entry points
+    "E501",  # ruff format command has not resolved this error, and thus it must be ignored
+]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "config",
+    "db",
+    "models",
+    "schemas",
+    "repositories",
+    "services",
+    "v1",
+    "utils",
+]

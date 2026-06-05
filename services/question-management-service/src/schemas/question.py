@@ -1,7 +1,7 @@
-from pydantic import BaseModel, field_validator, model_validator, Field
-from typing import List, Optional, Union
 from datetime import datetime
-from src.models.question import Option, OptionCreate, QuestionType
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+from src.models.question import OptionCreate, QuestionType
 
 
 class QuestionCreate(BaseModel):
@@ -18,13 +18,13 @@ class QuestionCreate(BaseModel):
     """
     type: QuestionType
     question_text: str = Field(..., min_length=10, max_length=2000, description="The question text")
-    options: Optional[List[OptionCreate]] = None  # User provides text only, IDs are auto-generated
-    correct_answers: Optional[List[Union[int, bool, str]]] = None
-    sample_answer: Optional[str] = Field(None, max_length=5000, description="Sample answer for text questions")
-    answer_explanation: Optional[str] = Field(None, max_length=2000, description="Explanation for the correct answer")
-    difficulty: Optional[str] = Field(default="medium", pattern="^(easy|medium|hard)$")
-    skills: List[str] = Field(default_factory=list, max_length=20)
-    tags: List[str] = Field(default_factory=list, max_length=30)
+    options: list[OptionCreate] | None = None  # User provides text only, IDs are auto-generated
+    correct_answers: list[int | bool | str] | None = None
+    sample_answer: str | None = Field(None, max_length=5000, description="Sample answer for text questions")
+    answer_explanation: str | None = Field(None, max_length=2000, description="Explanation for the correct answer")
+    difficulty: str | None = Field(default="medium", pattern="^(easy|medium|hard)$")
+    skills: list[str] = Field(default_factory=list, max_length=20)
+    tags: list[str] = Field(default_factory=list, max_length=30)
 
     @field_validator('question_text')
     @classmethod
@@ -37,7 +37,7 @@ class QuestionCreate(BaseModel):
 
     @field_validator('skills')
     @classmethod
-    def validate_skills(cls, v: List[str]) -> List[str]:
+    def validate_skills(cls, v: list[str]) -> list[str]:
         """Validate and sanitize skills list."""
         if not v:
             return []
@@ -51,7 +51,7 @@ class QuestionCreate(BaseModel):
 
     @field_validator('tags')
     @classmethod
-    def validate_tags(cls, v: List[str]) -> List[str]:
+    def validate_tags(cls, v: list[str]) -> list[str]:
         """Validate and sanitize tags list."""
         if not v:
             return []
@@ -65,7 +65,7 @@ class QuestionCreate(BaseModel):
 
     @field_validator('options')
     @classmethod
-    def validate_options(cls, v: Optional[List[OptionCreate]]) -> Optional[List[OptionCreate]]:
+    def validate_options(cls, v: list[OptionCreate] | None) -> list[OptionCreate] | None:
         """Validate options list structure (option_ids are auto-generated)."""
         if v is not None:
             if len(v) < 2:
@@ -179,18 +179,18 @@ class QuestionUpdate(BaseModel):
     When updating options, provide just the text - option_ids will be auto-generated.
     The updated_at timestamp is automatically set by the system.
     """
-    question_text: Optional[str] = Field(None, min_length=10, max_length=2000)
-    options: Optional[List[OptionCreate]] = None  # User provides text only
-    correct_answers: Optional[List[Union[int, bool, str]]] = None
-    sample_answer: Optional[str] = Field(None, max_length=5000)
-    answer_explanation: Optional[str] = Field(None, max_length=2000)
-    difficulty: Optional[str] = Field(None, pattern="^(easy|medium|hard)$")
-    skills: Optional[List[str]] = Field(None, max_length=20)
-    tags: Optional[List[str]] = Field(None, max_length=30)
+    question_text: str | None = Field(None, min_length=10, max_length=2000)
+    options: list[OptionCreate] | None = None  # User provides text only
+    correct_answers: list[int | bool | str] | None = None
+    sample_answer: str | None = Field(None, max_length=5000)
+    answer_explanation: str | None = Field(None, max_length=2000)
+    difficulty: str | None = Field(None, pattern="^(easy|medium|hard)$")
+    skills: list[str] | None = Field(None, max_length=20)
+    tags: list[str] | None = Field(None, max_length=30)
 
     @field_validator('question_text')
     @classmethod
-    def validate_question_text(cls, v: Optional[str]) -> Optional[str]:
+    def validate_question_text(cls, v: str | None) -> str | None:
         """Sanitize and validate question text."""
         if v is not None:
             v = v.strip()
@@ -200,7 +200,7 @@ class QuestionUpdate(BaseModel):
 
     @field_validator('skills')
     @classmethod
-    def validate_skills(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+    def validate_skills(cls, v: list[str] | None) -> list[str] | None:
         """Validate and sanitize skills list."""
         if v is not None:
             skills = [skill.strip() for skill in v if skill.strip()]
@@ -213,7 +213,7 @@ class QuestionUpdate(BaseModel):
 
     @field_validator('tags')
     @classmethod
-    def validate_tags(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+    def validate_tags(cls, v: list[str] | None) -> list[str] | None:
         """Validate and sanitize tags list."""
         if v is not None:
             tags = [tag.strip() for tag in v if tag.strip()]
@@ -226,7 +226,7 @@ class QuestionUpdate(BaseModel):
 
     @field_validator('options')
     @classmethod
-    def validate_options(cls, v: Optional[List[OptionCreate]]) -> Optional[List[OptionCreate]]:
+    def validate_options(cls, v: list[OptionCreate] | None) -> list[OptionCreate] | None:
         """Validate options list structure (option_ids will be auto-generated)."""
         if v is not None:
             if len(v) < 2:
@@ -280,13 +280,13 @@ class QuestionResponse(BaseModel):
     id: str = Field(..., description="MongoDB document ID", alias="_id")
     type: str
     question_text: str
-    options: Optional[List[dict]] = None
-    correct_answers: Optional[List[Union[int, bool, str]]] = None
-    sample_answer: Optional[str] = None
-    answer_explanation: Optional[str] = None
-    difficulty: Optional[str] = "medium"
-    skills: List[str] = []
-    tags: List[str] = []
+    options: list[dict] | None = None
+    correct_answers: list[int | bool | str] | None = None
+    sample_answer: str | None = None
+    answer_explanation: str | None = None
+    difficulty: str | None = "medium"
+    skills: list[str] = []
+    tags: list[str] = []
     created_at: datetime
     updated_at: datetime
 
