@@ -26,6 +26,13 @@ class SkillService:
         await SkillRepository.delete(db, skill)
 
     @staticmethod
+    async def get_skill_by_id(db: AsyncSession, skill_id: int) -> SkillOut:
+        skill = await SkillRepository.get_by_id(db, skill_id)
+        if not skill:
+            raise ValueError("Skill not found")
+        return SkillOut.from_orm(skill)
+
+    @staticmethod
     async def list_skills(db: AsyncSession) -> List[SkillOut]:
         skills = await SkillRepository.list_all(db)
         return [SkillOut.from_orm(skill) for skill in skills]

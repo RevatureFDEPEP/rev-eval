@@ -17,6 +17,7 @@ class Settings(BaseSettings):
 
     # Service-to-Service Communication
     USER_SERVICE_URL: str = "http://localhost:8003"
+    INTERVIEW_SERVICE_URL: Optional[str] = None
 
     @property
     def SQLALCHEMY_DATABASE_URL(self) -> str:

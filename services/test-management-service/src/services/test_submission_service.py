@@ -27,6 +27,8 @@ class TestSubmissionService:
     async def create_submission(db: AsyncSession, submission_in: TestSubmissionCreate) -> TestSubmissionOut:
 
         submission = await TestSubmissionRepository.create(db, submission_in)
+        # Re-fetch with selectinload so TestSubmissionOut.from_orm can access .test
+        submission = await TestSubmissionRepository.get_by_id(db, submission.id)
         # test = await TestService.get_test_by_id(db, submission_in.test_id)
         # if not test:
         #     raise ValueError(f"Test with ID {request.test_id} not found")
@@ -141,6 +143,8 @@ class TestSubmissionService:
         if not submission:
             raise ValueError("Submission not found")
         submission = await TestSubmissionRepository.update(db, submission, submission_in)
+        # Re-fetch with selectinload so .test relationship is loaded after the update refresh
+        submission = await TestSubmissionRepository.get_by_id(db, submission.id)
         return TestSubmissionOut.from_orm(submission)
 
     @staticmethod
@@ -455,6 +459,9 @@ class TestSubmissionService:
         transcript_data = None
 
         try:
+            if not interview_service_url:
+                logger.warning("⚠️ INTERVIEW_SERVICE_URL not configured — skipping transcript fetch")
+                raise ValueError("INTERVIEW_SERVICE_URL not set")
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
                     f"{interview_service_url}/v1/api/interview/submissions/{submission_id}/transcript"
@@ -534,6 +541,8 @@ class TestSubmissionService:
         if review.trainer_evaluation and submission.test.test_type.value == "INTERVIEW":
             interview_service_url = settings.INTERVIEW_SERVICE_URL
             try:
+                if not interview_service_url:
+                    raise ValueError("INTERVIEW_SERVICE_URL not set")
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     mongo_response = await client.patch(
                         f"{interview_service_url}/v1/api/interview/submissions/{submission_id}/trainer-evaluation",
