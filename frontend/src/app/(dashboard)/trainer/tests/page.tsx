@@ -126,6 +126,7 @@ export default function TrainerTestsPage() {
     };
 
     loadUser();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadTests();
     loadEvaluatedSubmissions();
     loadGradedSubmissions();

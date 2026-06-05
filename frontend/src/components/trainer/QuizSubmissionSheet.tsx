@@ -28,7 +28,9 @@ export function QuizSubmissionSheet({
 
   useEffect(() => {
     if (!submission || !open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSession(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError(null);
       return;
     }

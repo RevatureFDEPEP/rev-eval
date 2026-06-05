@@ -141,7 +141,9 @@ export function SubmissionReviewSheet({
 
   useEffect(() => {
     if (!submission || !open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDetails(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError(null);
       // Reset all form fields
       setTrainerScore('');
