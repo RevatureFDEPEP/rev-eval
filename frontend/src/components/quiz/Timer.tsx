@@ -18,13 +18,12 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface TimerProps {
-  timeRemaining: number;  // Seconds
   formatTime: () => string;  // Formatted time string
   isWarning: boolean;  // < 5 minutes
   isCritical: boolean;  // < 1 minute
 }
 
-export function Timer({ timeRemaining, formatTime, isWarning, isCritical }: TimerProps) {
+export function Timer({ formatTime, isWarning, isCritical }: TimerProps) {
   // Determine styling based on time remaining
   const getTimerColor = () => {
     if (isCritical) {

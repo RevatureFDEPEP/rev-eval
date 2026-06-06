@@ -210,6 +210,89 @@ def test_validate_update_for_type_rejects_invalid_payloads(
     assert message in str(exc.value)
 
 
+@pytest.mark.parametrize(
+    ("question_type", "existing", "update", "message"),
+    [
+        (
+            QuestionType.MCQ.value,
+            {"options": [{"option_id": 1, "text": "A"}], "correct_answers": [1]},
+            {"options": [{"option_id": 1, "text": "Only one"}]},
+            "at least 2",
+        ),
+        (
+            QuestionType.MCQ.value,
+            {"options": [{"option_id": 1, "text": "A"}], "correct_answers": [1]},
+            {"correct_answers": ["1"]},
+            "must be an integer",
+        ),
+        (
+            QuestionType.MCQ.value,
+            {"options": [{"option_id": 1, "text": "A"}], "correct_answers": [1]},
+            {"correct_answers": [2]},
+            "not a valid option_id",
+        ),
+        (
+            QuestionType.MULTI.value,
+            {"options": [{"option_id": 1, "text": "A"}, {"option_id": 2, "text": "B"}]},
+            {"correct_answers": []},
+            "at least one",
+        ),
+        (
+            QuestionType.MULTI.value,
+            {"options": [{"option_id": 1, "text": "A"}, {"option_id": 2, "text": "B"}]},
+            {"correct_answers": ["1"]},
+            "list of integers",
+        ),
+        (
+            QuestionType.MULTI.value,
+            {"options": [{"option_id": 1, "text": "A"}, {"option_id": 2, "text": "B"}]},
+            {"correct_answers": [3]},
+            "invalid option_id",
+        ),
+        (
+            QuestionType.MULTI.value,
+            {"options": [{"option_id": 1, "text": "A"}, {"option_id": 2, "text": "B"}]},
+            {"correct_answers": [1, 2]},
+            "cannot have all options",
+        ),
+        (
+            QuestionType.TRUE_FALSE.value,
+            {"correct_answers": [True]},
+            {"correct_answers": [True, False]},
+            "exactly one",
+        ),
+        (
+            QuestionType.TRUE_FALSE.value,
+            {"correct_answers": [True]},
+            {"correct_answers": ["true"]},
+            "boolean value",
+        ),
+        (
+            QuestionType.TEXT.value,
+            {"sample_answer": "A long enough sample answer."},
+            {"correct_answers": [1]},
+            "should not have correct_answers",
+        ),
+        (
+            QuestionType.TEXT.value,
+            {"sample_answer": "A long enough sample answer."},
+            {"sample_answer": "   "},
+            "non-empty",
+        ),
+    ],
+)
+def test_validate_update_for_type_rejects_additional_edge_cases(
+    question_type,
+    existing,
+    update,
+    message,
+):
+    with pytest.raises(ValueError) as exc:
+        QuestionService._validate_update_for_type(question_type, existing, update)
+
+    assert message in str(exc.value)
+
+
 @pytest.mark.asyncio
 async def test_update_question_converts_validation_errors_to_http_400():
     with patch(
@@ -462,3 +545,49 @@ async def test_question_filter_routes_delegate_to_service():
             limit=5,
         )
     assert len(filtered) == 1
+
+
+@pytest.mark.asyncio
+async def test_filter_questions_rejects_missing_and_invalid_filters():
+    with pytest.raises(HTTPException) as missing_filters:
+        await QuestionService.filter_questions()
+    assert missing_filters.value.status_code == 400
+
+    with pytest.raises(HTTPException) as invalid_type:
+        await QuestionService.filter_questions(question_type="essay")
+    assert invalid_type.value.status_code == 400
+
+    with pytest.raises(HTTPException) as invalid_difficulty:
+        await QuestionService.filter_questions(difficulty="expert")
+    assert invalid_difficulty.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_filter_questions_executes_single_type_condition():
+    class FakeField:
+        def __eq__(self, value):
+            return ("eq", value)
+
+    class FakeQuery:
+        def __init__(self, condition):
+            self.condition = condition
+            self.limit_value = None
+
+        def limit(self, value):
+            self.limit_value = value
+            return self
+
+        async def to_list(self):
+            return [self.condition, self.limit_value]
+
+    class FakeQuestion:
+        type = FakeField()
+
+        @staticmethod
+        def find(condition):
+            return FakeQuery(condition)
+
+    with patch("src.services.question_service.Question", FakeQuestion):
+        result = await QuestionService.filter_questions(question_type="mcq", limit=7)
+
+    assert result == [("eq", "mcq"), 7]

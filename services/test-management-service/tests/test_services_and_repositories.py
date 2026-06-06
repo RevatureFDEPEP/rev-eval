@@ -9,10 +9,18 @@ from src.models.test_skill import TestSkill
 from src.repositories.skill_repository import SkillRepository
 from src.repositories.test_repository import TestRepository
 from src.repositories.test_skill_repository import TestSkillRepository
+from src.repositories.test_submission_repository import TestSubmissionRepository
 from src.schemas.skill_schema import SkillCreate, SkillUpdate
 from src.schemas.test_schema import TestCreate, TestUpdate
+from src.schemas.test_submission_schema import (
+    BulkAssignRequest,
+    SubmissionStatus,
+    TestSubmissionCreate,
+    TestSubmissionUpdate,
+)
 from src.services.skill_service import SkillService
 from src.services.test_service import TestService
+from src.services.test_submission_service import TestSubmissionService
 
 
 class FakeScalarResult:
@@ -84,6 +92,30 @@ def make_test(test_id=1, duration=None):
 
 def make_skill(skill_id=1):
     return Skill(id=skill_id, name=f"Skill {skill_id}", description="Core skill")
+
+
+def make_submission(submission_id=1, user_id=100, status=SubmissionStatus.ASSIGNED):
+    now = datetime.utcnow()
+    return SimpleNamespace(
+        id=submission_id,
+        test_id=1,
+        user_id=user_id,
+        assigned_by_id=7,
+        due_date=None,
+        status=status,
+        assigned_at=now,
+        started_at=None,
+        submitted_at=None,
+        ai_score=None,
+        trainer_score=None,
+        final_score=None,
+        feedback=None,
+        reviewed_at=None,
+        reviewed_by_id=None,
+        created_at=now,
+        updated_at=now,
+        test=None,
+    )
 
 
 @pytest.mark.asyncio
@@ -326,3 +358,181 @@ async def test_test_service_lists_tests_with_submissions_by_user():
 
     assert len(result) == 1
     assert result[0].skills[0].id == 1
+
+
+@pytest.mark.asyncio
+async def test_submission_service_crud_and_list_paths():
+    db = object()
+    submission = make_submission()
+
+    with patch.object(
+        TestSubmissionRepository,
+        "create",
+        new=AsyncMock(return_value=submission),
+    ) as create:
+        created = await TestSubmissionService.create_submission(
+            db,
+            TestSubmissionCreate(test_id=1, user_id=100, assigned_by_id=7),
+        )
+    assert created.id == 1
+    create.assert_awaited_once()
+
+    with patch.object(
+        TestSubmissionRepository,
+        "get_by_id",
+        new=AsyncMock(return_value=None),
+    ):
+        with pytest.raises(ValueError):
+            await TestSubmissionService.update_submission(
+                db,
+                404,
+                TestSubmissionUpdate(status=SubmissionStatus.IN_PROGRESS),
+            )
+
+    with (
+        patch.object(
+            TestSubmissionRepository,
+            "get_by_id",
+            new=AsyncMock(return_value=submission),
+        ),
+        patch.object(
+            TestSubmissionRepository,
+            "update",
+            new=AsyncMock(return_value=make_submission(status=SubmissionStatus.IN_PROGRESS)),
+        ) as update,
+    ):
+        updated = await TestSubmissionService.update_submission(
+            db,
+            1,
+            TestSubmissionUpdate(status=SubmissionStatus.IN_PROGRESS),
+        )
+    assert updated.status == SubmissionStatus.IN_PROGRESS
+    update.assert_awaited_once()
+
+    with patch.object(
+        TestSubmissionRepository,
+        "get_by_id",
+        new=AsyncMock(return_value=submission),
+    ):
+        found = await TestSubmissionService.get_submission_by_id(db, 1)
+    assert found.user_id == 100
+
+    with patch.object(
+        TestSubmissionRepository,
+        "get_by_id",
+        new=AsyncMock(return_value=None),
+    ):
+        with pytest.raises(ValueError):
+            await TestSubmissionService.get_submission_by_id(db, 404)
+
+    with patch.object(
+        TestSubmissionRepository,
+        "get_by_id",
+        new=AsyncMock(return_value=None),
+    ):
+        with pytest.raises(ValueError):
+            await TestSubmissionService.delete_submission(db, 404)
+
+    with (
+        patch.object(
+            TestSubmissionRepository,
+            "get_by_id",
+            new=AsyncMock(return_value=submission),
+        ),
+        patch.object(TestSubmissionRepository, "delete", new=AsyncMock()) as delete,
+    ):
+        await TestSubmissionService.delete_submission(db, 1)
+    delete.assert_awaited_once_with(db, submission)
+
+    with patch.object(
+        TestSubmissionRepository,
+        "list_all",
+        new=AsyncMock(return_value=[submission]),
+    ):
+        assert len(await TestSubmissionService.list_all_submissions(db)) == 1
+
+    with patch.object(
+        TestSubmissionRepository,
+        "list_by_user",
+        new=AsyncMock(return_value=[submission]),
+    ):
+        assert len(await TestSubmissionService.list_submissions_by_user(db, 100)) == 1
+
+
+@pytest.mark.asyncio
+async def test_bulk_assign_test_handles_existing_invited_and_failed_users():
+    db = object()
+    request = BulkAssignRequest(
+        test_id=1,
+        participant_emails=[
+            "existing@example.com",
+            "new@example.com",
+            "bad@example.com",
+        ],
+    )
+
+    class FakeResponse:
+        def __init__(self, status_code, payload=None, text=""):
+            self.status_code = status_code
+            self.payload = payload or {}
+            self.text = text
+
+        def json(self):
+            return self.payload
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url):
+            if "existing@example.com" in url:
+                return FakeResponse(200, {"id": 101})
+            if "new@example.com" in url:
+                return FakeResponse(404)
+            return FakeResponse(500, text="user-service error")
+
+        async def post(self, url, json):
+            return FakeResponse(201, {"id": 202})
+
+    created_submissions = [
+        make_submission(1, user_id=101),
+        make_submission(2, user_id=202),
+    ]
+
+    with (
+        patch.object(TestService, "get_test_by_id", new=AsyncMock(return_value=make_test())),
+        patch(
+            "src.services.test_submission_service.httpx.AsyncClient",
+            return_value=FakeClient(),
+        ),
+        patch.object(
+            TestSubmissionRepository,
+            "create",
+            new=AsyncMock(side_effect=created_submissions),
+        ) as create,
+    ):
+        result = await TestSubmissionService.bulk_assign_test(
+            db,
+            request,
+            current_user={"id": 7},
+        )
+
+    assert result.success_count == 2
+    assert result.failure_count == 1
+    assert [submission.user_id for submission in result.created_submissions] == [101, 202]
+    assert result.errors[0]["email"] == "bad@example.com"
+    assert create.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_bulk_assign_test_requires_existing_test():
+    with patch.object(TestService, "get_test_by_id", new=AsyncMock(return_value=None)):
+        with pytest.raises(ValueError):
+            await TestSubmissionService.bulk_assign_test(
+                object(),
+                BulkAssignRequest(test_id=404, participant_emails=["user@example.com"]),
+                current_user={"id": 7},
+            )

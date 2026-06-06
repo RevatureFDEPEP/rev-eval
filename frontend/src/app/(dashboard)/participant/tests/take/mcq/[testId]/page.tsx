@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, use, useMemo } from 'react';
+import { useEffect, useState, useCallback, use, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -116,6 +116,7 @@ function QuizContent({ testId, submissionId }: QuizContentProps) {
   const [answers, setAnswers] = useState<Map<string, AnswerValue>>(new Map());
   const [submittedPartAQuestionIds, setSubmittedPartAQuestionIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
+  const handleTimeExpiredRef = useRef<() => Promise<void>>(async () => {});
 
   const answeredQuestionIds = useMemo(() => {
     const combined = new Set<string>();
@@ -151,17 +152,6 @@ function QuizContent({ testId, submissionId }: QuizContentProps) {
     };
   }, [state]);
 
-  // Auto-submit handler
-  const handleTimeExpired = useCallback(async () => {
-    toast.error('Time expired! Auto-submitting your quiz...');
-
-    if (currentPart === 'A' && sessionId) {
-      await handleSubmitPartA();
-    } else if (currentPart === 'B' && sessionId) {
-      await handleFinalSubmit();
-    }
-  }, [currentPart, sessionId, answers]);
-
   const derivedTotalQuestions =
     typeof test?.number_of_questions === 'number' && test.number_of_questions > 0
       ? test.number_of_questions
@@ -191,6 +181,9 @@ function QuizContent({ testId, submissionId }: QuizContentProps) {
   }, [partBQuestions, expectedPartBCount]);
 
   const totalDuration = test?.duration_seconds ?? 0;
+  const handleTimeExpired = useCallback(() => {
+    void handleTimeExpiredRef.current();
+  }, []);
 
   const timer = useTimer({
     durationSeconds: totalDuration || 0,
@@ -346,7 +339,7 @@ function QuizContent({ testId, submissionId }: QuizContentProps) {
   };
 
   // Submit Part A handler
-  const handleSubmitPartA = async () => {
+  const handleSubmitPartA = useCallback(async () => {
     if (!sessionId) return;
 
     try {
@@ -391,10 +384,10 @@ function QuizContent({ testId, submissionId }: QuizContentProps) {
       setState('part-a');
       resumeTimer();
     }
-  };
+  }, [answers, partAQuestions, pauseTimer, resumeTimer, sessionId, testId]);
 
   // Final submit handler
-  const handleFinalSubmit = async () => {
+  const handleFinalSubmit = useCallback(async () => {
     if (!sessionId) return;
 
     try {
@@ -436,7 +429,19 @@ function QuizContent({ testId, submissionId }: QuizContentProps) {
       setState('part-b');
       resumeTimer();
     }
-  };
+  }, [answers, pauseTimer, resumeTimer, router, sessionId, testId]);
+
+  useEffect(() => {
+    handleTimeExpiredRef.current = async () => {
+      toast.error('Time expired! Auto-submitting your quiz...');
+
+      if (currentPart === 'A' && sessionId) {
+        await handleSubmitPartA();
+      } else if (currentPart === 'B' && sessionId) {
+        await handleFinalSubmit();
+      }
+    };
+  }, [currentPart, handleFinalSubmit, handleSubmitPartA, sessionId]);
 
   // Confirm submit handler
   const handleConfirmSubmit = () => {
@@ -584,7 +589,6 @@ function QuizContent({ testId, submissionId }: QuizContentProps) {
           <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
             {/* Timer */}
             <Timer
-              timeRemaining={timer.timeRemaining}
               formatTime={timer.formatTime}
               isWarning={timer.isWarning}
               isCritical={timer.isCritical}

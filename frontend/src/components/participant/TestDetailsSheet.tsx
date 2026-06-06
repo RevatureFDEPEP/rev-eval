@@ -42,7 +42,7 @@ interface InterviewTranscript {
   status?: 'COMPLETED' | 'IN_PROGRESS' | 'PENDING' | 'FAILED' | string;
 }
 
-async function getInterviewTranscript(_submissionId: number): Promise<InterviewTranscript> {
+async function getInterviewTranscript(): Promise<InterviewTranscript> {
   throw new Error('Interview transcripts not available — candidate-built on W3 D13.');
 }
 
@@ -106,7 +106,7 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
       try {
         setLoadingTranscript(true);
         setTranscriptError(null);
-        const data = await getInterviewTranscript(submissionId);
+        const data = await getInterviewTranscript();
         setTranscript(data);
       } catch (err) {
         console.error('Failed to load transcript:', err);
@@ -714,11 +714,6 @@ function QuestionResultCard({ question, index }: { question: GradedQuizQuestion;
     easy: 'bg-green-100 text-green-800 border-green-200',
     medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     hard: 'bg-red-100 text-red-800 border-red-200',
-  };
-
-  const getOptionText = (optionId: number): string => {
-    const option = question.options?.find((opt) => opt.option_id === optionId);
-    return option?.text || `Option ${optionId}`;
   };
 
   return (
