@@ -12,7 +12,9 @@ class TestRepository:
     async def get_by_id(db: AsyncSession, test_id: int) -> Test | None:
         result = await db.execute(select(Test).where(Test.id == test_id))
         test = result.scalars().first()
-        if test and test.duration:
+        if test is None:
+            return None
+        if test.duration:
             test.duration_seconds = int(test.duration.total_seconds())
         else:
             test.duration_seconds = None
