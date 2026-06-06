@@ -84,7 +84,9 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 8
+          # Must match the packageManager field in frontend/package.json —
+          # action-setup errors out if the two disagree
+          version: 9.15.0
 
       - name: Set up Node
         uses: actions/setup-node@v4
