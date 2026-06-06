@@ -61,6 +61,7 @@ export function useTimer(options: UseTimerOptions): UseTimerReturn {
   const warning5MinShown = useRef<boolean>(false);
   const warning1MinShown = useRef<boolean>(false);
   const expiredCallbackFired = useRef<boolean>(false);
+  const timeRemainingRef = useRef<number>(timeRemaining);
 
   // Save time to localStorage
   const saveToLocalStorage = useCallback((remaining: number) => {
@@ -156,14 +157,21 @@ export function useTimer(options: UseTimerOptions): UseTimerReturn {
     saveToLocalStorage(nextDuration);
   }, [durationSeconds, autoStart, saveToLocalStorage]);
 
-  // Cleanup on unmount
+  // Track latest time in a ref so the unmount effect below doesn't need
+  // timeRemaining in its deps — depending on it made the cleanup run on every
+  // tick, writing a stale value back to storage (and undoing the clear on expiry).
+  useEffect(() => {
+    timeRemainingRef.current = timeRemaining;
+  }, [timeRemaining]);
+
+  // Persist on unmount only
   useEffect(() => {
     return () => {
-      if (timeRemaining > 0) {
-        saveToLocalStorage(timeRemaining);
+      if (timeRemainingRef.current > 0) {
+        saveToLocalStorage(timeRemainingRef.current);
       }
     };
-  }, [timeRemaining, saveToLocalStorage]);
+  }, [saveToLocalStorage]);
 
   return {
     timeRemaining,
