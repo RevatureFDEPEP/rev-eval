@@ -99,7 +99,7 @@ jobs:
 
       - name: Lint
         working-directory: frontend
-        run: pnpm lint || echo "⚠️ Lint warnings found — not blocking build"
+        run: pnpm lint
 
       - name: Build
         working-directory: frontend
