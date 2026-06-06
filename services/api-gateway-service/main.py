@@ -150,6 +150,10 @@ async def public_auth_proxy(auth_path: str, request: Request):
             request.method, target_url, content=body, headers=headers, timeout=30.0,
         )
 
+    # Bodyless responses (204 No Content, etc.) can still carry a JSON
+    # content-type header — don't try to parse them.
+    if not resp.content:
+        return Response(status_code=resp.status_code)
     if resp.headers.get("content-type", "").startswith("application/json"):
         return JSONResponse(content=resp.json(), status_code=resp.status_code)
     return Response(
@@ -234,7 +238,11 @@ async def smart_gateway(
 
         logger.info("=" * 80)
 
-        # Return response with correct status code
+        # Return response with correct status code. Bodyless responses
+        # (204 No Content, etc.) can still carry a JSON content-type
+        # header — don't try to parse them.
+        if not resp.content:
+            return Response(status_code=resp.status_code)
         if resp.headers.get("content-type", "").startswith("application/json"):
             return JSONResponse(
                 content=resp.json(),
