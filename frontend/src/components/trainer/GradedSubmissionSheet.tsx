@@ -90,6 +90,7 @@ export function GradedSubmissionSheet({
   const [error, setError] = useState<string | null>(null);
   const [playingAudioIndex, setPlayingAudioIndex] = useState<number | null>(null);
   const audioPlayer = useAudioPlayer();
+  const stopAudio = audioPlayer.stop;
 
   useEffect(() => {
     if (!submission || !open) {
@@ -133,10 +134,6 @@ export function GradedSubmissionSheet({
     await audioPlayer.play(audioUrl);
   };
 
-  const handlePauseAudio = () => {
-    audioPlayer.pause();
-  };
-
   const handleRestartAudio = () => {
     audioPlayer.restart();
   };
@@ -151,10 +148,10 @@ export function GradedSubmissionSheet({
 
   useEffect(() => {
     return () => {
-      audioPlayer.stop();
+      stopAudio();
       setPlayingAudioIndex(null);
     };
-  }, [open]);
+  }, [open, stopAudio]);
 
   if (!submission) return null;
 

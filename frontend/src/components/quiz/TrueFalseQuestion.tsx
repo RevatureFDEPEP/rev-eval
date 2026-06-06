@@ -9,15 +9,13 @@
 import { Button } from '@/components/ui/button';
 import { Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { QuizQuestion } from '@/lib/api/types';
 
 interface TrueFalseQuestionProps {
-  question: QuizQuestion;
   selectedAnswer: boolean | null;  // true, false, or null
   onAnswerChange: (answer: boolean) => void;
 }
 
-export function TrueFalseQuestion({ question, selectedAnswer, onAnswerChange }: TrueFalseQuestionProps) {
+export function TrueFalseQuestion({ selectedAnswer, onAnswerChange }: TrueFalseQuestionProps) {
   return (
     <div className="grid grid-cols-2 gap-4">
       <Button

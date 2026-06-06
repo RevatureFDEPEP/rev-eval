@@ -83,7 +83,6 @@ export function QuestionCard({
       case 'true_false':
         return (
           <TrueFalseQuestion
-            question={question}
             selectedAnswer={typeof selectedAnswer === 'boolean' ? selectedAnswer : null}
             onAnswerChange={(answer) => onAnswerChange(answer)}
           />

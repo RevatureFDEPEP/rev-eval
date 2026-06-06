@@ -12,6 +12,82 @@ import {
   BulkTestSubmissionCreate,
 } from './types';
 
+interface SubmissionReviewScoreBreakdown {
+  technical_knowledge?: number;
+  problem_solving?: number;
+  communication?: number;
+  code_quality?: number;
+  engagement?: number;
+}
+
+interface SubmissionReviewSkillBreakdown {
+  score: number;
+  feedback: string;
+  proficiency_level: string;
+}
+
+interface SubmissionLambdaEvaluation {
+  overall_score: number;
+  score_breakdown: SubmissionReviewScoreBreakdown;
+  skill_breakdown: Record<string, SubmissionReviewSkillBreakdown>;
+  feedback: string;
+  strengths: string[];
+  improvements: string[];
+  key_highlights: string[];
+  red_flags: string[];
+  recommendation: string;
+  reasoning: string;
+  evaluated_at?: string;
+  evaluated_by?: string;
+}
+
+interface SubmissionTrainerEvaluation {
+  overall_score: number;
+  score_breakdown?: SubmissionReviewScoreBreakdown;
+  skill_breakdown?: Record<string, SubmissionReviewSkillBreakdown>;
+  feedback?: string;
+  strengths?: string[];
+  improvements?: string[];
+}
+
+interface SubmissionReviewTranscript {
+  session_id: string;
+  submission_id: number;
+  test_name: string;
+  test_role?: string;
+  messages: Array<{
+    role: string;
+    content: string;
+    timestamp: string;
+  }>;
+  audio_urls?: Array<{
+    message_index: number;
+    audio_url: string;
+    uploaded_at: string;
+  }>;
+  message_count: number;
+  duration_seconds?: number;
+  status: string;
+  created_at: string;
+  ended_at?: string;
+  lambda_evaluation?: SubmissionLambdaEvaluation;
+  trainer_evaluation?: SubmissionTrainerEvaluation;
+}
+
+interface SubmissionReviewDetails {
+  submission: TestSubmission;
+  test: {
+    id: number;
+    name: string;
+    test_type: string;
+    role?: string;
+    curriculum?: string;
+    duration_seconds?: number;
+    skills: Array<{ id: number; name: string; description?: string }>;
+  };
+  transcript: SubmissionReviewTranscript;
+}
+
 /**
  * Get all submissions (with optional filters)
  *
@@ -112,19 +188,9 @@ export async function getAllSubmissionsForTrainer(): Promise<TestSubmission[]> {
  * Get full review details for a submission
  * Includes submission, test info, transcript, and AI evaluation
  */
-export async function getSubmissionReviewDetails(submissionId: number): Promise<{
-  submission: TestSubmission;
-  test: {
-    id: number;
-    name: string;
-    test_type: string;
-    role?: string;
-    curriculum?: string;
-    duration_seconds?: number;
-    skills: Array<{ id: number; name: string; description?: string }>;
-  };
-  transcript: any; // Full transcript from interview service
-}> {
+export async function getSubmissionReviewDetails(
+  submissionId: number
+): Promise<SubmissionReviewDetails> {
   return api.get(`/v1/api/submissions/${submissionId}/review-details`);
 }
 
@@ -136,7 +202,7 @@ export async function submitTrainerReview(
   data: {
     trainer_score: number;
     feedback?: string;
-    trainer_evaluation?: any;  // Comprehensive trainer evaluation structure
+    trainer_evaluation?: unknown;  // Comprehensive trainer evaluation structure
   }
 ): Promise<{
   submission_id: number;

@@ -42,7 +42,7 @@ interface InterviewTranscript {
   status?: 'COMPLETED' | 'IN_PROGRESS' | 'PENDING' | 'FAILED' | string;
 }
 
-async function getInterviewTranscript(_submissionId: number): Promise<InterviewTranscript> {
+async function getInterviewTranscript(): Promise<InterviewTranscript> {
   throw new Error('Interview transcripts not available — candidate-built on W3 D13.');
 }
 
@@ -102,18 +102,21 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
       return;
     }
 
-    setLoadingTranscript(true);
-    setTranscriptError(null);
-    getInterviewTranscript(submissionId)
-      .then((data) => {
+    const loadTranscript = async () => {
+      try {
+        setLoadingTranscript(true);
+        setTranscriptError(null);
+        const data = await getInterviewTranscript();
         setTranscript(data);
-        setLoadingTranscript(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('Failed to load transcript:', err);
         setTranscriptError(err instanceof Error ? err.message : 'Failed to load transcript');
+      } finally {
         setLoadingTranscript(false);
-      });
+      }
+    };
+
+    loadTranscript();
   }, [test, open, isQuiz, isCompleted, submissionId, transcript, loadingTranscript]);
 
   // Fetch quiz session data for completed/graded quizzes
@@ -122,10 +125,11 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
       return;
     }
 
-    setLoadingQuizSession(true);
-    setQuizSessionError(null);
-    getTestSessionBySubmission(submissionId)
-      .then((data) => {
+    const loadQuizSession = async () => {
+      try {
+        setLoadingQuizSession(true);
+        setQuizSessionError(null);
+        const data = await getTestSessionBySubmission(submissionId);
         console.log('📊 Quiz session data received:', {
           part_a: data.part_a,
           part_b: data.part_b,
@@ -135,13 +139,15 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
           part_b_questions_count: data.part_b?.questions?.length,
         });
         setQuizSession(data);
-        setLoadingQuizSession(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('Failed to load quiz session:', err);
         setQuizSessionError(err instanceof Error ? err.message : 'Failed to load quiz session');
+      } finally {
         setLoadingQuizSession(false);
-      });
+      }
+    };
+
+    loadQuizSession();
   }, [test, open, isQuiz, isCompleted, submissionId, quizSession, loadingQuizSession]);
 
   // Early return check - AFTER all hooks
@@ -708,11 +714,6 @@ function QuestionResultCard({ question, index }: { question: GradedQuizQuestion;
     easy: 'bg-green-100 text-green-800 border-green-200',
     medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     hard: 'bg-red-100 text-red-800 border-red-200',
-  };
-
-  const getOptionText = (optionId: number): string => {
-    const option = question.options?.find((opt) => opt.option_id === optionId);
-    return option?.text || `Option ${optionId}`;
   };
 
   return (

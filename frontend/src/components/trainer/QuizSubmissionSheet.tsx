@@ -141,7 +141,7 @@ export function QuizSubmissionSheet({
             <div className="space-y-3">
               {question.selected_answers && question.selected_answers.length > 0 && (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs font-medium text-slate-500 mb-2">Participant's Answer:</p>
+                  <p className="text-xs font-medium text-slate-500 mb-2">Participant&apos;s Answer:</p>
                   <p className="text-sm text-slate-700">
                     {question.selected_answers[0] === 1 ? 'True' : 'False'}
                   </p>
@@ -182,7 +182,7 @@ export function QuizSubmissionSheet({
                 {submission.test?.name || 'Loading...'}
               </h2>
               <p className="max-w-2xl text-sm text-slate-500">
-                View the participant's quiz submission with answers and scoring breakdown.
+                View the participant&apos;s quiz submission with answers and scoring breakdown.
               </p>
             </div>
           </header>

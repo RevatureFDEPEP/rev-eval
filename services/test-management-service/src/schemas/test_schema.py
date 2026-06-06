@@ -1,8 +1,10 @@
-from typing import List, Optional
-from pydantic import BaseModel
 from datetime import datetime
+from typing import List, Optional
+
+from pydantic import BaseModel
 from src.models.test import TestType
 from src.schemas.skill_schema import SkillOut
+
 
 # ===== TEST SCHEMAS =====
 class TestBase(BaseModel):

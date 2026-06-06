@@ -8,6 +8,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 
+type WindowWithWebKitAudioContext = Window &
+  typeof globalThis & {
+    webkitAudioContext?: typeof AudioContext;
+  };
+
 interface UseAudioPlayerReturn {
   isPlaying: boolean;
   isPaused: boolean;
@@ -48,7 +53,15 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     try {
       // Create audio context if it doesn't exist
       if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioContextConstructor =
+          window.AudioContext ||
+          (window as WindowWithWebKitAudioContext).webkitAudioContext;
+
+        if (!AudioContextConstructor) {
+          throw new Error('AudioContext is not supported in this browser');
+        }
+
+        audioContextRef.current = new AudioContextConstructor();
       }
 
       const audioContext = audioContextRef.current;
@@ -69,7 +82,7 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
       if (sourceRef.current) {
         try {
           sourceRef.current.disconnect();
-        } catch (e) {
+        } catch {
           // Ignore disconnect errors
         }
       }

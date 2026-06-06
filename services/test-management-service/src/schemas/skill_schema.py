@@ -1,5 +1,7 @@
 from typing import Optional
+
 from pydantic import BaseModel
+
 
 # ===== SKILL SCHEMAS =====
 class SkillBase(BaseModel):

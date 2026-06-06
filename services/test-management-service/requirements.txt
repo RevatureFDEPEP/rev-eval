@@ -9,7 +9,6 @@ email-validator
 psycopg2-binary
 passlib[bcrypt]
 bcrypt<4.1
-python-jose[cryptography]
 python-multipart
 asyncpg
 httpx
