@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import settings
+from src.db.seed import seed_users
 from src.db.session import init_db
 from src.middleware.correlation import CorrelationIdMiddleware
 from src.utils.logging_config import setup_logging
@@ -52,6 +53,10 @@ def health_check():
 def on_startup():
     setup_logging(settings.SERVICE_NAME, settings.LOG_LEVEL)
     init_db()
+    # Seed demo users after tables exist. Runs before /health responds, so
+    # test-management-service (which waits on our healthcheck and seeds
+    # demo tests/submissions referencing these users) sees them.
+    seed_users()
 
 # ---- Run server ----
 if __name__ == "__main__":
