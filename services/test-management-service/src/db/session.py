@@ -53,6 +53,7 @@ async def init_db():
         # Import all models here so they are registered with Base.metadata
         # before create_all runs. Kept local + noqa: removing these breaks
         # table creation (the models would never register).
+        from src.models.category import Category  # noqa: F401
         from src.models.skill import Skill  # noqa: F401
         from src.models.test import Test  # noqa: F401
         from src.models.test_skill import TestSkill  # noqa: F401

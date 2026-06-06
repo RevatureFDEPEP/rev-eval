@@ -15,5 +15,9 @@ class Skill(Base):
     # Convenience read-only relationship to Tests
     tests = relationship("Test", secondary="test_skills", viewonly=True)
 
+    # Convenience read-only relationship to Categories (the Category side
+    # owns link writes — see src/models/category.py)
+    categories = relationship("Category", secondary="category_skills", viewonly=True)
+
     def __repr__(self):
         return f"<Skill(id={self.id}, name='{self.name}')>"
