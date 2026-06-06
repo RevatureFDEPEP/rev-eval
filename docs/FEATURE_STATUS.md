@@ -34,6 +34,7 @@ This file stays at summary level only.
 | F5 | Direct-to-MinIO diagram uploads (pre-signed URLs) | — | ✅ Completed | [f5-minio-presigned-uploads.md](features/f5-minio-presigned-uploads.md) |
 | F6 | Structured question authoring interface | — | ✅ Completed | [f6-question-authoring-ui.md](features/f6-question-authoring-ui.md) |
 | F7 | Alembic migrations & Category domain | — | ✅ Completed | [f7-alembic-category-domain.md](features/f7-alembic-category-domain.md) |
+| F8 | Pre-existing defect cleanup (found during F7) | — | 🟡 In Progress | [f8-pre-existing-defects.md](features/f8-pre-existing-defects.md) |
 | M10 | Day 10 milestone: reporting service scaffold | milestone | ❌ Not Started | [m10-reporting-service-scaffold.md](features/m10-reporting-service-scaffold.md) |
 
 ## Suggested order of attack
@@ -43,3 +44,4 @@ This file stays at summary level only.
 3. ~~**F7 Alembic + Category**~~ — done (branch `richardh-feat-alembic`).
 4. **F2 deepen** — multi-stage Dockerfiles + model/repo test depth.
 5. **M10 reporting scaffold** — pairs naturally with F7's Alembic work.
+6. **F8 defect cleanup** — small fixes, good filler tasks between features (gateway 204 item already done in F7).
