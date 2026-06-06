@@ -46,26 +46,24 @@ async def get_db():
 # ===== Initialize DB =====
 async def init_db():
     """
-    Import all models, create tables (async), and test connection.
-    Call this on app startup.
+    Register all models and test the connection. Call this on app startup.
+
+    Schema creation/evolution is owned by Alembic (alembic upgrade head,
+    run by start.sh before the app boots) — create_all was removed when
+    migrations were introduced so a broken migration can't be papered over.
     """
     try:
         # Import all models here so they are registered with Base.metadata
-        # before create_all runs. Kept local + noqa: removing these breaks
-        # table creation (the models would never register).
+        # and relationship strings resolve. Keep in sync with alembic/env.py.
         from src.models.category import Category  # noqa: F401
         from src.models.skill import Skill  # noqa: F401
         from src.models.test import Test  # noqa: F401
         from src.models.test_skill import TestSkill  # noqa: F401
         from src.models.test_submission import TestSubmission  # noqa: F401
 
-        # Create tables in async context
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
         # Test async connection
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-        logger.info("Async DB connected successfully and tables are ready.")
+        logger.info("Async DB connected successfully.")
     except OperationalError:
         logger.error("Async DB connection failed!", exc_info=True)
