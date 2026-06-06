@@ -75,6 +75,10 @@ class Question(Document):
     difficulty: Optional[str] = Field(default="medium", pattern="^(easy|medium|hard)$")
     skills: List[str] = Field(default_factory=list, max_length=20)
     tags: List[str] = Field(default_factory=list, max_length=30)
+    image_object_key: Optional[str] = Field(
+        default=None, max_length=256,
+        description="MinIO object key for an attached diagram/screenshot",
+    )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

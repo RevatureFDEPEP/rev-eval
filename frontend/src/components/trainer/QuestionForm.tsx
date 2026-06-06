@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useFieldArray, FieldValues } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Check, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, ImageIcon, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -37,14 +37,17 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   QuestionCreate,
   QuestionType,
+  getPresignedUploadUrl,
   getSkills,
   SkillInfo,
+  uploadToPresignedUrl,
 } from "@/lib/api";
 import {
   QuestionFormInitial,
   QuestionFormMode,
   buildQuestionSchema,
   getDefaultValues,
+  imageFileSchema,
   transformFormData,
 } from "./question-form-utils";
 
@@ -83,6 +86,14 @@ export function QuestionForm({
   const router = useRouter();
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
+
+  // Diagram upload state — file PUTs directly to MinIO via a pre-signed URL;
+  // only the resulting object key travels with the form payload.
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | undefined>(
+    initialData?.image_url
+  );
 
   const isOptionsType = questionType === "mcq" || questionType === "multi";
 
@@ -128,6 +139,42 @@ export function QuestionForm({
 
   const handleSubmit = async (values: FieldValues) => {
     await onSubmit(transformFormData(values, mode, questionType));
+  };
+
+  const handleImageSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImageError(null);
+    const parsed = imageFileSchema.safeParse(file);
+    if (!parsed.success) {
+      setImageError(parsed.error.issues[0]?.message ?? "Invalid file");
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+      const { upload_url, object_key } = await getPresignedUploadUrl(file.type);
+      await uploadToPresignedUrl(upload_url, file);
+      form.setValue("image_object_key", object_key, { shouldDirty: true });
+      setImagePreviewUrl(URL.createObjectURL(file));
+    } catch (err) {
+      setImageError(
+        err instanceof Error ? err.message : "Image upload failed"
+      );
+      event.target.value = "";
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleImageRemove = () => {
+    form.setValue("image_object_key", undefined, { shouldDirty: true });
+    setImagePreviewUrl(undefined);
+    setImageError(null);
   };
 
   return (
@@ -190,6 +237,63 @@ export function QuestionForm({
                   </FormItem>
                 )}
               />
+            </CardContent>
+          </Card>
+
+          {/* Diagram / Screenshot upload (direct to MinIO via pre-signed URL) */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Diagram or Screenshot (Optional)</CardTitle>
+              <CardDescription>
+                Attach a .png or .jpg image (max 5MB). Uploads go directly to
+                object storage when you select a file.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Input
+                type="file"
+                accept="image/png,image/jpeg"
+                onChange={handleImageSelect}
+                disabled={uploadingImage || submitting}
+              />
+              {uploadingImage && (
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-slate-900" />
+                  Uploading image...
+                </div>
+              )}
+              {imageError && (
+                <p className="text-sm font-medium text-destructive">
+                  {imageError}
+                </p>
+              )}
+              {imagePreviewUrl && !uploadingImage && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="flex items-center gap-1">
+                      <ImageIcon className="size-3" />
+                      Image attached
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleImageRemove}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="mr-1 size-3" />
+                      Remove
+                    </Button>
+                  </div>
+                  {/* Pre-signed/object URLs are dynamic, skip next/image optimization */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imagePreviewUrl}
+                    alt="Question diagram preview"
+                    className="max-h-64 rounded-lg border object-contain"
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -571,7 +675,7 @@ export function QuestionForm({
             </Button>
             <Button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || uploadingImage}
               className="bg-orange-500 hover:bg-orange-600"
             >
               {submitting ? (

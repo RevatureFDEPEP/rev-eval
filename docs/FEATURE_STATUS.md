@@ -13,7 +13,7 @@ This file stays at summary level only.
 > start, advance, or finish a feature, update its detail file (check off steps,
 > add evidence) **and** its status row here, in the same PR as the code change.
 
-**Last assessed:** 2026-06-04 (PR #40 / branch `richardh`)
+**Last assessed:** 2026-06-05 (PR #49 / branch `richardh-feat-minio-uploads`)
 
 ## Status values
 
@@ -31,7 +31,7 @@ This file stays at summary level only.
 | F2 | Unit test scaffolding (frontend + backend) | — | 🟡 In Progress | [f2-unit-test-scaffolding.md](features/f2-unit-test-scaffolding.md) |
 | F3 | Centralized log aggregation (Loki/Grafana) | — | ✅ Completed | [f3-log-aggregation.md](features/f3-log-aggregation.md) |
 | F4 | CI quality gates (Ruff / ESLint / Trivy / coverage) | REQUIRED | ✅ Completed | [f4-ci-quality-gates.md](features/f4-ci-quality-gates.md) |
-| F5 | Direct-to-MinIO diagram uploads (pre-signed URLs) | — | ❌ Not Started | [f5-minio-presigned-uploads.md](features/f5-minio-presigned-uploads.md) |
+| F5 | Direct-to-MinIO diagram uploads (pre-signed URLs) | — | ✅ Completed | [f5-minio-presigned-uploads.md](features/f5-minio-presigned-uploads.md) |
 | F6 | Structured question authoring interface | — | ✅ Completed | [f6-question-authoring-ui.md](features/f6-question-authoring-ui.md) |
 | F7 | Alembic migrations & Category domain | — | ❌ Not Started | [f7-alembic-category-domain.md](features/f7-alembic-category-domain.md) |
 | M10 | Day 10 milestone: reporting service scaffold | milestone | ❌ Not Started | [m10-reporting-service-scaffold.md](features/m10-reporting-service-scaffold.md) |
@@ -39,7 +39,7 @@ This file stays at summary level only.
 ## Suggested order of attack
 
 1. ~~**F4 finish**~~ — done (PR #40).
-2. **F5 pre-signed uploads** — W3-F1 needs seeded question documents with uploads working.
+2. ~~**F5 pre-signed uploads**~~ — done (PR #49).
 3. **F7 Alembic + Category** — W3-F1 sessions migration and W4-F1 reporting migrations build on it.
 4. **F2 deepen** — multi-stage Dockerfiles + model/repo test depth.
 5. **M10 reporting scaffold** — pairs naturally with F7's Alembic work.

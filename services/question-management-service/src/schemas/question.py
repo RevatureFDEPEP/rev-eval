@@ -26,6 +26,9 @@ class QuestionCreate(BaseModel):
     difficulty: Optional[str] = Field(default="medium", pattern="^(easy|medium|hard)$")
     skills: List[str] = Field(default_factory=list, max_length=20)
     tags: List[str] = Field(default_factory=list, max_length=30)
+    image_object_key: Optional[str] = Field(
+        None, max_length=256, description="MinIO object key for an attached diagram/screenshot"
+    )
 
     @field_validator('question_text')
     @classmethod
@@ -194,6 +197,9 @@ class QuestionUpdate(BaseModel):
     difficulty: Optional[str] = Field(None, pattern="^(easy|medium|hard)$")
     skills: Optional[List[str]] = Field(None, max_length=20)
     tags: Optional[List[str]] = Field(None, max_length=30)
+    image_object_key: Optional[str] = Field(
+        None, max_length=256, description="MinIO object key for an attached diagram/screenshot"
+    )
 
     @field_validator('question_text')
     @classmethod
@@ -297,6 +303,10 @@ class QuestionResponse(BaseModel):
     difficulty: Optional[str] = "medium"
     skills: List[str] = []
     tags: List[str] = []
+    image_object_key: Optional[str] = None
+    image_url: Optional[str] = Field(
+        None, description="Pre-signed GET URL for the attached image (populated when image_object_key is set)"
+    )
     created_at: datetime
     updated_at: datetime
 
@@ -306,3 +316,10 @@ class QuestionResponse(BaseModel):
         json_encoders = {
             datetime: lambda v: v.isoformat()
         }
+
+
+class PresignedUploadResponse(BaseModel):
+    """Response schema for the pre-signed upload URL endpoint."""
+    upload_url: str = Field(..., description="Pre-signed PUT URL the browser uploads to directly")
+    object_key: str = Field(..., description="Server-generated object key to store on the question")
+    expires_in: int = Field(..., description="URL validity window in seconds")
