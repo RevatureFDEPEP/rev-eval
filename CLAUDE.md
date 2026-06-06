@@ -47,7 +47,7 @@ src/config/settings.py  # pydantic-settings, env-driven
 src/db/session.py       # engine/session + init_db()
 ```
 
-Postgres services use **async SQLAlchemy** (`asyncpg`); `question-management-service` uses **Beanie/Motor** over Mongo. Tables/collections are created on startup via `init_db()` — **no Alembic migrations** are wired (a candidate task).
+Postgres services use **async SQLAlchemy** (`asyncpg`); `question-management-service` uses **Beanie/Motor** over Mongo. **test-management-service's schema is owned by Alembic** (`alembic/versions/`, applied by its `start.sh`; its `init_db()` is connectivity-check only) — model changes there need an `alembic revision --autogenerate`. The other services still create tables on startup via `init_db()`/`create_all`.
 
 ## Frontend (`frontend/`)
 
@@ -70,9 +70,15 @@ pnpm lint                     # eslint
 # One backend service locally (cd services/<svc>)
 pip install -r requirements.txt
 python main.py                # or: uvicorn main:app --reload --port <port>
+# test-management-service only: apply migrations first (also seeds demo data)
+alembic upgrade head
+
+# Migrations (cd services/test-management-service; compose runs this on startup)
+alembic upgrade head          # demo tests/skills/categories seed in revision 0003
+alembic revision --autogenerate -m "..."   # after model changes
 
 # Seed demo data (all seeded users share password "password123")
-python services/test-management-service/seed_db.py
+# users: seeded by user-service on startup; tests/skills/categories: Alembic 0003
 python services/question-management-service/seed_rag_context_questions.py
 ```
 

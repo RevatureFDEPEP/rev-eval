@@ -1,137 +1,37 @@
-#!/usr/bin/env python3
-"""
-Database seeding script for test-management-service.
+"""seed demo data
 
-Inserts a handful of demo users (with bcrypt password hashes) and demo
-tests/skills/questions into the shared Postgres instance used by
-user-service and test-management-service.
-"""
+Revision ID: 0003
+Revises: 0002
+Create Date: 2026-06-05
 
-import os
+Data migration: demo skills, tests, test submissions, and categories
+(with category->skill links) for local development. Replaces the old
+seed_db.py startup script.
+
+- Idempotent per table: a table that already has rows is skipped, so
+  pre-existing dev volumes (seeded by the old script) are untouched.
+- Demo users live in the shared database but belong to user-service,
+  which seeds them on its startup. In docker compose this service waits
+  on user-service's healthcheck, so the trainer/participant lookups
+  below are satisfied. If no trainer exists the migration raises —
+  Alembic then does NOT record 0003 as applied, the container exits,
+  and compose restarts it (self-healing retry).
+"""
 from datetime import datetime, timedelta
+from typing import Sequence, Union
 
-import psycopg2
-from passlib.context import CryptContext
-from psycopg2.extras import execute_values
+import sqlalchemy as sa
+from alembic import op
 
-# All seeded users share this password — local dev convenience only.
-DEV_PASSWORD = "password123"
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-DEV_PASSWORD_HASH = _pwd_context.hash(DEV_PASSWORD)
+# revision identifiers, used by Alembic.
+revision: str = '0003'
+down_revision: Union[str, Sequence[str], None] = '0002'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
 
 
-def get_db_connection():
-    """Create database connection"""
-    return psycopg2.connect(
-        host=os.getenv('DB_HOST', 'postgres'),
-        port=os.getenv('DB_PORT', '5432'),
-        user=os.getenv('DB_USERNAME', 'root'),
-        password=os.getenv('DB_PASSWORD', 'root'),
-        dbname=os.getenv('DB_NAME', 'eval_ai_dev')
-    )
-
-def seed_users(conn):
-    """Create mock users"""
-    print("Seeding users...")
-
-    cur = conn.cursor()
-
-    # Check if users already exist
-    cur.execute("SELECT COUNT(*) FROM users;")
-    count = cur.fetchone()[0]
-
-    if count > 0:
-        print(f"✅ Users table already has {count} users, skipping...")
-        cur.close()
-        return
-
-    users_data = [
-        # (email, full_name, first_name, last_name, role, organization_id)
-        # Mock trainers
-        ('trainer1@revature.com', 'John Trainer', 'John', 'Trainer', 'TRAINER', None),
-        ('trainer2@revature.com', 'Sarah Instructor', 'Sarah', 'Instructor', 'TRAINER', None),
-        # Mock participants
-        ('student1@revature.com', 'Alice Johnson', 'Alice', 'Johnson', 'PARTICIPANT', None),
-        ('student2@revature.com', 'Bob Smith', 'Bob', 'Smith', 'PARTICIPANT', None),
-        ('student3@revature.com', 'Carol Davis', 'Carol', 'Davis', 'PARTICIPANT', None),
-        ('student4@revature.com', 'David Wilson', 'David', 'Wilson', 'PARTICIPANT', None),
-        ('student5@revature.com', 'Eva Brown', 'Eva', 'Brown', 'PARTICIPANT', None),
-    ]
-
-    execute_values(
-        cur,
-        """
-        INSERT INTO users (email, password_hash, full_name, first_name, last_name, role, organization_id, is_active, created_at, updated_at)
-        VALUES %s
-        """,
-        [
-            (u[0], DEV_PASSWORD_HASH, u[1], u[2], u[3], u[4], u[5], True, datetime.utcnow(), datetime.utcnow())
-            for u in users_data
-        ]
-    )
-
-    conn.commit()
-    cur.close()
-    print(f"✅ Created {len(users_data)} users (shared dev password: {DEV_PASSWORD!r})")
-
-def seed_tests(conn):
-    """Create mock tests"""
-    print("Seeding tests...")
-
-    cur = conn.cursor()
-
-    # Check if tests already exist
-    cur.execute("SELECT COUNT(*) FROM tests;")
-    count = cur.fetchone()[0]
-
-    if count > 0:
-        print(f"✅ Tests table already has {count} tests, skipping...")
-        cur.close()
-        return
-
-    # Get the first trainer
-    cur.execute("SELECT id FROM users WHERE role = 'TRAINER' LIMIT 1;")
-    trainer_id = cur.fetchone()[0]
-
-    tests_data = [
-        ('Java Fundamentals Quiz', 'QUIZ', 'Java Developer', 'Full Stack Java', '00:45:00', 20, trainer_id, True),
-        ('Python Data Structures Quiz', 'QUIZ', 'Python Developer', 'Python Full Stack', '01:00:00', 25, trainer_id, True),
-        ('System Design Interview', 'INTERVIEW', 'Senior Developer', 'System Design', '00:30:00', None, trainer_id, True),
-        ('React Components Assessment', 'QUIZ', 'Frontend Developer', 'React Frontend', '00:40:00', 15, trainer_id, True),
-        ('Behavioral Interview', 'INTERVIEW', 'Software Engineer', 'Soft Skills', '00:25:00', None, trainer_id, True),
-        ('Advanced Java Quiz', 'QUIZ', 'Senior Java Developer', 'Full Stack Java', '00:50:00', 30, trainer_id, True),
-    ]
-
-    execute_values(
-        cur,
-        """
-        INSERT INTO tests (name, test_type, role, curriculum, duration, number_of_questions, created_by_id, active, created_at, updated_at)
-        VALUES %s
-        """,
-        [(t[0], t[1], t[2], t[3], t[4], t[5], t[6], t[7], datetime.utcnow(), datetime.utcnow()) for t in tests_data]
-    )
-
-    conn.commit()
-    cur.close()
-    print(f"✅ Created {len(tests_data)} tests")
-
-def seed_skills(conn):
-    """Create predefined skills"""
-    print("Seeding skills...")
-
-    cur = conn.cursor()
-
-    # Check if skills already exist
-    cur.execute("SELECT COUNT(*) FROM skills;")
-    count = cur.fetchone()[0]
-
-    if count > 0:
-        print(f"✅ Skills table already has {count} skills, skipping...")
-        cur.close()
-        return
-
-    # Comprehensive skills list organized by category
-    skills_data = [
+# (name, description) — ported verbatim from the old seed_db.py
+SKILLS_DATA = [
         # Programming Languages
         ('Java', 'Object-oriented programming language'),
         ('Python', 'High-level programming language'),
@@ -350,175 +250,215 @@ def seed_skills(conn):
         ('Apache Hive', 'Data warehouse software'),
         ('Presto', 'Distributed SQL query engine'),
         ('Snowflake', 'Cloud data warehouse'),
-    ]
+]
 
-    execute_values(
-        cur,
-        """
-        INSERT INTO skills (name, description)
-        VALUES %s
-        """,
-        [(s[0], s[1]) for s in skills_data]
+# (name, test_type, role, curriculum, duration, number_of_questions, active)
+TESTS_DATA = [
+    ('Java Fundamentals Quiz', 'QUIZ', 'Java Developer', 'Full Stack Java', timedelta(minutes=45), 20, True),
+    ('Python Data Structures Quiz', 'QUIZ', 'Python Developer', 'Python Full Stack', timedelta(hours=1), 25, True),
+    ('System Design Interview', 'INTERVIEW', 'Senior Developer', 'System Design', timedelta(minutes=30), None, True),
+    ('React Components Assessment', 'QUIZ', 'Frontend Developer', 'React Frontend', timedelta(minutes=40), 15, True),
+    ('Behavioral Interview', 'INTERVIEW', 'Software Engineer', 'Soft Skills', timedelta(minutes=25), None, True),
+    ('Advanced Java Quiz', 'QUIZ', 'Senior Java Developer', 'Full Stack Java', timedelta(minutes=50), 30, True),
+]
+
+# name -> (description, [linked skill names])
+CATEGORIES_DATA = {
+    'Python': (
+        'Python language and ecosystem',
+        ['Python', 'Django', 'Flask', 'FastAPI', 'PyTest', 'Pandas', 'NumPy'],
+    ),
+    'Docker': (
+        'Containers and orchestration',
+        ['Docker', 'Kubernetes', 'Helm', 'Terraform'],
+    ),
+    'Algorithms': (
+        'Data structures, algorithms, and problem solving',
+        ['Design Patterns', 'SOLID Principles', 'TDD'],
+    ),
+}
+
+
+def _count(conn, table: str) -> int:
+    return conn.execute(sa.text(f"SELECT COUNT(*) FROM {table}")).scalar()
+
+
+def _seed_skills(conn) -> None:
+    if _count(conn, "skills") > 0:
+        print("skills already populated, skipping seed")
+        return
+    conn.execute(
+        sa.text("INSERT INTO skills (name, description) VALUES (:name, :description)"),
+        [{"name": n, "description": d} for n, d in SKILLS_DATA],
     )
+    print(f"seeded {len(SKILLS_DATA)} skills")
 
-    conn.commit()
-    cur.close()
-    print(f"✅ Created {len(skills_data)} skills")
 
-def seed_test_submissions(conn):
-    """Create mock test submissions"""
-    print("Seeding test submissions...")
+def _trainer_id(conn) -> int:
+    """First TRAINER user. users is owned/seeded by user-service — see module
+    docstring for the ordering contract."""
+    has_users_table = conn.execute(
+        sa.text(
+            "SELECT 1 FROM information_schema.tables "
+            "WHERE table_name = 'users' AND table_schema = current_schema()"
+        )
+    ).scalar()
+    trainer = (
+        conn.execute(
+            sa.text("SELECT id FROM users WHERE role = 'TRAINER' ORDER BY id LIMIT 1")
+        ).scalar()
+        if has_users_table
+        else None
+    )
+    if trainer is None:
+        raise RuntimeError(
+            "Cannot seed demo tests/submissions: no TRAINER user found. "
+            "user-service seeds demo users on its startup — start it first "
+            "(docker compose orders this automatically via its healthcheck)."
+        )
+    return trainer
 
-    cur = conn.cursor()
 
-    # Check if submissions already exist
-    cur.execute("SELECT COUNT(*) FROM test_submissions;")
-    count = cur.fetchone()[0]
-
-    if count > 0:
-        print(f"✅ Test submissions table already has {count} submissions, skipping...")
-        cur.close()
+def _seed_tests(conn) -> None:
+    if _count(conn, "tests") > 0:
+        print("tests already populated, skipping seed")
         return
-
-    # Get tests and participant users
-    cur.execute("SELECT id FROM tests;")
-    test_ids = [row[0] for row in cur.fetchall()]
-
-    cur.execute("SELECT id FROM users WHERE role = 'PARTICIPANT';")
-    participant_ids = [row[0] for row in cur.fetchall()]
-
-    cur.execute("SELECT id FROM users WHERE role = 'TRAINER' LIMIT 1;")
-    trainer_id = cur.fetchone()[0]
-
-    if not test_ids or not participant_ids:
-        print("❌ Missing tests or participants!")
-        cur.close()
-        return
-
-    submissions_data = []
+    trainer_id = _trainer_id(conn)
     now = datetime.utcnow()
+    conn.execute(
+        sa.text(
+            "INSERT INTO tests (name, test_type, role, curriculum, duration, "
+            "number_of_questions, created_by_id, active, created_at, updated_at) "
+            "VALUES (:name, :test_type, :role, :curriculum, :duration, "
+            ":number_of_questions, :created_by_id, :active, :created_at, :updated_at)"
+        ),
+        [
+            {
+                "name": name,
+                "test_type": test_type,
+                "role": role,
+                "curriculum": curriculum,
+                "duration": duration,
+                "number_of_questions": number_of_questions,
+                "created_by_id": trainer_id,
+                "active": active,
+                "created_at": now,
+                "updated_at": now,
+            }
+            for name, test_type, role, curriculum, duration, number_of_questions, active in TESTS_DATA
+        ],
+    )
+    print(f"seeded {len(TESTS_DATA)} tests")
 
+
+def _seed_test_submissions(conn) -> None:
+    if _count(conn, "test_submissions") > 0:
+        print("test_submissions already populated, skipping seed")
+        return
+    trainer_id = _trainer_id(conn)
+    test_ids = [r[0] for r in conn.execute(sa.text("SELECT id FROM tests ORDER BY id"))]
+    participant_ids = [
+        r[0]
+        for r in conn.execute(
+            sa.text("SELECT id FROM users WHERE role = 'PARTICIPANT' ORDER BY id")
+        )
+    ]
+    if not test_ids or not participant_ids:
+        print("no tests or participants found, skipping submission seed")
+        return
+
+    now = datetime.utcnow()
+    rows = []
     for test_id in test_ids:
         for i, participant_id in enumerate(participant_ids):
-            # Vary the status and scores
-            if i == 0:  # First participant - completed
-                status = 'COMPLETED'
-                ai_score = 85
-                final_score = 85
-                started_at = now - timedelta(days=2)
-                submitted_at = started_at + timedelta(minutes=30)
-            elif i == 1:  # Second participant - in progress
-                status = 'IN_PROGRESS'
-                ai_score = None
-                final_score = None
-                started_at = now - timedelta(hours=1)
-                submitted_at = None
-            elif i == 2:  # Third participant - completed
-                status = 'COMPLETED'
-                ai_score = 92
-                final_score = 92
-                started_at = now - timedelta(days=1)
-                submitted_at = started_at + timedelta(minutes=25)
-            else:  # Others - assigned
-                status = 'ASSIGNED'
-                ai_score = None
-                final_score = None
-                started_at = None
-                submitted_at = None
-
-            feedback = "Good performance" if status == 'COMPLETED' else None
-
-            submissions_data.append((
-                test_id,
-                participant_id,
-                trainer_id,
-                now - timedelta(days=3),
-                now + timedelta(days=7),
-                status,
-                started_at,
-                submitted_at,
-                ai_score,
-                final_score,
-                feedback,
-                now,
-                now
-            ))
-
-    execute_values(
-        cur,
-        """
-        INSERT INTO test_submissions
-        (test_id, user_id, assigned_by_id, assigned_at, due_date, status, started_at, submitted_at,
-         ai_score, final_score, feedback, created_at, updated_at)
-        VALUES %s
-        """,
-        submissions_data
+            if i == 0:  # first participant — completed
+                status, ai, final = "COMPLETED", 85, 85
+                started = now - timedelta(days=2)
+                submitted = started + timedelta(minutes=30)
+            elif i == 1:  # second — in progress
+                status, ai, final = "IN_PROGRESS", None, None
+                started, submitted = now - timedelta(hours=1), None
+            elif i == 2:  # third — completed
+                status, ai, final = "COMPLETED", 92, 92
+                started = now - timedelta(days=1)
+                submitted = started + timedelta(minutes=25)
+            else:  # rest — assigned
+                status, ai, final = "ASSIGNED", None, None
+                started, submitted = None, None
+            rows.append(
+                {
+                    "test_id": test_id,
+                    "user_id": participant_id,
+                    "assigned_by_id": trainer_id,
+                    "assigned_at": now - timedelta(days=3),
+                    "due_date": now + timedelta(days=7),
+                    "status": status,
+                    "started_at": started,
+                    "submitted_at": submitted,
+                    "ai_score": ai,
+                    "final_score": final,
+                    "feedback": "Good performance" if status == "COMPLETED" else None,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            )
+    conn.execute(
+        sa.text(
+            "INSERT INTO test_submissions (test_id, user_id, assigned_by_id, "
+            "assigned_at, due_date, status, started_at, submitted_at, ai_score, "
+            "final_score, feedback, created_at, updated_at) "
+            "VALUES (:test_id, :user_id, :assigned_by_id, :assigned_at, :due_date, "
+            ":status, :started_at, :submitted_at, :ai_score, :final_score, "
+            ":feedback, :created_at, :updated_at)"
+        ),
+        rows,
     )
+    print(f"seeded {len(rows)} test submissions")
 
-    conn.commit()
-    cur.close()
-    print(f"✅ Created {len(submissions_data)} test submissions")
 
-def main():
-    """Main seeding function"""
-    print("🌱 Starting database seeding...")
+def _seed_categories(conn) -> None:
+    if _count(conn, "categories") > 0:
+        print("categories already populated, skipping seed")
+        return
+    for name, (description, skill_names) in CATEGORIES_DATA.items():
+        category_id = conn.execute(
+            sa.text(
+                "INSERT INTO categories (name, description) "
+                "VALUES (:name, :description) RETURNING id"
+            ),
+            {"name": name, "description": description},
+        ).scalar()
+        skill_ids = [
+            r[0]
+            for r in conn.execute(
+                sa.text("SELECT id FROM skills WHERE name = ANY(:names)"),
+                {"names": skill_names},
+            )
+        ]
+        if skill_ids:
+            conn.execute(
+                sa.text(
+                    "INSERT INTO category_skills (category_id, skill_id) "
+                    "VALUES (:category_id, :skill_id)"
+                ),
+                [{"category_id": category_id, "skill_id": s} for s in skill_ids],
+            )
+    print(f"seeded {len(CATEGORIES_DATA)} categories with skill links")
 
-    try:
-        conn = get_db_connection()
 
-        # Seed data in order
-        seed_users(conn)
-        seed_tests(conn)
-        seed_skills(conn)
-        seed_test_submissions(conn)
+def upgrade() -> None:
+    """Seed demo data (idempotent per table)."""
+    conn = op.get_bind()
+    _seed_skills(conn)
+    _seed_tests(conn)
+    _seed_test_submissions(conn)
+    _seed_categories(conn)
 
-        # Print summary
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM users WHERE role = 'TRAINER';")
-        trainer_count = cur.fetchone()[0]
 
-        cur.execute("SELECT COUNT(*) FROM users WHERE role = 'PARTICIPANT';")
-        participant_count = cur.fetchone()[0]
+def downgrade() -> None:
+    """Data migration — intentionally not reversed.
 
-        cur.execute("SELECT COUNT(*) FROM tests;")
-        test_count = cur.fetchone()[0]
-
-        cur.execute("SELECT COUNT(*) FROM skills;")
-        skills_count = cur.fetchone()[0]
-
-        cur.execute("SELECT COUNT(*) FROM test_submissions;")
-        submission_count = cur.fetchone()[0]
-
-        cur.execute("SELECT COUNT(*) FROM test_submissions WHERE status = 'COMPLETED';")
-        completed_count = cur.fetchone()[0]
-
-        cur.execute("SELECT COUNT(*) FROM test_submissions WHERE status = 'IN_PROGRESS';")
-        in_progress_count = cur.fetchone()[0]
-
-        cur.execute("SELECT COUNT(*) FROM test_submissions WHERE status = 'ASSIGNED';")
-        assigned_count = cur.fetchone()[0]
-
-        cur.close()
-        conn.close()
-
-        print("\n🎉 Database seeding completed successfully!")
-        print("\n📊 Summary:")
-        print(f"  - Users: {trainer_count + participant_count} ({trainer_count} trainers, {participant_count} participants)")
-        print(f"  - Tests: {test_count}")
-        print(f"  - Skills: {skills_count}")
-        print(f"  - Test Submissions: {submission_count}")
-        print(f"    • Completed: {completed_count}")
-        print(f"    • In Progress: {in_progress_count}")
-        print(f"    • Assigned: {assigned_count}")
-
-        print(f"\n🔑 Dev credentials: any seeded user / password = {DEV_PASSWORD!r}")
-
-    except Exception as e:
-        print(f"❌ Error during seeding: {e}")
-        import traceback
-        traceback.print_exc()
-        raise
-
-if __name__ == "__main__":
-    main()
-
+    The seeded rows may have been modified or referenced by real usage;
+    deleting them on downgrade would be destructive. Re-running upgrade
+    is a no-op for any table that still has rows.
+    """
