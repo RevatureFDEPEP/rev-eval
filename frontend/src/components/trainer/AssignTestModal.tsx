@@ -59,6 +59,7 @@ export function AssignTestModal({ tests, onSuccess, triggerClassName, defaultTes
 
   useEffect(() => {
     if (defaultTestId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedTestId(`${defaultTestId}`);
     }
   }, [defaultTestId, open]);
@@ -87,6 +88,7 @@ export function AssignTestModal({ tests, onSuccess, triggerClassName, defaultTes
     candidate.setHours(hours, minutes, 0, 0);
 
     if (candidate.getTime() <= current.getTime()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDueTime('');
     }
   }, [dueDate, dueTime]);

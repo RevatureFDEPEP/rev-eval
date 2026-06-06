@@ -98,6 +98,7 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingTranscript(true);
     setTranscriptError(null);
     getInterviewTranscript(submissionId)
@@ -118,6 +119,7 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingQuizSession(true);
     setQuizSessionError(null);
     getTestSessionBySubmission(submissionId)

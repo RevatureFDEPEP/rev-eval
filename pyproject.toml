@@ -1,7 +1,7 @@
 [tool.ruff]
 exclude = [".agents/"]
 
-# Max chars per line — formatter wraps code at 88; E501 is ignored (see below).
+# Max chars per line — formatter wraps code at 88; E501 is ignored (see lint.ignore below).
 line-length = 88
 
 # Valid Python syntax target — pyupgrade rules (UP) will suggest syntax available since 3.11.

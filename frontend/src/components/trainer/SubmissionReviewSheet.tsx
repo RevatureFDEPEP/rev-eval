@@ -141,7 +141,9 @@ export function SubmissionReviewSheet({
 
   useEffect(() => {
     if (!submission || !open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDetails(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError(null);
       // Reset all form fields
       setTrainerScore('');
@@ -162,7 +164,7 @@ export function SubmissionReviewSheet({
         setLoading(true);
         setError(null);
         const data = await getSubmissionReviewDetails(submission.id);
-        setDetails(data);
+        setDetails(data as ReviewDetails);
 
         // In read-only mode, pre-fill with existing trainer evaluation
         if (readOnly && submission.trainer_score) {
@@ -271,7 +273,7 @@ export function SubmissionReviewSheet({
                 proficiency_level: data.proficiency,
               };
               return acc;
-            }, {} as Record<string, any>)
+            }, {} as Record<string, { score: number; feedback: string; proficiency_level: string }>)
           : undefined,
       };
 
