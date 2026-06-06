@@ -10,6 +10,11 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Keep base-image Python tooling current: the bundled pip/setuptools/wheel
+# lag upstream, so the Trivy gate (CRITICAL/HIGH, ignore-unfixed) can trip on
+# fixable tooling CVEs whenever the base image drifts.
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
 
 # ---- test stage ----
 FROM base AS test
@@ -27,7 +32,6 @@ FROM base AS production
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --upgrade wheel setuptools && \
     apt-get purge -y --auto-remove gcc linux-libc-dev && \
     rm -rf /var/lib/apt/lists/*
 
