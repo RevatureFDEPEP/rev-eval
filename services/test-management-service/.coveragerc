@@ -9,6 +9,8 @@ omit =
     conftest.py
     seed_*.py
     .venv/*
+    # migrations run against a real DB, not under unit tests
+    alembic/*
 
 [report]
 fail_under = 43
