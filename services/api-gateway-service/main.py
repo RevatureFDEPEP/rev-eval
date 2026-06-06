@@ -53,6 +53,7 @@ ROUTES = [
     {"pattern": r"^/v1/api/tests(/.*)?$", "service": "test-management-service"},
     {"pattern": r"^/v1/api/submissions(/.*)?$", "service": "test-management-service"},
     {"pattern": r"^/v1/api/skills(/.*)?$", "service": "test-management-service"},
+    {"pattern": r"^/v1/api/categories(/.*)?$", "service": "test-management-service"},
     {"pattern": r"^/v1/api/questions(/.*)?$", "service": "question-management-service"},
 ]
 
