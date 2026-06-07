@@ -1,13 +1,13 @@
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-import jwt
-from datetime import datetime, UTC, timedelta
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from main import app, find_service_for_path, get_service_url
+import jwt
+import pytest
+from main import find_service_for_path, get_service_url
 from src.middleware.auth import add_user_context_headers
 
-
 # ===== HEALTH AND ROUTES =====
+
 
 def test_health(client):
     response = client.get("/health")
@@ -25,6 +25,7 @@ def test_list_routes(client):
 
 
 # ===== find_service_for_path =====
+
 
 def test_find_service_auth():
     assert find_service_for_path("/v1/api/auth/login") == "user-service"
@@ -56,12 +57,16 @@ def test_find_service_unknown():
 
 # ===== get_service_url =====
 
+
 def test_get_service_url_user():
     assert get_service_url("user-service") == "http://user-service:8002"
 
 
 def test_get_service_url_test_mgmt():
-    assert get_service_url("test-management-service") == "http://test-management-service:8001"
+    assert (
+        get_service_url("test-management-service")
+        == "http://test-management-service:8001"
+    )
 
 
 def test_get_service_url_unknown():
@@ -70,6 +75,7 @@ def test_get_service_url_unknown():
 
 
 # ===== add_user_context_headers =====
+
 
 def test_add_user_context_headers():
     user_context = {"user_id": "1", "email": "a@b.com", "role": "TRAINER"}
@@ -91,13 +97,16 @@ def test_add_user_context_headers_does_not_mutate_original():
 
 # ===== smart_gateway (JWT-protected routes) =====
 
+
 def test_smart_gateway_no_auth_header(client):
     response = client.get("/v1/api/tests/")
     assert response.status_code == 401
 
 
 def test_smart_gateway_invalid_token(client):
-    response = client.get("/v1/api/tests/", headers={"Authorization": "Bearer badtoken"})
+    response = client.get(
+        "/v1/api/tests/", headers={"Authorization": "Bearer badtoken"}
+    )
     assert response.status_code == 401
 
 
@@ -137,7 +146,10 @@ def test_smart_gateway_no_matching_service(client, auth_headers):
 
 # ===== public_auth_proxy =====
 
-def _make_mock_client(status_code: int, content_type: str = "application/json", body=None):
+
+def _make_mock_client(
+    status_code: int, content_type: str = "application/json", body=None
+):
     mock_response = MagicMock()
     mock_response.status_code = status_code
     mock_response.headers = {"content-type": content_type}
@@ -154,7 +166,9 @@ def _make_mock_client(status_code: int, content_type: str = "application/json", 
 def test_public_auth_login_proxy(client):
     mock_client = _make_mock_client(200, body={"token": "abc"})
     with patch("main.httpx.AsyncClient", return_value=mock_client):
-        response = client.post("/v1/api/auth/login", json={"email": "a@b.com", "password": "pass"})
+        response = client.post(
+            "/v1/api/auth/login", json={"email": "a@b.com", "password": "pass"}
+        )
     assert response.status_code == 200
 
 
@@ -204,6 +218,7 @@ def test_public_auth_proxy_non_json_response(client):
 
 
 # ===== smart_gateway additional coverage =====
+
 
 def test_smart_gateway_with_query_params(client, auth_headers):
     """Covers main.py:192 — query string forwarded in smart_gateway."""
@@ -264,9 +279,7 @@ def test_smart_gateway_connect_error(client, auth_headers):
         mock_instance = AsyncMock()
         mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
         mock_instance.__aexit__ = AsyncMock(return_value=False)
-        mock_instance.request = AsyncMock(
-            side_effect=httpx_lib.ConnectError("refused")
-        )
+        mock_instance.request = AsyncMock(side_effect=httpx_lib.ConnectError("refused"))
         mock_cls.return_value = mock_instance
 
         response = client.get("/v1/api/tests/", headers=auth_headers)
@@ -287,6 +300,7 @@ def test_smart_gateway_generic_exception(client, auth_headers):
 
 
 # ===== middleware/auth.py additional coverage =====
+
 
 def test_verify_jwt_malformed_auth_header(client):
     """Covers auth.py:39 — auth header not in 'Bearer token' format."""
@@ -310,7 +324,11 @@ def test_verify_jwt_expired_token(client):
 def test_verify_jwt_missing_sub_claim(client):
     """Covers auth.py:65 — valid JWT but no 'sub' claim raises 401."""
     no_sub = jwt.encode(
-        {"email": "x@y.com", "role": "PARTICIPANT", "exp": datetime.now(UTC) + timedelta(hours=1)},
+        {
+            "email": "x@y.com",
+            "role": "PARTICIPANT",
+            "exp": datetime.now(UTC) + timedelta(hours=1),
+        },
         "test-gateway-secret-key",
         algorithm="HS256",
     )
@@ -323,8 +341,9 @@ def test_verify_jwt_missing_sub_claim(client):
 def test_get_secret_missing_env(monkeypatch):
     """Covers auth.py:21 — JWT_SECRET not set raises HTTPException 500."""
     monkeypatch.delenv("JWT_SECRET", raising=False)
-    from src.middleware.auth import _get_secret
     from fastapi import HTTPException
+    from src.middleware.auth import _get_secret
+
     with pytest.raises(HTTPException) as exc_info:
         _get_secret()
     assert exc_info.value.status_code == 500

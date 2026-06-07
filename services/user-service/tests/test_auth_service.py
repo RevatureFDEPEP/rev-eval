@@ -14,14 +14,13 @@ os.environ.setdefault("JWT_SECRET", "test-super-secret-key-for-testing-only")
 
 import pytest  # noqa: E402
 from jwt import PyJWTError  # noqa: E402
-
 from src.models.user import UserRole  # noqa: E402
 from src.services.auth_service import AuthService  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Password hashing
 # ---------------------------------------------------------------------------
+
 
 def test_hash_password_is_not_plaintext():
     hashed = AuthService.hash_password("secret")
@@ -47,6 +46,7 @@ def test_verify_password_empty_hash():
 # JWT
 # ---------------------------------------------------------------------------
 
+
 def test_create_access_token_returns_string():
     token = AuthService.create_access_token({"sub": "1", "email": "a@b.com"})
     assert isinstance(token, str)
@@ -69,6 +69,7 @@ def test_decode_access_token_invalid_raises():
 # ---------------------------------------------------------------------------
 # DB-dependent tests
 # ---------------------------------------------------------------------------
+
 
 def test_create_user_stores_hash_not_plaintext(db):
     user = AuthService.create_user(

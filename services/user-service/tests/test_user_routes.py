@@ -18,6 +18,7 @@ USERS_BASE = "/v1/api/users"
 # GET /users/{user_id}
 # ---------------------------------------------------------------------------
 
+
 def test_get_user_by_id_found(client, auth_headers):
     # auth_headers fixture already registered user id=1
     resp = client.get(f"{USERS_BASE}/1", headers=auth_headers)
@@ -37,6 +38,7 @@ def test_get_user_by_id_not_found(client):
 # GET /users/by-email/{email}
 # ---------------------------------------------------------------------------
 
+
 def test_get_user_by_email_found(client, auth_headers):
     resp = client.get(f"{USERS_BASE}/by-email/test@example.com", headers=auth_headers)
     assert resp.status_code == 200
@@ -51,6 +53,7 @@ def test_get_user_by_email_not_found(client):
 # ---------------------------------------------------------------------------
 # GET /users/
 # ---------------------------------------------------------------------------
+
 
 def test_list_users(client):
     # Seed a couple of users first
@@ -97,6 +100,7 @@ def test_list_users_filter_by_role(client):
 # POST /users/invite
 # ---------------------------------------------------------------------------
 
+
 def test_invite_user_new(client):
     resp = client.post(
         f"{USERS_BASE}/invite",
@@ -130,6 +134,7 @@ def test_invite_user_duplicate(client, auth_headers):
 # PATCH /users/{user_id}
 # ---------------------------------------------------------------------------
 
+
 def test_update_user(client, auth_headers):
     resp = client.patch(
         f"{USERS_BASE}/1",
@@ -151,6 +156,7 @@ def test_update_user_not_found(client):
 # ---------------------------------------------------------------------------
 # GET /users/me
 # ---------------------------------------------------------------------------
+
 
 def test_get_users_me_authenticated(client, auth_headers):
     resp = client.get(f"{USERS_BASE}/me", headers=auth_headers)

@@ -63,6 +63,7 @@ def db():
 
 def _override_get_db(session):
     """Return a generator that yields the provided session (matches get_db signature)."""
+
     def _get_db():
         try:
             yield session

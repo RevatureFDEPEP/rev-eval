@@ -19,6 +19,7 @@ _VALID_REGISTER = {
 # Register
 # ---------------------------------------------------------------------------
 
+
 def test_register_success(client):
     resp = client.post(REGISTER_URL, json=_VALID_REGISTER)
     assert resp.status_code == 201
@@ -43,11 +44,15 @@ def test_register_short_password(client):
 # Login
 # ---------------------------------------------------------------------------
 
+
 def test_login_success(client):
     client.post(REGISTER_URL, json=_VALID_REGISTER)
     resp = client.post(
         LOGIN_URL,
-        json={"email": _VALID_REGISTER["email"], "password": _VALID_REGISTER["password"]},
+        json={
+            "email": _VALID_REGISTER["email"],
+            "password": _VALID_REGISTER["password"],
+        },
     )
     assert resp.status_code == 200
     assert "access_token" in resp.json()
@@ -73,6 +78,7 @@ def test_login_unknown_email(client):
 # ---------------------------------------------------------------------------
 # /auth/me
 # ---------------------------------------------------------------------------
+
 
 def test_get_me_authenticated(client, auth_headers):
     resp = client.get(ME_URL, headers=auth_headers)

@@ -1,10 +1,12 @@
 import os
+
 os.environ.setdefault("JWT_SECRET", "test-gateway-secret-key")
 os.environ.setdefault("JWT_ALGORITHM", "HS256")
 
-import pytest
+from datetime import UTC, datetime, timedelta
+
 import jwt
-from datetime import datetime, UTC, timedelta
+import pytest
 from fastapi.testclient import TestClient
 from main import app
 
