@@ -3,21 +3,10 @@ Dashboard Statistics Endpoints
 
 Provides aggregated statistics for trainer and participant dashboards.
 """
-from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
-from src.db.session import get_db
-from src.models.test import Test, TestType
-from src.models.test_submission import TestSubmission, SubmissionStatus
-from src.models.user import User, UserRole
-from src.schemas.test_schema import (
-    TrainerDashboardStats,
-    ParticipantDashboardStats,
-    AssignedTestInfo
-)
-from typing import Optional, List
-from datetime import datetime, timedelta
+
 import logging
+
+from fastapi import APIRouter, Header, HTTPException
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -27,19 +16,15 @@ router = APIRouter()
 
 
 def get_user_context(
-    x_user_id: Optional[str] = Header(None),
-    x_user_email: Optional[str] = Header(None),
-    x_user_role: Optional[str] = Header(None)
+    x_user_id: str | None = Header(None),
+    x_user_email: str | None = Header(None),
+    x_user_role: str | None = Header(None),
 ):
     """Extract user context from headers set by API Gateway"""
     if not x_user_email or not x_user_role:
         raise HTTPException(status_code=401, detail="User context not found in headers")
 
-    return {
-        "user_id": x_user_id,
-        "email": x_user_email,
-        "role": x_user_role
-    }
+    return {"user_id": x_user_id, "email": x_user_email, "role": x_user_role}
 
 
 # @router.get("/dashboard/trainer/stats", response_model=TrainerDashboardStats)
@@ -202,7 +187,7 @@ def get_user_context(
 #         average_score=average_score,
 #         tests_due_this_week=tests_due_this_week
 #     )
-    
+
 #     logger.info(f"✅ Returning participant stats: {stats}")
 #     return stats
 

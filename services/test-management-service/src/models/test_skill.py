@@ -1,12 +1,14 @@
-from sqlalchemy import Column, Integer, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import relationship
 from src.db.session import Base
+
 
 class TestSkill(Base):
     """
     Association model for many-to-many relationship between Test and Skill.
     Can be extended to store metadata like weight, importance, etc.
     """
+
     __tablename__ = "test_skills"
 
     id = Column(Integer, primary_key=True, index=True)

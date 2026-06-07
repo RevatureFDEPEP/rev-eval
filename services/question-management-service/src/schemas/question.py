@@ -1,7 +1,7 @@
-from pydantic import BaseModel, field_validator, model_validator, Field
-from typing import List, Optional, Union
 from datetime import datetime
-from src.models.question import Option, OptionCreate, QuestionType
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+from src.models.question import OptionCreate, QuestionType
 
 
 class QuestionCreate(BaseModel):
@@ -16,17 +16,26 @@ class QuestionCreate(BaseModel):
     - TRUE_FALSE: Requires correct_answers as single boolean, no options
     - TEXT: Requires sample_answer, no options or correct_answers
     """
-    type: QuestionType
-    question_text: str = Field(..., min_length=10, max_length=2000, description="The question text")
-    options: Optional[List[OptionCreate]] = None  # User provides text only, IDs are auto-generated
-    correct_answers: Optional[List[Union[int, bool, str]]] = None
-    sample_answer: Optional[str] = Field(None, max_length=5000, description="Sample answer for text questions")
-    answer_explanation: Optional[str] = Field(None, max_length=2000, description="Explanation for the correct answer")
-    difficulty: Optional[str] = Field(default="medium", pattern="^(easy|medium|hard)$")
-    skills: List[str] = Field(default_factory=list, max_length=20)
-    tags: List[str] = Field(default_factory=list, max_length=30)
 
-    @field_validator('question_text')
+    type: QuestionType
+    question_text: str = Field(
+        ..., min_length=10, max_length=2000, description="The question text"
+    )
+    options: list[OptionCreate] | None = (
+        None  # User provides text only, IDs are auto-generated
+    )
+    correct_answers: list[int | bool | str] | None = None
+    sample_answer: str | None = Field(
+        None, max_length=5000, description="Sample answer for text questions"
+    )
+    answer_explanation: str | None = Field(
+        None, max_length=2000, description="Explanation for the correct answer"
+    )
+    difficulty: str | None = Field(default="medium", pattern="^(easy|medium|hard)$")
+    skills: list[str] = Field(default_factory=list, max_length=20)
+    tags: list[str] = Field(default_factory=list, max_length=30)
+
+    @field_validator("question_text")
     @classmethod
     def validate_question_text(cls, v: str) -> str:
         """Sanitize and validate question text."""
@@ -35,9 +44,9 @@ class QuestionCreate(BaseModel):
             raise ValueError("question_text must be at least 10 characters long")
         return v
 
-    @field_validator('skills')
+    @field_validator("skills")
     @classmethod
-    def validate_skills(cls, v: List[str]) -> List[str]:
+    def validate_skills(cls, v: list[str]) -> list[str]:
         """Validate and sanitize skills list."""
         if not v:
             return []
@@ -49,9 +58,9 @@ class QuestionCreate(BaseModel):
             raise ValueError("Maximum 20 skills allowed")
         return skills
 
-    @field_validator('tags')
+    @field_validator("tags")
     @classmethod
-    def validate_tags(cls, v: List[str]) -> List[str]:
+    def validate_tags(cls, v: list[str]) -> list[str]:
         """Validate and sanitize tags list."""
         if not v:
             return []
@@ -63,13 +72,17 @@ class QuestionCreate(BaseModel):
             raise ValueError("Maximum 30 tags allowed")
         return tags
 
-    @field_validator('options')
+    @field_validator("options")
     @classmethod
-    def validate_options(cls, v: Optional[List[OptionCreate]]) -> Optional[List[OptionCreate]]:
+    def validate_options(
+        cls, v: list[OptionCreate] | None
+    ) -> list[OptionCreate] | None:
         """Validate options list structure (option_ids are auto-generated)."""
         if v is not None:
             if len(v) < 2:
-                raise ValueError("At least 2 options are required when options are provided")
+                raise ValueError(
+                    "At least 2 options are required when options are provided"
+                )
             if len(v) > 10:
                 raise ValueError("Maximum 10 options allowed")
 
@@ -78,7 +91,9 @@ class QuestionCreate(BaseModel):
                 if not opt.text or not opt.text.strip():
                     raise ValueError(f"Option at position {idx} has empty text")
                 if len(opt.text.strip()) < 1 or len(opt.text.strip()) > 500:
-                    raise ValueError(f"Option at position {idx} text must be between 1 and 500 characters")
+                    raise ValueError(
+                        f"Option at position {idx} text must be between 1 and 500 characters"
+                    )
 
             # Check for duplicate option text (shouldn't have exact duplicates)
             option_texts = [opt.text.strip().lower() for opt in v]
@@ -87,7 +102,7 @@ class QuestionCreate(BaseModel):
 
         return v
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_question_type_fields(self):
         """
         Validate that required fields are present based on question type.
@@ -105,12 +120,19 @@ class QuestionCreate(BaseModel):
                 raise ValueError("MCQ questions must have exactly one correct answer")
 
             if not isinstance(self.correct_answers[0], int):
-                raise ValueError("MCQ correct_answers must be an integer (1-indexed position)")
+                raise ValueError(
+                    "MCQ correct_answers must be an integer (1-indexed position)"
+                )
 
             # Validate correct answer is a valid position (1-indexed)
             max_option_index = len(self.options)
-            if self.correct_answers[0] < 1 or self.correct_answers[0] > max_option_index:
-                raise ValueError(f"correct_answers must be between 1 and {max_option_index}. Got: {self.correct_answers[0]}")
+            if (
+                self.correct_answers[0] < 1
+                or self.correct_answers[0] > max_option_index
+            ):
+                raise ValueError(
+                    f"correct_answers must be between 1 and {max_option_index}. Got: {self.correct_answers[0]}"
+                )
 
         elif self.type == QuestionType.MULTI:
             # MULTI: Must have options and at least one correct answer (list of ints)
@@ -118,16 +140,22 @@ class QuestionCreate(BaseModel):
                 raise ValueError("MULTI questions must have at least 2 options")
 
             if not self.correct_answers or len(self.correct_answers) == 0:
-                raise ValueError("MULTI questions must have at least one correct answer")
+                raise ValueError(
+                    "MULTI questions must have at least one correct answer"
+                )
 
             if not all(isinstance(ans, int) for ans in self.correct_answers):
-                raise ValueError("MULTI correct_answers must be a list of integers (1-indexed positions)")
+                raise ValueError(
+                    "MULTI correct_answers must be a list of integers (1-indexed positions)"
+                )
 
             # Validate all correct answers are valid positions (1-indexed)
             max_option_index = len(self.options)
             for ans in self.correct_answers:
                 if ans < 1 or ans > max_option_index:
-                    raise ValueError(f"correct_answers contains invalid position {ans}. Must be between 1 and {max_option_index}")
+                    raise ValueError(
+                        f"correct_answers contains invalid position {ans}. Must be between 1 and {max_option_index}"
+                    )
 
             # Check for duplicate correct answers
             if len(self.correct_answers) != len(set(self.correct_answers)):
@@ -135,7 +163,9 @@ class QuestionCreate(BaseModel):
 
             # At least one option should be correct, but not all
             if len(self.correct_answers) == len(self.options):
-                raise ValueError("MULTI questions cannot have all options as correct answers")
+                raise ValueError(
+                    "MULTI questions cannot have all options as correct answers"
+                )
 
         elif self.type == QuestionType.TRUE_FALSE:
             # TRUE_FALSE: Must have exactly one boolean correct answer, no options
@@ -143,10 +173,14 @@ class QuestionCreate(BaseModel):
                 raise ValueError("TRUE_FALSE questions should not have options")
 
             if not self.correct_answers:
-                raise ValueError("TRUE_FALSE questions must have correct_answers specified")
+                raise ValueError(
+                    "TRUE_FALSE questions must have correct_answers specified"
+                )
 
             if len(self.correct_answers) != 1:
-                raise ValueError("TRUE_FALSE questions must have exactly one correct answer")
+                raise ValueError(
+                    "TRUE_FALSE questions must have exactly one correct answer"
+                )
 
             if not isinstance(self.correct_answers[0], bool):
                 raise ValueError("TRUE_FALSE correct_answers must be a boolean value")
@@ -157,13 +191,17 @@ class QuestionCreate(BaseModel):
                 raise ValueError("TEXT questions should not have options")
 
             if self.correct_answers:
-                raise ValueError("TEXT questions should not have correct_answers (use sample_answer instead)")
+                raise ValueError(
+                    "TEXT questions should not have correct_answers (use sample_answer instead)"
+                )
 
             if not self.sample_answer or not self.sample_answer.strip():
                 raise ValueError("TEXT questions must have a sample_answer")
 
             if len(self.sample_answer.strip()) < 10:
-                raise ValueError("TEXT sample_answer must be at least 10 characters long")
+                raise ValueError(
+                    "TEXT sample_answer must be at least 10 characters long"
+                )
 
         return self
 
@@ -179,18 +217,19 @@ class QuestionUpdate(BaseModel):
     When updating options, provide just the text - option_ids will be auto-generated.
     The updated_at timestamp is automatically set by the system.
     """
-    question_text: Optional[str] = Field(None, min_length=10, max_length=2000)
-    options: Optional[List[OptionCreate]] = None  # User provides text only
-    correct_answers: Optional[List[Union[int, bool, str]]] = None
-    sample_answer: Optional[str] = Field(None, max_length=5000)
-    answer_explanation: Optional[str] = Field(None, max_length=2000)
-    difficulty: Optional[str] = Field(None, pattern="^(easy|medium|hard)$")
-    skills: Optional[List[str]] = Field(None, max_length=20)
-    tags: Optional[List[str]] = Field(None, max_length=30)
 
-    @field_validator('question_text')
+    question_text: str | None = Field(None, min_length=10, max_length=2000)
+    options: list[OptionCreate] | None = None  # User provides text only
+    correct_answers: list[int | bool | str] | None = None
+    sample_answer: str | None = Field(None, max_length=5000)
+    answer_explanation: str | None = Field(None, max_length=2000)
+    difficulty: str | None = Field(None, pattern="^(easy|medium|hard)$")
+    skills: list[str] | None = Field(None, max_length=20)
+    tags: list[str] | None = Field(None, max_length=30)
+
+    @field_validator("question_text")
     @classmethod
-    def validate_question_text(cls, v: Optional[str]) -> Optional[str]:
+    def validate_question_text(cls, v: str | None) -> str | None:
         """Sanitize and validate question text."""
         if v is not None:
             v = v.strip()
@@ -198,9 +237,9 @@ class QuestionUpdate(BaseModel):
                 raise ValueError("question_text must be at least 10 characters long")
         return v
 
-    @field_validator('skills')
+    @field_validator("skills")
     @classmethod
-    def validate_skills(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+    def validate_skills(cls, v: list[str] | None) -> list[str] | None:
         """Validate and sanitize skills list."""
         if v is not None:
             skills = [skill.strip() for skill in v if skill.strip()]
@@ -211,9 +250,9 @@ class QuestionUpdate(BaseModel):
             return skills
         return v
 
-    @field_validator('tags')
+    @field_validator("tags")
     @classmethod
-    def validate_tags(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+    def validate_tags(cls, v: list[str] | None) -> list[str] | None:
         """Validate and sanitize tags list."""
         if v is not None:
             tags = [tag.strip() for tag in v if tag.strip()]
@@ -224,13 +263,17 @@ class QuestionUpdate(BaseModel):
             return tags
         return v
 
-    @field_validator('options')
+    @field_validator("options")
     @classmethod
-    def validate_options(cls, v: Optional[List[OptionCreate]]) -> Optional[List[OptionCreate]]:
+    def validate_options(
+        cls, v: list[OptionCreate] | None
+    ) -> list[OptionCreate] | None:
         """Validate options list structure (option_ids will be auto-generated)."""
         if v is not None:
             if len(v) < 2:
-                raise ValueError("At least 2 options are required when options are provided")
+                raise ValueError(
+                    "At least 2 options are required when options are provided"
+                )
             if len(v) > 10:
                 raise ValueError("Maximum 10 options allowed")
 
@@ -239,7 +282,9 @@ class QuestionUpdate(BaseModel):
                 if not opt.text or not opt.text.strip():
                     raise ValueError(f"Option at position {idx} has empty text")
                 if len(opt.text.strip()) < 1 or len(opt.text.strip()) > 500:
-                    raise ValueError(f"Option at position {idx} text must be between 1 and 500 characters")
+                    raise ValueError(
+                        f"Option at position {idx} text must be between 1 and 500 characters"
+                    )
 
             # Check for duplicate option text
             option_texts = [opt.text.strip().lower() for opt in v]
@@ -248,7 +293,7 @@ class QuestionUpdate(BaseModel):
 
         return v
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_update_consistency(self):
         """
         Validate that if type-specific fields are being updated,
@@ -266,7 +311,9 @@ class QuestionUpdate(BaseModel):
             if all(isinstance(ans, int) for ans in self.correct_answers):
                 for ans in self.correct_answers:
                     if ans < 1 or ans > max_option_index:
-                        raise ValueError(f"correct_answers contains invalid position {ans}. Must be between 1 and {max_option_index}")
+                        raise ValueError(
+                            f"correct_answers contains invalid position {ans}. Must be between 1 and {max_option_index}"
+                        )
 
         return self
 
@@ -277,22 +324,22 @@ class QuestionResponse(BaseModel):
 
     Includes all Question fields plus MongoDB's auto-generated _id.
     """
+
     id: str = Field(..., description="MongoDB document ID", alias="_id")
     type: str
     question_text: str
-    options: Optional[List[dict]] = None
-    correct_answers: Optional[List[Union[int, bool, str]]] = None
-    sample_answer: Optional[str] = None
-    answer_explanation: Optional[str] = None
-    difficulty: Optional[str] = "medium"
-    skills: List[str] = []
-    tags: List[str] = []
+    options: list[dict] | None = None
+    correct_answers: list[int | bool | str] | None = None
+    sample_answer: str | None = None
+    answer_explanation: str | None = None
+    difficulty: str | None = "medium"
+    skills: list[str] = []
+    tags: list[str] = []
     created_at: datetime
     updated_at: datetime
 
     class Config:
         """Pydantic configuration."""
+
         populate_by_name = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+        json_encoders = {datetime: lambda v: v.isoformat()}
