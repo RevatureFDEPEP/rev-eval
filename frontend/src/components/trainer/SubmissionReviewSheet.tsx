@@ -265,7 +265,7 @@ export function SubmissionReviewSheet({
                 proficiency_level: data.proficiency,
               };
               return acc;
-            }, {} as Record<string, any>)
+            }, {} as Record<string, { score: number; feedback: string; proficiency_level: string }>)
           : undefined,
       };
 
