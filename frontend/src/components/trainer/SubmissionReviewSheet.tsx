@@ -139,43 +139,40 @@ export function SubmissionReviewSheet({
   const audioPlayer = useAudioPlayer();
 
   useEffect(() => {
-    const loadDetails = async () => {
-      if (!submission || !open) {
-        setDetails(null);
-        setError(null);
-        setTrainerScore('');
-        setOverallFeedback('');
-        setStrengths('');
-        setImprovements('');
-        setTechnicalKnowledge('');
-        setProblemSolving('');
-        setCommunication('');
-        setCodeQuality('');
-        setEngagement('');
-        setSkillsAssessment({});
-        return;
-      }
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getSubmissionReviewDetails(submission.id);
+    if (!submission || !open) {
+      setDetails(null);
+      setError(null);
+      setTrainerScore('');
+      setOverallFeedback('');
+      setStrengths('');
+      setImprovements('');
+      setTechnicalKnowledge('');
+      setProblemSolving('');
+      setCommunication('');
+      setCodeQuality('');
+      setEngagement('');
+      setSkillsAssessment({});
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    getSubmissionReviewDetails(submission.id)
+      .then(data => {
         setDetails(data);
-
         if (readOnly && submission.trainer_score) {
           setTrainerScore(submission.trainer_score.toString());
           if (submission.feedback) {
             setOverallFeedback(submission.feedback);
           }
         }
-      } catch (err) {
+      })
+      .catch(err => {
         console.error('Failed to load review details:', err);
         setError(err instanceof Error ? err.message : 'Failed to load details');
-      } finally {
+      })
+      .finally(() => {
         setLoading(false);
-      }
-    };
-
-    loadDetails();
+      });
   }, [submission, open]);
 
   const handlePlayAudio = async (audioUrl: string, messageIndex: number) => {

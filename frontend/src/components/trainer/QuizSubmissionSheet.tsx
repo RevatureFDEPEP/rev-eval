@@ -27,26 +27,24 @@ export function QuizSubmissionSheet({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadSession = async () => {
-      if (!submission || !open) {
-        setSession(null);
-        setError(null);
-        return;
-      }
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getTestSessionBySubmission(submission.id);
+    if (!submission || !open) {
+      setSession(null);
+      setError(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    getTestSessionBySubmission(submission.id)
+      .then(data => {
         setSession(data);
-      } catch (err) {
+      })
+      .catch(err => {
         console.error('Failed to load quiz session:', err);
         setError(err instanceof Error ? err.message : 'Failed to load quiz details');
-      } finally {
+      })
+      .finally(() => {
         setLoading(false);
-      }
-    };
-
-    loadSession();
+      });
   }, [submission, open]);
 
   if (!submission) return null;

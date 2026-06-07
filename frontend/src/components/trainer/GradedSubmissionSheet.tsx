@@ -92,26 +92,24 @@ export function GradedSubmissionSheet({
   const audioPlayer = useAudioPlayer();
 
   useEffect(() => {
-    const loadDetails = async () => {
-      if (!submission || !open) {
-        setDetails(null);
-        setError(null);
-        return;
-      }
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getSubmissionReviewDetails(submission.id);
+    if (!submission || !open) {
+      setDetails(null);
+      setError(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    getSubmissionReviewDetails(submission.id)
+      .then(data => {
         setDetails(data);
-      } catch (err) {
+      })
+      .catch(err => {
         console.error('Failed to load review details:', err);
         setError(err instanceof Error ? err.message : 'Failed to load details');
-      } finally {
+      })
+      .finally(() => {
         setLoading(false);
-      }
-    };
-
-    loadDetails();
+      });
   }, [submission, open]);
 
   const handlePlayAudio = async (audioUrl: string, messageIndex: number) => {
@@ -130,10 +128,6 @@ export function GradedSubmissionSheet({
       setPlayingAudioIndex(null);
     });
     await audioPlayer.play(audioUrl);
-  };
-
-  const handlePauseAudio = () => {
-    audioPlayer.pause();
   };
 
   const handleRestartAudio = () => {
