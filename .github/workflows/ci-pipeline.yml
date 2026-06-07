@@ -73,7 +73,7 @@ jobs:
           docker build -t ${{ matrix.service }}:ci services/${{ matrix.service }}
 
       - name: Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: '${{ matrix.service }}:ci'
           format: 'sarif'
