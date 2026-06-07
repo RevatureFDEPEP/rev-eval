@@ -235,7 +235,9 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   }, [currentPart, sessionId, handleSubmitPartA, handleFinalSubmit]);
 
   // Sync the ref so stableOnTimeExpired always invokes the latest handleTimeExpired
-  onTimeExpiredRef.current = handleTimeExpired;
+  useEffect(() => {
+    onTimeExpiredRef.current = handleTimeExpired;
+  }, [handleTimeExpired]);
 
   useEffect(() => {
     if (state === 'part-a' || state === 'part-b') {

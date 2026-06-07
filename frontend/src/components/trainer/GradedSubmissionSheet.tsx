@@ -97,19 +97,20 @@ export function GradedSubmissionSheet({
       setError(null);
       return;
     }
-    setLoading(true);
-    setError(null);
-    getSubmissionReviewDetails(submission.id)
-      .then(data => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getSubmissionReviewDetails(submission.id);
         setDetails(data);
-      })
-      .catch(err => {
+      } catch (err) {
         console.error('Failed to load review details:', err);
         setError(err instanceof Error ? err.message : 'Failed to load details');
-      })
-      .finally(() => {
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+    load();
   }, [submission, open]);
 
   const handlePlayAudio = async (audioUrl: string, messageIndex: number) => {
@@ -151,7 +152,7 @@ export function GradedSubmissionSheet({
     return () => {
       audioPlayer.stop();
     };
-  }, [open]);
+  }, [open, audioPlayer]);  // Added audioPlayer to dependency array
 
   if (!submission) return null;
 

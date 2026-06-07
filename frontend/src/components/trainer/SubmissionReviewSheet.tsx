@@ -154,10 +154,11 @@ export function SubmissionReviewSheet({
       setSkillsAssessment({});
       return;
     }
-    setLoading(true);
-    setError(null);
-    getSubmissionReviewDetails(submission.id)
-      .then(data => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getSubmissionReviewDetails(submission.id);
         setDetails(data);
         if (readOnly && submission.trainer_score) {
           setTrainerScore(submission.trainer_score.toString());
@@ -165,14 +166,14 @@ export function SubmissionReviewSheet({
             setOverallFeedback(submission.feedback);
           }
         }
-      })
-      .catch(err => {
+      } catch (err) {
         console.error('Failed to load review details:', err);
         setError(err instanceof Error ? err.message : 'Failed to load details');
-      })
-      .finally(() => {
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+    load();
   }, [submission, open]);
 
   const handlePlayAudio = async (audioUrl: string, messageIndex: number) => {

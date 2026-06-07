@@ -32,19 +32,20 @@ export function QuizSubmissionSheet({
       setError(null);
       return;
     }
-    setLoading(true);
-    setError(null);
-    getTestSessionBySubmission(submission.id)
-      .then(data => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getTestSessionBySubmission(submission.id);
         setSession(data);
-      })
-      .catch(err => {
+      } catch (err) {
         console.error('Failed to load quiz session:', err);
         setError(err instanceof Error ? err.message : 'Failed to load quiz details');
-      })
-      .finally(() => {
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+    load();
   }, [submission, open]);
 
   if (!submission) return null;

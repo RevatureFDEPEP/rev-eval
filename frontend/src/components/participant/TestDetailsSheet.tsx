@@ -12,8 +12,8 @@ import { getTestSessionBySubmission } from '@/lib/api/quiz-sessions';
 // Interview-transcript surface was removed in the PEP brownfield strip
 // (ai-interview-service is Phase 2). Candidates rebuild this on W3 D13–D14.
 interface InterviewTranscriptMessage {
-  speaker?: string;
-  text?: string;
+  role?: string;
+  content?: string;
   timestamp?: string;
 }
 
@@ -85,7 +85,7 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
   // COMPLETED = user finished test, GRADED = evaluation complete with score
   const isCompleted = test?.status === 'COMPLETED' || test?.status === 'GRADED';
   const isGraded = test?.status === 'GRADED';
-  const submissionId = test?.submission_id;
+  const _submissionId = test?.submission_id;
 
   // Fetch transcript for completed interviews
   // This useEffect always runs (hooks must be called unconditionally)
@@ -701,11 +701,6 @@ function QuestionResultCard({ question, index }: { question: GradedQuizQuestion;
     easy: 'bg-green-100 text-green-800 border-green-200',
     medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     hard: 'bg-red-100 text-red-800 border-red-200',
-  };
-
-  const getOptionText = (optionId: number): string => {
-    const option = question.options?.find((opt) => opt.option_id === optionId);
-    return option?.text || `Option ${optionId}`;
   };
 
   return (
