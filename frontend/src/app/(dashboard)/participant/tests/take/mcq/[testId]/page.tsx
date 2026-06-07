@@ -43,54 +43,7 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   console.log('🔍 Parsed testId:', testId, 'isNaN:', isNaN(testId));
   console.log('🔍 Parsed submissionId:', submissionId, 'isNaN:', isNaN(submissionId));
 
-  // Validate testId
-  if (isNaN(testId)) {
-    console.error('❌ Invalid testId - isNaN returned true. params.testId:', resolvedParams.testId);
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Card className="w-full max-w-md border-red-200">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center gap-4">
-              <AlertCircle className="size-12 text-red-600" />
-              <div className="text-center">
-                <h2 className="text-lg font-semibold text-slate-900">Invalid Test ID</h2>
-                <p className="mt-2 text-sm text-slate-600">
-                  The test ID in the URL is invalid. Received: "{resolvedParams.testId}"
-                </p>
-              </div>
-              <Button onClick={() => router.push('/participant/tests')}>Back to Tests</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Validate submissionId
-  if (isNaN(submissionId)) {
-    console.error('❌ Invalid submissionId - isNaN returned true. query param:', searchParams.get('submission'));
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Card className="w-full max-w-md border-red-200">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center gap-4">
-              <AlertCircle className="size-12 text-red-600" />
-              <div className="text-center">
-                <h2 className="text-lg font-semibold text-slate-900">Invalid Submission ID</h2>
-                <p className="mt-2 text-sm text-slate-600">
-                  Missing or invalid submission ID in URL.
-                </p>
-              </div>
-              <Button onClick={() => router.push('/participant/tests')}>Back to Tests</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  console.log('✅ testId validation passed:', testId);
-  console.log('✅ submissionId validation passed:', submissionId);
+  // All hooks must appear before any conditional returns (Rules of Hooks).
 
   // State management
   const [state, setState] = useState<QuizState>('loading');
@@ -123,7 +76,7 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   // Warn user if they try to leave during an active test
   useEffect(() => {
     const shouldWarn = state !== 'completed' && state !== 'error' && state !== 'loading';
-    
+
     if (!shouldWarn) return;
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -201,6 +154,8 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
 
   // Load test data and create session
   useEffect(() => {
+    if (isNaN(testId) || isNaN(submissionId)) return;
+
     const initializeQuiz = async () => {
       try {
         setState('loading');
@@ -297,6 +252,55 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
       localStorage.setItem(`quiz-answers-${testId}`, JSON.stringify(answersObj));
     }
   }, [answers, testId]);
+
+  // Validate testId
+  if (isNaN(testId)) {
+    console.error('❌ Invalid testId - isNaN returned true. params.testId:', resolvedParams.testId);
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="w-full max-w-md border-red-200">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center gap-4">
+              <AlertCircle className="size-12 text-red-600" />
+              <div className="text-center">
+                <h2 className="text-lg font-semibold text-slate-900">Invalid Test ID</h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  The test ID in the URL is invalid. Received: &quot;{resolvedParams.testId}&quot;
+                </p>
+              </div>
+              <Button onClick={() => router.push('/participant/tests')}>Back to Tests</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Validate submissionId
+  if (isNaN(submissionId)) {
+    console.error('❌ Invalid submissionId - isNaN returned true. query param:', searchParams.get('submission'));
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="w-full max-w-md border-red-200">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center gap-4">
+              <AlertCircle className="size-12 text-red-600" />
+              <div className="text-center">
+                <h2 className="text-lg font-semibold text-slate-900">Invalid Submission ID</h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  Missing or invalid submission ID in URL.
+                </p>
+              </div>
+              <Button onClick={() => router.push('/participant/tests')}>Back to Tests</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  console.log('✅ testId validation passed:', testId);
+  console.log('✅ submissionId validation passed:', submissionId);
 
   // Answer change handler
   const handleAnswerChange = (questionId: string, answer: AnswerValue) => {

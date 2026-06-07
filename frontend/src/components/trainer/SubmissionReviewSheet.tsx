@@ -13,9 +13,8 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getSubmissionReviewDetails, submitTrainerReview } from '@/lib/api';
 import type { TestSubmission } from '@/lib/api/types';
-import { CheckCircle2, Star, Play, Pause, RotateCcw, Loader2, Copy, Lightbulb } from 'lucide-react';
+import { CheckCircle2, Play, Pause, RotateCcw, Loader2, Copy, Lightbulb } from 'lucide-react';
 import { useAudioPlayer } from '@/lib/hooks/useAudioPlayer';
-import { formatTableDate } from '@/lib/utils/date';
 
 interface SubmissionReviewSheetProps {
   submission: TestSubmission | null;
@@ -198,10 +197,6 @@ export function SubmissionReviewSheet({
       setPlayingAudioIndex(null);
     });
     await audioPlayer.play(audioUrl);
-  };
-
-  const handlePauseAudio = () => {
-    audioPlayer.pause();
   };
 
   const handleRestartAudio = () => {
