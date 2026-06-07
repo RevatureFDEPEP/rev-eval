@@ -14,7 +14,6 @@ select = [
 ignore = [
     "B008",  # Depends()/Query() in FastAPI route signatures is idiomatic, not a bug
     "E402",  # module-level import not at top — intentional in service entry points
-    "E501",  # ruff format command has not resolved this error, and thus it must be ignored
 ]
 
 [tool.ruff.lint.isort]

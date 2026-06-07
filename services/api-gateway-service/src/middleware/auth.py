@@ -4,6 +4,7 @@ JWT authentication middleware for the API Gateway.
 Verifies HS256 tokens issued by user-service, extracts the user context,
 and injects it as X-User-* headers for downstream services.
 """
+
 import os
 
 import jwt
@@ -24,7 +25,9 @@ def _get_secret() -> str:
     return secret
 
 
-async def verify_jwt_token(authorization: str | None = Header(None)) -> dict[str, str]:
+async def verify_jwt_token(
+    authorization: str | None = Header(None),
+) -> dict[str, str]:
     """Verify a Bearer JWT and return a user-context dict (user_id, email, role)."""
     if not authorization:
         raise HTTPException(

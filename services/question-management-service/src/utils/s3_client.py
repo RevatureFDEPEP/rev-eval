@@ -7,6 +7,7 @@ so the same code works against AWS S3 or a local MinIO container.
 W2 D8 candidate task: wire this into a question-image upload endpoint
 (POST /v1/api/questions/{id}/image → returns pre-signed PUT URL).
 """
+
 from __future__ import annotations
 
 import logging

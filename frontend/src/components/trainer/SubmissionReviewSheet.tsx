@@ -13,9 +13,8 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getSubmissionReviewDetails, submitTrainerReview } from '@/lib/api';
 import type { TestSubmission } from '@/lib/api/types';
-import { CheckCircle2, Star, Play, Pause, RotateCcw, Loader2, Copy, Lightbulb } from 'lucide-react';
+import { CheckCircle2, Play, Pause, RotateCcw, Loader2, Copy, Lightbulb } from 'lucide-react';
 import { useAudioPlayer } from '@/lib/hooks/useAudioPlayer';
-import { formatTableDate } from '@/lib/utils/date';
 
 interface SubmissionReviewSheetProps {
   submission: TestSubmission | null;
@@ -143,7 +142,6 @@ export function SubmissionReviewSheet({
     if (!submission || !open) {
       setDetails(null);
       setError(null);
-      // Reset all form fields
       setTrainerScore('');
       setOverallFeedback('');
       setStrengths('');
@@ -156,22 +154,17 @@ export function SubmissionReviewSheet({
       setSkillsAssessment({});
       return;
     }
-
-    const loadDetails = async () => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setLoading(true);
-        setError(null);
         const data = await getSubmissionReviewDetails(submission.id);
         setDetails(data);
-
-        // In read-only mode, pre-fill with existing trainer evaluation
         if (readOnly && submission.trainer_score) {
           setTrainerScore(submission.trainer_score.toString());
           if (submission.feedback) {
             setOverallFeedback(submission.feedback);
           }
-          // Note: Full trainer_evaluation structure would need to be fetched from MongoDB
-          // For now, we show basic fields from submission
         }
       } catch (err) {
         console.error('Failed to load review details:', err);
@@ -180,8 +173,7 @@ export function SubmissionReviewSheet({
         setLoading(false);
       }
     };
-
-    loadDetails();
+    load();
   }, [submission, open]);
 
   const handlePlayAudio = async (audioUrl: string, messageIndex: number) => {
@@ -205,10 +197,6 @@ export function SubmissionReviewSheet({
     await audioPlayer.play(audioUrl);
   };
 
-  const handlePauseAudio = () => {
-    audioPlayer.pause();
-  };
-
   const handleRestartAudio = () => {
     audioPlayer.restart();
   };
@@ -223,9 +211,13 @@ export function SubmissionReviewSheet({
   };
 
   useEffect(() => {
+    if (!open) {
+      setPlayingAudioIndex(null);
+      audioPlayer.stop();
+      return;
+    }
     return () => {
       audioPlayer.stop();
-      setPlayingAudioIndex(null);
     };
   }, [open]);
 
@@ -271,7 +263,7 @@ export function SubmissionReviewSheet({
                 proficiency_level: data.proficiency,
               };
               return acc;
-            }, {} as Record<string, any>)
+            }, {} as Record<string, { score: number; feedback: string; proficiency_level: string }>)
           : undefined,
       };
 

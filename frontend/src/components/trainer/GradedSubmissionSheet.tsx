@@ -97,11 +97,10 @@ export function GradedSubmissionSheet({
       setError(null);
       return;
     }
-
-    const loadDetails = async () => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setLoading(true);
-        setError(null);
         const data = await getSubmissionReviewDetails(submission.id);
         setDetails(data);
       } catch (err) {
@@ -111,8 +110,7 @@ export function GradedSubmissionSheet({
         setLoading(false);
       }
     };
-
-    loadDetails();
+    load();
   }, [submission, open]);
 
   const handlePlayAudio = async (audioUrl: string, messageIndex: number) => {
@@ -133,10 +131,6 @@ export function GradedSubmissionSheet({
     await audioPlayer.play(audioUrl);
   };
 
-  const handlePauseAudio = () => {
-    audioPlayer.pause();
-  };
-
   const handleRestartAudio = () => {
     audioPlayer.restart();
   };
@@ -150,11 +144,15 @@ export function GradedSubmissionSheet({
   };
 
   useEffect(() => {
+    if (!open) {
+      setPlayingAudioIndex(null);
+      audioPlayer.stop();
+      return;
+    }
     return () => {
       audioPlayer.stop();
-      setPlayingAudioIndex(null);
     };
-  }, [open]);
+  }, [open, audioPlayer]);  // Added audioPlayer to dependency array
 
   if (!submission) return null;
 

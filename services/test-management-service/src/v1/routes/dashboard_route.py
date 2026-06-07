@@ -3,6 +3,7 @@ Dashboard Statistics Endpoints
 
 Provides aggregated statistics for trainer and participant dashboards.
 """
+
 import logging
 
 from fastapi import APIRouter, Header, HTTPException
@@ -17,17 +18,13 @@ router = APIRouter()
 def get_user_context(
     x_user_id: str | None = Header(None),
     x_user_email: str | None = Header(None),
-    x_user_role: str | None = Header(None)
+    x_user_role: str | None = Header(None),
 ):
     """Extract user context from headers set by API Gateway"""
     if not x_user_email or not x_user_role:
         raise HTTPException(status_code=401, detail="User context not found in headers")
 
-    return {
-        "user_id": x_user_id,
-        "email": x_user_email,
-        "role": x_user_role
-    }
+    return {"user_id": x_user_id, "email": x_user_email, "role": x_user_role}
 
 
 # @router.get("/dashboard/trainer/stats", response_model=TrainerDashboardStats)

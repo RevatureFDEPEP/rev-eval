@@ -37,14 +37,14 @@ async def init_db():
             maxPoolSize=10,  # Connection pool size
             minPoolSize=1,
             retryWrites=True,
-            retryReads=True
+            retryReads=True,
         )
 
         # Get database instance
         db = client[settings.MONGO_DB]
 
         # Test the connection with ping
-        await client.admin.command('ping')
+        await client.admin.command("ping")
         print(f"✅ Successfully connected to MongoDB: {settings.MONGO_DB}")
 
         # Initialize Beanie ODM
@@ -61,6 +61,7 @@ async def init_db():
     except Exception as e:
         print(f"❌ Unexpected error during MongoDB initialization: {e}")
         import traceback
+
         traceback.print_exc()
         raise
 
@@ -124,7 +125,7 @@ async def check_connection():
         return False
 
     try:
-        await client.admin.command('ping')
+        await client.admin.command("ping")
         return True
     except Exception as e:
         print(f"⚠️ MongoDB connection check failed: {e}")

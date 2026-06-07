@@ -32,15 +32,18 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/v1/api")
 app.include_router(user_router, prefix="/v1/api")
 
+
 # ---- Health Endpoint ----
 @app.get("/health", tags=["health"])
 def health_check():
     return {"status": "ok"}
 
+
 # ---- DB Init ----
 @app.on_event("startup")
 def on_startup():
     init_db()
+
 
 # ---- Run server ----
 if __name__ == "__main__":

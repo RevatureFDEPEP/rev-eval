@@ -34,13 +34,13 @@ QUESTIONS: list[dict[str, Any]] = [
             {"text": "Random Access Generation"},
             {"text": "Retrieval Augmented Generation"},
             {"text": "Recursive Algorithm Generation"},
-            {"text": "Reinforcement Augmented Generation"}
+            {"text": "Reinforcement Augmented Generation"},
         ],
         "correct_answers": [1],
         "answer_explanation": "RAG stands for Retrieval Augmented Generation, a technique that enhances LLM responses by retrieving relevant information from external knowledge bases.",
         "difficulty": "easy",
         "skills": ["RAG using Pinecone"],
-        "tags": ["rag", "fundamentals", "llm", "retrieval"]
+        "tags": ["rag", "fundamentals", "llm", "retrieval"],
     },
     {
         "type": "true_false",
@@ -49,22 +49,24 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_explanation": "True. RAG systems retrieve relevant documents or information first, then use that context to generate more informed and accurate responses.",
         "difficulty": "easy",
         "skills": ["RAG using Pinecone"],
-        "tags": ["rag", "fundamentals", "architecture"]
+        "tags": ["rag", "fundamentals", "architecture"],
     },
     {
         "type": "mcq",
         "question_text": "What is the primary purpose of the retrieval component in a RAG system?",
         "options": [
             {"text": "To generate random text"},
-            {"text": "To fetch relevant documents or information from a knowledge base"},
+            {
+                "text": "To fetch relevant documents or information from a knowledge base"
+            },
             {"text": "To compress the language model"},
-            {"text": "To train the model faster"}
+            {"text": "To train the model faster"},
         ],
         "correct_answers": [1],
         "answer_explanation": "The retrieval component fetches relevant documents or information from a knowledge base to provide context for the generation component.",
         "difficulty": "easy",
         "skills": ["RAG using Pinecone"],
-        "tags": ["rag", "retrieval", "knowledge-base"]
+        "tags": ["rag", "retrieval", "knowledge-base"],
     },
     {
         "type": "mcq",
@@ -73,15 +75,14 @@ QUESTIONS: list[dict[str, Any]] = [
             {"text": "Relational databases like MySQL"},
             {"text": "Vector databases like Pinecone or Milvus"},
             {"text": "Graph databases like Neo4j"},
-            {"text": "Key-value stores like Redis"}
+            {"text": "Key-value stores like Redis"},
         ],
         "correct_answers": [1],
         "answer_explanation": "Vector databases are specifically designed to store and efficiently search high-dimensional embeddings, making them ideal for RAG systems.",
         "difficulty": "easy",
         "skills": ["RAG using Pinecone"],
-        "tags": ["rag", "vector-database", "embeddings"]
+        "tags": ["rag", "vector-database", "embeddings"],
     },
-
     # ============================================================================
     # RAG - MEDIUM Questions
     # ============================================================================
@@ -93,28 +94,30 @@ QUESTIONS: list[dict[str, Any]] = [
             {"text": "Similarity search for relevant documents"},
             {"text": "Context injection into the LLM prompt"},
             {"text": "Random noise generation"},
-            {"text": "Model fine-tuning on retrieved documents"}
+            {"text": "Model fine-tuning on retrieved documents"},
         ],
         "correct_answers": [0, 1, 2],
         "answer_explanation": "A RAG pipeline typically involves: 1) generating embeddings for documents, 2) performing similarity searches to find relevant content, and 3) injecting that context into the LLM prompt. Fine-tuning and random noise are not standard RAG components.",
         "difficulty": "medium",
         "skills": ["RAG using Pinecone"],
-        "tags": ["rag", "pipeline", "architecture"]
+        "tags": ["rag", "pipeline", "architecture"],
     },
     {
         "type": "mcq",
         "question_text": "What is chunking in the context of RAG systems?",
         "options": [
-            {"text": "Dividing large documents into smaller, manageable pieces for embedding and retrieval"},
+            {
+                "text": "Dividing large documents into smaller, manageable pieces for embedding and retrieval"
+            },
             {"text": "Compressing the language model to reduce size"},
             {"text": "Grouping similar queries together"},
-            {"text": "Removing irrelevant words from documents"}
+            {"text": "Removing irrelevant words from documents"},
         ],
         "correct_answers": [0],
         "answer_explanation": "Chunking is the process of dividing large documents into smaller segments that can be embedded and retrieved more effectively, balancing context preservation with retrieval precision.",
         "difficulty": "medium",
         "skills": ["RAG using Pinecone"],
-        "tags": ["rag", "chunking", "preprocessing"]
+        "tags": ["rag", "chunking", "preprocessing"],
     },
     {
         "type": "mcq",
@@ -123,29 +126,31 @@ QUESTIONS: list[dict[str, Any]] = [
             {"text": "Model size in gigabytes"},
             {"text": "Semantic similarity preservation in the embedding space"},
             {"text": "Training data size"},
-            {"text": "Number of parameters"}
+            {"text": "Number of parameters"},
         ],
         "correct_answers": [2],
         "answer_explanation": "The ability to preserve semantic similarity in the embedding space is crucial, as RAG systems rely on finding semantically similar documents through vector similarity search.",
         "difficulty": "medium",
         "skills": ["RAG using Pinecone"],
-        "tags": ["rag", "embeddings", "semantic-search"]
+        "tags": ["rag", "embeddings", "semantic-search"],
     },
     {
         "type": "multi",
         "question_text": "What are common challenges when implementing RAG systems? (Select all that apply)",
         "options": [
-            {"text": "Handling outdated or incorrect information in the knowledge base"},
+            {
+                "text": "Handling outdated or incorrect information in the knowledge base"
+            },
             {"text": "Balancing retrieval relevance with context window limitations"},
             {"text": "Managing embedding costs and latency"},
             {"text": "Eliminating all hallucinations"},
-            {"text": "Chunk size optimization"}
+            {"text": "Chunk size optimization"},
         ],
         "correct_answers": [1, 2, 3, 5],
         "answer_explanation": "Common RAG challenges include managing knowledge base quality, balancing retrieval with context limits, managing costs/latency, and optimizing chunk sizes. While RAG reduces hallucinations, it cannot eliminate them entirely.",
         "difficulty": "medium",
         "skills": ["RAG using Pinecone"],
-        "tags": ["rag", "challenges", "optimization"]
+        "tags": ["rag", "challenges", "optimization"],
     },
     {
         "type": "text",
@@ -154,9 +159,8 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_explanation": "This question tests understanding of the core retrieval mechanism in RAG systems.",
         "difficulty": "medium",
         "skills": ["RAG using Pinecone"],
-        "tags": ["rag", "semantic-search", "retrieval-methods"]
+        "tags": ["rag", "semantic-search", "retrieval-methods"],
     },
-
     # ============================================================================
     # RAG - HARD Questions
     # ============================================================================
@@ -168,28 +172,30 @@ QUESTIONS: list[dict[str, Any]] = [
             {"text": "Reranking retrieved documents with a cross-encoder"},
             {"text": "Query expansion and reformulation"},
             {"text": "Caching frequently retrieved document embeddings"},
-            {"text": "Removing all punctuation from documents"}
+            {"text": "Removing all punctuation from documents"},
         ],
         "correct_answers": [1, 2, 3, 4],
         "answer_explanation": "Production RAG systems benefit from hybrid search (combining semantic and keyword approaches), reranking for precision, query expansion for better recall, and caching for performance. Removing punctuation is generally not beneficial and can harm semantic understanding.",
         "difficulty": "hard",
         "skills": ["RAG using Pinecone"],
-        "tags": ["rag", "optimization", "production", "hybrid-search"]
+        "tags": ["rag", "optimization", "production", "hybrid-search"],
     },
     {
         "type": "mcq",
         "question_text": "What is the purpose of a reranking model in an advanced RAG pipeline?",
         "options": [
             {"text": "To generate embeddings faster"},
-            {"text": "To refine the initial retrieval results by scoring document relevance more accurately"},
+            {
+                "text": "To refine the initial retrieval results by scoring document relevance more accurately"
+            },
             {"text": "To compress the documents before storage"},
-            {"text": "To translate documents into multiple languages"}
+            {"text": "To translate documents into multiple languages"},
         ],
         "correct_answers": [2],
         "answer_explanation": "Reranking models, often using cross-encoders, provide more accurate relevance scoring by considering the full interaction between query and document, improving upon the initial retrieval results from faster but less precise vector similarity search.",
         "difficulty": "hard",
         "skills": ["RAG using Pinecone"],
-        "tags": ["rag", "reranking", "cross-encoder", "optimization"]
+        "tags": ["rag", "reranking", "cross-encoder", "optimization"],
     },
     {
         "type": "text",
@@ -198,22 +204,26 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_explanation": "This tests deep understanding of RAG system design and optimization strategies.",
         "difficulty": "hard",
         "skills": ["RAG using Pinecone"],
-        "tags": ["rag", "chunking", "optimization", "trade-offs"]
+        "tags": ["rag", "chunking", "optimization", "trade-offs"],
     },
     {
         "type": "mcq",
         "question_text": "In a RAG system, what is the 'lost in the middle' problem?",
         "options": [
             {"text": "The vector database failing to index middle documents"},
-            {"text": "Language models performing worse on information in the middle of long contexts"},
+            {
+                "text": "Language models performing worse on information in the middle of long contexts"
+            },
             {"text": "Embeddings losing quality for medium-length texts"},
-            {"text": "The retrieval system skipping documents in the middle of the corpus"}
+            {
+                "text": "The retrieval system skipping documents in the middle of the corpus"
+            },
         ],
         "correct_answers": [2],
         "answer_explanation": "The 'lost in the middle' problem refers to research showing that LLMs often pay less attention to information placed in the middle of long contexts, performing better on information at the beginning or end. This affects RAG systems when multiple retrieved documents are concatenated.",
         "difficulty": "hard",
         "skills": ["RAG using Pinecone"],
-        "tags": ["rag", "llm-limitations", "context-window", "research"]
+        "tags": ["rag", "llm-limitations", "context-window", "research"],
     },
     {
         "type": "multi",
@@ -223,15 +233,14 @@ QUESTIONS: list[dict[str, Any]] = [
             {"text": "Using confidence scoring for retrieved documents"},
             {"text": "Instructing the model to only use provided context"},
             {"text": "Increasing the language model's temperature parameter"},
-            {"text": "Adding explicit 'I don't know' options in prompts"}
+            {"text": "Adding explicit 'I don't know' options in prompts"},
         ],
         "correct_answers": [1, 2, 3, 5],
         "answer_explanation": "Effective strategies include citations for transparency, confidence scoring to filter low-quality retrievals, explicit instructions to stick to context, and allowing the model to acknowledge uncertainty. Increasing temperature generally increases randomness and potential hallucinations.",
         "difficulty": "hard",
         "skills": ["RAG using Pinecone"],
-        "tags": ["rag", "hallucinations", "reliability", "best-practices"]
+        "tags": ["rag", "hallucinations", "reliability", "best-practices"],
     },
-
     # ============================================================================
     # Context Engineering - EASY Questions
     # ============================================================================
@@ -240,15 +249,17 @@ QUESTIONS: list[dict[str, Any]] = [
         "question_text": "What is context engineering in the realm of large language models?",
         "options": [
             {"text": "The process of training new language models"},
-            {"text": "The practice of designing and optimizing input context to improve model outputs"},
+            {
+                "text": "The practice of designing and optimizing input context to improve model outputs"
+            },
             {"text": "Hardware optimization for AI systems"},
-            {"text": "The compression of model weights"}
+            {"text": "The compression of model weights"},
         ],
         "correct_answers": [2],
         "answer_explanation": "Context engineering involves carefully crafting and structuring the input context (prompts, examples, instructions) to guide the model toward desired outputs.",
         "difficulty": "easy",
         "skills": ["Context Engineering"],
-        "tags": ["context-engineering", "fundamentals", "prompting"]
+        "tags": ["context-engineering", "fundamentals", "prompting"],
     },
     {
         "type": "true_false",
@@ -257,7 +268,7 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_explanation": "True. LLMs are sensitive to information ordering, with research showing they often prioritize information at the beginning or end of the context (primacy and recency effects).",
         "difficulty": "easy",
         "skills": ["Context Engineering"],
-        "tags": ["context-engineering", "ordering", "prompt-design"]
+        "tags": ["context-engineering", "ordering", "prompt-design"],
     },
     {
         "type": "mcq",
@@ -266,13 +277,13 @@ QUESTIONS: list[dict[str, Any]] = [
             {"text": "The graphical user interface for the model"},
             {"text": "The maximum amount of text the model can process at once"},
             {"text": "The time window for model training"},
-            {"text": "The number of parameters in the model"}
+            {"text": "The number of parameters in the model"},
         ],
         "correct_answers": [2],
         "answer_explanation": "The context window refers to the maximum number of tokens (roughly words) that a language model can process in a single request, including both input and output.",
         "difficulty": "easy",
         "skills": ["Context Engineering"],
-        "tags": ["context-engineering", "context-window", "fundamentals"]
+        "tags": ["context-engineering", "context-window", "fundamentals"],
     },
     {
         "type": "multi",
@@ -282,15 +293,14 @@ QUESTIONS: list[dict[str, Any]] = [
             {"text": "Relevant examples (few-shot learning)"},
             {"text": "Structured format specifications"},
             {"text": "Random padding text"},
-            {"text": "Role definitions"}
+            {"text": "Role definitions"},
         ],
         "correct_answers": [1, 2, 3, 5],
         "answer_explanation": "Effective context engineering includes clear instructions, relevant examples for few-shot learning, structured format specifications, and role definitions. Random padding text does not improve performance.",
         "difficulty": "easy",
         "skills": ["Context Engineering"],
-        "tags": ["context-engineering", "prompt-design", "best-practices"]
+        "tags": ["context-engineering", "prompt-design", "best-practices"],
     },
-
     # ============================================================================
     # Context Engineering - MEDIUM Questions
     # ============================================================================
@@ -299,15 +309,17 @@ QUESTIONS: list[dict[str, Any]] = [
         "question_text": "What is few-shot prompting in context engineering?",
         "options": [
             {"text": "Using a small language model"},
-            {"text": "Providing a few examples in the context to guide the model's response pattern"},
+            {
+                "text": "Providing a few examples in the context to guide the model's response pattern"
+            },
             {"text": "Running the model multiple times with different inputs"},
-            {"text": "Fine-tuning the model on a small dataset"}
+            {"text": "Fine-tuning the model on a small dataset"},
         ],
         "correct_answers": [2],
         "answer_explanation": "Few-shot prompting involves providing a few input-output examples in the context to demonstrate the desired response pattern, allowing the model to learn the task from examples without fine-tuning.",
         "difficulty": "medium",
         "skills": ["Context Engineering"],
-        "tags": ["context-engineering", "few-shot", "prompting-techniques"]
+        "tags": ["context-engineering", "few-shot", "prompting-techniques"],
     },
     {
         "type": "multi",
@@ -317,13 +329,13 @@ QUESTIONS: list[dict[str, Any]] = [
             {"text": "Prioritizing the most relevant information"},
             {"text": "Using sliding window approaches for long texts"},
             {"text": "Including all available information regardless of relevance"},
-            {"text": "Chunking and processing information in multiple passes"}
+            {"text": "Chunking and processing information in multiple passes"},
         ],
         "correct_answers": [1, 2, 3, 5],
         "answer_explanation": "Effective strategies include summarization, prioritization, sliding windows, and multi-pass processing. Including all information without regard to relevance wastes context window space and may dilute important information.",
         "difficulty": "medium",
         "skills": ["Context Engineering"],
-        "tags": ["context-engineering", "context-window", "optimization"]
+        "tags": ["context-engineering", "context-window", "optimization"],
     },
     {
         "type": "text",
@@ -332,22 +344,24 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_explanation": "This tests understanding of advanced prompting techniques that improve reasoning.",
         "difficulty": "medium",
         "skills": ["Context Engineering"],
-        "tags": ["context-engineering", "chain-of-thought", "reasoning"]
+        "tags": ["context-engineering", "chain-of-thought", "reasoning"],
     },
     {
         "type": "mcq",
         "question_text": "What is the primary benefit of using system messages or role definitions in context engineering?",
         "options": [
             {"text": "They make the model run faster"},
-            {"text": "They establish consistent behavior patterns and boundaries for the model"},
+            {
+                "text": "They establish consistent behavior patterns and boundaries for the model"
+            },
             {"text": "They increase the context window size"},
-            {"text": "They eliminate the need for examples"}
+            {"text": "They eliminate the need for examples"},
         ],
         "correct_answers": [2],
         "answer_explanation": "System messages and role definitions help establish the model's persona, behavior guidelines, and response boundaries, leading to more consistent and appropriate outputs aligned with the intended use case.",
         "difficulty": "medium",
         "skills": ["Context Engineering"],
-        "tags": ["context-engineering", "system-messages", "role-definition"]
+        "tags": ["context-engineering", "system-messages", "role-definition"],
     },
     {
         "type": "true_false",
@@ -356,9 +370,8 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_explanation": "False. Contradictory information generally confuses the model and degrades performance. Context should be clear and consistent. If multiple perspectives are needed, they should be clearly labeled and structured.",
         "difficulty": "medium",
         "skills": ["Context Engineering"],
-        "tags": ["context-engineering", "best-practices", "context-quality"]
+        "tags": ["context-engineering", "best-practices", "context-quality"],
     },
-
     # ============================================================================
     # Context Engineering - HARD Questions
     # ============================================================================
@@ -369,38 +382,42 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_explanation": "This tests advanced understanding of context management strategies and system design.",
         "difficulty": "hard",
         "skills": ["Context Engineering"],
-        "tags": ["context-engineering", "optimization", "architecture", "trade-offs"]
+        "tags": ["context-engineering", "optimization", "architecture", "trade-offs"],
     },
     {
         "type": "multi",
         "question_text": "Which factors should be considered when designing context for multi-turn conversations? (Select all that apply)",
         "options": [
             {"text": "Conversation history pruning strategies"},
-            {"text": "Maintaining relevant context across turns while managing window limits"},
+            {
+                "text": "Maintaining relevant context across turns while managing window limits"
+            },
             {"text": "Identifying and preserving key entities and facts"},
             {"text": "Ignoring previous turns to keep context fresh"},
-            {"text": "Summarization of older conversation segments"}
+            {"text": "Summarization of older conversation segments"},
         ],
         "correct_answers": [1, 2, 3, 5],
         "answer_explanation": "Effective multi-turn conversation design requires pruning strategies, balancing history with window limits, preserving key information, and summarizing older segments. Ignoring previous turns breaks conversational coherence.",
         "difficulty": "hard",
         "skills": ["Context Engineering"],
-        "tags": ["context-engineering", "multi-turn", "conversation-design"]
+        "tags": ["context-engineering", "multi-turn", "conversation-design"],
     },
     {
         "type": "mcq",
         "question_text": "What is context stuffing, and why is it problematic?",
         "options": [
             {"text": "Adding padding tokens to reach minimum context length"},
-            {"text": "Overloading the context with excessive or poorly organized information that degrades model performance"},
+            {
+                "text": "Overloading the context with excessive or poorly organized information that degrades model performance"
+            },
             {"text": "Compressing context to fit more information"},
-            {"text": "Using multiple contexts simultaneously"}
+            {"text": "Using multiple contexts simultaneously"},
         ],
         "correct_answers": [2],
         "answer_explanation": "Context stuffing refers to overloading the context with too much information, redundant content, or poorly structured data. This can degrade model performance through confusion, attention dilution, increased latency, and difficulty identifying relevant information.",
         "difficulty": "hard",
         "skills": ["Context Engineering"],
-        "tags": ["context-engineering", "anti-patterns", "optimization"]
+        "tags": ["context-engineering", "anti-patterns", "optimization"],
     },
     {
         "type": "multi",
@@ -410,13 +427,18 @@ QUESTIONS: list[dict[str, Any]] = [
             {"text": "Using metadata to inform context selection"},
             {"text": "Implementing user intent detection for context personalization"},
             {"text": "Always including maximum possible information"},
-            {"text": "Adaptive context budgeting based on query complexity"}
+            {"text": "Adaptive context budgeting based on query complexity"},
         ],
         "correct_answers": [1, 2, 3, 5],
         "answer_explanation": "Effective dynamic context construction uses prioritization, metadata-driven selection, intent detection, and adaptive budgeting. Simply maximizing information often leads to context stuffing and degraded performance.",
         "difficulty": "hard",
         "skills": ["Context Engineering"],
-        "tags": ["context-engineering", "dynamic-context", "optimization", "personalization"]
+        "tags": [
+            "context-engineering",
+            "dynamic-context",
+            "optimization",
+            "personalization",
+        ],
     },
     {
         "type": "text",
@@ -425,9 +447,13 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_explanation": "This tests advanced understanding of security considerations in context engineering.",
         "difficulty": "hard",
         "skills": ["Context Engineering"],
-        "tags": ["context-engineering", "security", "prompt-injection", "defensive-design"]
+        "tags": [
+            "context-engineering",
+            "security",
+            "prompt-injection",
+            "defensive-design",
+        ],
     },
-
     # ============================================================================
     # Combined RAG + Context Engineering Questions
     # ============================================================================
@@ -439,13 +465,13 @@ QUESTIONS: list[dict[str, Any]] = [
             {"text": "Adding source citations for transparency"},
             {"text": "Formatting retrieved content for clarity"},
             {"text": "Including all retrieved documents regardless of context window"},
-            {"text": "Summarizing lengthy retrieved documents"}
+            {"text": "Summarizing lengthy retrieved documents"},
         ],
         "correct_answers": [1, 2, 3, 5],
         "answer_explanation": "Effective RAG systems apply context engineering by ordering by relevance, adding citations, formatting for clarity, and summarizing when needed. Blindly including all documents risks context stuffing and window overflow.",
         "difficulty": "hard",
         "skills": ["RAG using Pinecone", "Context Engineering"],
-        "tags": ["rag", "context-engineering", "integration", "best-practices"]
+        "tags": ["rag", "context-engineering", "integration", "best-practices"],
     },
     {
         "type": "text",
@@ -454,23 +480,31 @@ QUESTIONS: list[dict[str, Any]] = [
         "answer_explanation": "This tests advanced integration of RAG and context engineering principles.",
         "difficulty": "hard",
         "skills": ["RAG using Pinecone", "Context Engineering"],
-        "tags": ["rag", "context-engineering", "hybrid-search", "optimization", "structured-data"]
+        "tags": [
+            "rag",
+            "context-engineering",
+            "hybrid-search",
+            "optimization",
+            "structured-data",
+        ],
     },
     {
         "type": "mcq",
         "question_text": "In a production RAG system, what is the most important factor when deciding how many documents to retrieve and include in the context?",
         "options": [
             {"text": "Always retrieve the maximum number possible"},
-            {"text": "Balance between providing sufficient information and avoiding context window saturation and attention dilution"},
+            {
+                "text": "Balance between providing sufficient information and avoiding context window saturation and attention dilution"
+            },
             {"text": "Retrieve exactly 5 documents as a standard practice"},
-            {"text": "Minimize retrieval to reduce costs regardless of quality"}
+            {"text": "Minimize retrieval to reduce costs regardless of quality"},
         ],
         "correct_answers": [2],
         "answer_explanation": "The key is balancing information sufficiency with context efficiency. Too many documents cause context stuffing and attention dilution; too few may miss critical information. The optimal number should be determined empirically based on query complexity, document relevance, and context window size.",
         "difficulty": "hard",
         "skills": ["RAG using Pinecone", "Context Engineering"],
-        "tags": ["rag", "context-engineering", "optimization", "retrieval-strategy"]
-    }
+        "tags": ["rag", "context-engineering", "optimization", "retrieval-strategy"],
+    },
 ]
 
 
@@ -490,13 +524,13 @@ async def create_question(question_data: dict[str, Any]) -> dict[str, Any]:
                 f"{BASE_URL}/questions/",
                 json=question_data,
                 timeout=30.0,
-                follow_redirects=True
+                follow_redirects=True,
             )
             response.raise_for_status()
             return response.json()
         except httpx.HTTPError as e:
             print(f"❌ Error creating question: {e}")
-            if hasattr(e, 'response') and e.response is not None:
+            if hasattr(e, "response") and e.response is not None:
                 print(f"   Response: {e.response.text}")
             raise
 
@@ -513,7 +547,9 @@ async def seed_questions():
 
     for i, question in enumerate(QUESTIONS, start=1):
         try:
-            print(f"Creating question {i}/{len(QUESTIONS)}: {question['question_text'][:60]}...")
+            print(
+                f"Creating question {i}/{len(QUESTIONS)}: {question['question_text'][:60]}..."
+            )
             result = await create_question(question)
             created_count += 1
             print(f"✅ Created question ID: {result.get('_id', 'unknown')}\n")
@@ -522,17 +558,21 @@ async def seed_questions():
             print(f"❌ Failed to create question {i}\n")
             continue
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("🎉 Question seeding completed!")
     print(f"✅ Successfully created: {created_count} questions")
     print(f"❌ Failed: {failed_count} questions")
-    print("="*80)
+    print("=" * 80)
 
     # Print summary by skill and difficulty
     print("\n📊 Questions by Skill:")
     rag_count = sum(1 for q in QUESTIONS if "RAG using Pinecone" in q["skills"])
     context_count = sum(1 for q in QUESTIONS if "Context Engineering" in q["skills"])
-    both_count = sum(1 for q in QUESTIONS if "RAG using Pinecone" in q["skills"] and "Context Engineering" in q["skills"])
+    both_count = sum(
+        1
+        for q in QUESTIONS
+        if "RAG using Pinecone" in q["skills"] and "Context Engineering" in q["skills"]
+    )
     print(f"   RAG using Pinecone: {rag_count} questions")
     print(f"   Context Engineering: {context_count} questions")
     print(f"   Both: {both_count} questions")

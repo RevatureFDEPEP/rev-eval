@@ -13,12 +13,12 @@ export default function UnauthorizedPage() {
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900">Access Denied</CardTitle>
           <CardDescription>
-            You don't have permission to access this resource
+            You don&apos;t have permission to access this resource
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-center text-sm text-gray-600">
-            <p>Your current role doesn't have access to this page.</p>
+            <p>Your current role doesn&apos;t have access to this page.</p>
             <p>Please contact your administrator if you believe this is an error.</p>
           </div>
           <div className="space-y-2">

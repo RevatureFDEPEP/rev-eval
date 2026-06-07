@@ -12,11 +12,10 @@ from src.schemas.test_submission_schema import (
 
 
 class TestSubmissionRepository:
-
     @staticmethod
     def _strip_timezone_from_dict(data: dict) -> dict:
         """Strip timezone info from datetime fields for POC"""
-        datetime_fields = ['due_date', 'assigned_at', 'started_at', 'submitted_at']
+        datetime_fields = ["due_date", "assigned_at", "started_at", "submitted_at"]
         for field in datetime_fields:
             if field in data and data[field] is not None:
                 if isinstance(data[field], datetime) and data[field].tzinfo is not None:
@@ -27,7 +26,9 @@ class TestSubmissionRepository:
     async def get_by_id(db: AsyncSession, submission_id: int) -> TestSubmission | None:
         result = await db.execute(
             select(TestSubmission)
-            .options(selectinload(TestSubmission.test))  # Eagerly load test relationship
+            .options(
+                selectinload(TestSubmission.test)
+            )  # Eagerly load test relationship
             .where(TestSubmission.id == submission_id)
         )
         return result.scalars().first()
@@ -36,7 +37,9 @@ class TestSubmissionRepository:
     async def list_all(db: AsyncSession) -> list[TestSubmission]:
         result = await db.execute(
             select(TestSubmission)
-            .options(selectinload(TestSubmission.test))  # Eagerly load test relationship
+            .options(
+                selectinload(TestSubmission.test)
+            )  # Eagerly load test relationship
             .order_by(TestSubmission.created_at.desc())
         )
         return list(result.scalars().all())
@@ -46,7 +49,9 @@ class TestSubmissionRepository:
         """Get all test submissions by a specific user"""
         result = await db.execute(
             select(TestSubmission)
-            .options(selectinload(TestSubmission.test))  # Eagerly load test relationship
+            .options(
+                selectinload(TestSubmission.test)
+            )  # Eagerly load test relationship
             .where(TestSubmission.user_id == user_id)
             .order_by(TestSubmission.created_at.desc())
         )
@@ -57,7 +62,9 @@ class TestSubmissionRepository:
         """Get all submissions for a specific test"""
         result = await db.execute(
             select(TestSubmission)
-            .options(selectinload(TestSubmission.test))  # Eagerly load test relationship
+            .options(
+                selectinload(TestSubmission.test)
+            )  # Eagerly load test relationship
             .where(TestSubmission.test_id == test_id)
             .order_by(TestSubmission.created_at.desc())
         )
@@ -65,27 +72,32 @@ class TestSubmissionRepository:
 
     @staticmethod
     async def get_by_user_and_test(
-        db: AsyncSession,
-        user_id: int,
-        test_id: int
+        db: AsyncSession, user_id: int, test_id: int
     ) -> TestSubmission | None:
         """Get a user's submission for a specific test (most recent if multiple)"""
         result = await db.execute(
             select(TestSubmission)
-            .options(selectinload(TestSubmission.test))  # Eagerly load test relationship
-            .where(
-                TestSubmission.user_id == user_id,
-                TestSubmission.test_id == test_id
-            )
+            .options(
+                selectinload(TestSubmission.test)
+            )  # Eagerly load test relationship
+            .where(TestSubmission.user_id == user_id, TestSubmission.test_id == test_id)
             .order_by(TestSubmission.created_at.desc())
         )
         return result.scalars().first()
 
     @staticmethod
-    async def create(db: AsyncSession, submission_in: TestSubmissionCreate) -> TestSubmission:
+    async def create(
+        db: AsyncSession, submission_in: TestSubmissionCreate
+    ) -> TestSubmission:
         # Convert to dict and strip timezones (POC fix)
-        submission_data = submission_in.model_dump() if hasattr(submission_in, 'model_dump') else submission_in.dict()
-        submission_data = TestSubmissionRepository._strip_timezone_from_dict(submission_data)
+        submission_data = (
+            submission_in.model_dump()
+            if hasattr(submission_in, "model_dump")
+            else submission_in.dict()
+        )
+        submission_data = TestSubmissionRepository._strip_timezone_from_dict(
+            submission_data
+        )
 
         submission = TestSubmission(**submission_data)
         db.add(submission)
@@ -94,9 +106,17 @@ class TestSubmissionRepository:
         return submission
 
     @staticmethod
-    async def update(db: AsyncSession, submission: TestSubmission, submission_in: TestSubmissionUpdate) -> TestSubmission:
+    async def update(
+        db: AsyncSession,
+        submission: TestSubmission,
+        submission_in: TestSubmissionUpdate,
+    ) -> TestSubmission:
         # Convert to dict and strip timezones (POC fix)
-        update_data = submission_in.model_dump(exclude_unset=True) if hasattr(submission_in, 'model_dump') else submission_in.dict(exclude_unset=True)
+        update_data = (
+            submission_in.model_dump(exclude_unset=True)
+            if hasattr(submission_in, "model_dump")
+            else submission_in.dict(exclude_unset=True)
+        )
         update_data = TestSubmissionRepository._strip_timezone_from_dict(update_data)
 
         for field, value in update_data.items():

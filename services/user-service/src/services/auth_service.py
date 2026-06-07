@@ -1,6 +1,7 @@
 """
 Authentication service: bcrypt password hashing + JWT (HS256) issuance and verification.
 """
+
 from datetime import UTC, datetime, timedelta
 
 import jwt
@@ -30,12 +31,16 @@ class AuthService:
             expires_delta or timedelta(minutes=settings.JWT_EXPIRY_MINUTES)
         )
         to_encode.update({"exp": expire})
-        return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+        return jwt.encode(
+            to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM
+        )
 
     @staticmethod
     def decode_access_token(token: str) -> dict:
         """Decode and verify JWT; raises jwt.PyJWTError on failure."""
-        return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        return jwt.decode(
+            token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
+        )
 
     @staticmethod
     def get_user_by_email(db: Session, email: str) -> User | None:
@@ -97,4 +102,6 @@ class AuthService:
     def create_student(
         db: Session, email: str, password: str, full_name: str | None = None
     ) -> User:
-        return AuthService.create_user(db, email, password, full_name, UserRole.PARTICIPANT)
+        return AuthService.create_user(
+            db, email, password, full_name, UserRole.PARTICIPANT
+        )

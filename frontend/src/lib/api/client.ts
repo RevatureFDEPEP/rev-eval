@@ -35,7 +35,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     public statusText: string,
-    public body: any
+    public body: string
   ) {
     super(`API Error: ${status} ${statusText}`);
     this.name = 'ApiError';
@@ -108,7 +108,7 @@ export const api = {
   /**
    * POST request
    */
-  async post<T>(endpoint: string, data?: any): Promise<T> {
+  async post<T>(endpoint: string, data?: unknown): Promise<T> {
     const response = await fetchApi(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
@@ -120,7 +120,7 @@ export const api = {
   /**
    * PUT request
    */
-  async put<T>(endpoint: string, data: any): Promise<T> {
+  async put<T>(endpoint: string, data: unknown): Promise<T> {
     const response = await fetchApi(endpoint, {
       method: 'PUT',
       body: JSON.stringify(data),

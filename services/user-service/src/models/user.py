@@ -5,14 +5,16 @@ from sqlalchemy import Boolean, Column, DateTime, Enum, Integer, String
 from src.db.session import Base
 
 
-class UserRole(str, enum.Enum):
+class UserRole(enum.StrEnum):
     """User roles in the system"""
+
     TRAINER = "TRAINER"
     PARTICIPANT = "PARTICIPANT"
 
 
 class User(Base):
     """Unified user model for trainers and participants."""
+
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)

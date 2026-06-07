@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, use, useMemo } from 'react';
+import { useEffect, useState, useCallback, use, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -43,54 +43,7 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   console.log('🔍 Parsed testId:', testId, 'isNaN:', isNaN(testId));
   console.log('🔍 Parsed submissionId:', submissionId, 'isNaN:', isNaN(submissionId));
 
-  // Validate testId
-  if (isNaN(testId)) {
-    console.error('❌ Invalid testId - isNaN returned true. params.testId:', resolvedParams.testId);
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Card className="w-full max-w-md border-red-200">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center gap-4">
-              <AlertCircle className="size-12 text-red-600" />
-              <div className="text-center">
-                <h2 className="text-lg font-semibold text-slate-900">Invalid Test ID</h2>
-                <p className="mt-2 text-sm text-slate-600">
-                  The test ID in the URL is invalid. Received: "{resolvedParams.testId}"
-                </p>
-              </div>
-              <Button onClick={() => router.push('/participant/tests')}>Back to Tests</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Validate submissionId
-  if (isNaN(submissionId)) {
-    console.error('❌ Invalid submissionId - isNaN returned true. query param:', searchParams.get('submission'));
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Card className="w-full max-w-md border-red-200">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center gap-4">
-              <AlertCircle className="size-12 text-red-600" />
-              <div className="text-center">
-                <h2 className="text-lg font-semibold text-slate-900">Invalid Submission ID</h2>
-                <p className="mt-2 text-sm text-slate-600">
-                  Missing or invalid submission ID in URL.
-                </p>
-              </div>
-              <Button onClick={() => router.push('/participant/tests')}>Back to Tests</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  console.log('✅ testId validation passed:', testId);
-  console.log('✅ submissionId validation passed:', submissionId);
+  // All hooks must appear before any conditional returns (Rules of Hooks).
 
   // State management
   const [state, setState] = useState<QuizState>('loading');
@@ -123,7 +76,7 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   // Warn user if they try to leave during an active test
   useEffect(() => {
     const shouldWarn = state !== 'completed' && state !== 'error' && state !== 'loading';
-    
+
     if (!shouldWarn) return;
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -139,16 +92,10 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
     };
   }, [state]);
 
-  // Auto-submit handler
-  const handleTimeExpired = useCallback(async () => {
-    toast.error('Time expired! Auto-submitting your quiz...');
-
-    if (currentPart === 'A' && sessionId) {
-      await handleSubmitPartA();
-    } else if (currentPart === 'B' && sessionId) {
-      await handleFinalSubmit();
-    }
-  }, [currentPart, sessionId, answers]);
+  // Stable ref to break the circular dependency:
+  // handleTimeExpired → handleSubmitPartA/handleFinalSubmit → pauseTimer/resumeTimer → timer → handleTimeExpired
+  const onTimeExpiredRef = useRef<() => Promise<void>>(async () => {});
+  const stableOnTimeExpired = useCallback(() => onTimeExpiredRef.current(), []);
 
   const derivedTotalQuestions =
     typeof test?.number_of_questions === 'number' && test.number_of_questions > 0
@@ -183,13 +130,114 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   const timer = useTimer({
     durationSeconds: totalDuration || 0,
     testId: testId.toString(),
-    onTimeExpired: handleTimeExpired,
+    onTimeExpired: stableOnTimeExpired,
     autoStart: false,
   });
 
   const pauseTimer = timer.pause;
   const resumeTimer = timer.resume;
   const resetTimer = timer.reset;
+
+  // Submit Part A handler — defined here so pauseTimer/resumeTimer are in scope
+  const handleSubmitPartA = useCallback(async () => {
+    if (!sessionId) return;
+
+    try {
+      setState('transitioning');
+      pauseTimer();
+
+      const answersArray: QuizAnswer[] = Array.from(answers.entries()).map(([qId, answer]) => ({
+        question_id: qId,
+        selected_answers: Array.isArray(answer)
+          ? answer
+          : typeof answer === 'boolean'
+            ? [answer ? 1 : 0]
+            : [answer],
+      }));
+
+      await submitPartA({
+        session_id: sessionId,
+        answers: answersArray,
+      });
+
+      const partBData = await getPartBQuestions(sessionId);
+      setPartBQuestions(partBData.questions);
+      setQuestions(partBData.questions);
+      setCurrentPart('B');
+      setCurrentQuestionIndex(0);
+      setSubmittedPartAQuestionIds(new Set(partAQuestions.map((question) => question.question_id)));
+      setAnswers(new Map());
+
+      localStorage.setItem(`quiz-part-${testId}`, 'B');
+      localStorage.removeItem(`quiz-answers-${testId}`);
+
+      setState('part-b');
+      resumeTimer();
+      toast.success('Part A submitted! Starting Part B...');
+    } catch (err) {
+      console.error('Part A submission error:', err);
+      toast.error('Failed to submit Part A. Please try again.');
+      setState('part-a');
+      resumeTimer();
+    }
+  }, [sessionId, answers, partAQuestions, testId, pauseTimer, resumeTimer]);
+
+  // Final submit handler — defined here so pauseTimer/resumeTimer are in scope
+  const handleFinalSubmit = useCallback(async () => {
+    if (!sessionId) return;
+
+    try {
+      setState('submitting');
+      pauseTimer();
+
+      const answersArray: QuizAnswer[] = Array.from(answers.entries()).map(([qId, answer]) => ({
+        question_id: qId,
+        selected_answers: Array.isArray(answer)
+          ? answer
+          : typeof answer === 'boolean'
+            ? [answer ? 1 : 0]
+            : [answer],
+      }));
+
+      await submitPartB({
+        session_id: sessionId,
+        answers: answersArray,
+      });
+
+      localStorage.removeItem(`quiz-session-${testId}`);
+      localStorage.removeItem(`quiz-part-${testId}`);
+      localStorage.removeItem(`quiz-answers-${testId}`);
+      localStorage.removeItem(`quiz-timer-${testId}`);
+
+      setState('completed');
+      toast.success('Quiz submitted successfully! Redirecting to your tests...');
+
+      setTimeout(() => {
+        router.push('/participant/tests');
+      }, 2000);
+    } catch (err) {
+      console.error('Final submission error:', err);
+      toast.error('Failed to submit quiz. Please try again.');
+      setState('part-b');
+      resumeTimer();
+    }
+  }, [sessionId, answers, testId, pauseTimer, resumeTimer, router]);
+
+  // Auto-submit handler — defined after submit handlers so all deps are declared
+  const handleTimeExpired = useCallback(async () => {
+    toast.error('Time expired! Auto-submitting your quiz...');
+
+    if (currentPart === 'A' && sessionId) {
+      await handleSubmitPartA();
+    } else if (currentPart === 'B' && sessionId) {
+      await handleFinalSubmit();
+    }
+  }, [currentPart, sessionId, handleSubmitPartA, handleFinalSubmit]);
+
+  // Sync the ref so stableOnTimeExpired always invokes the latest handleTimeExpired
+  useEffect(() => {
+    onTimeExpiredRef.current = handleTimeExpired;
+  }, [handleTimeExpired]);
 
   useEffect(() => {
     if (state === 'part-a' || state === 'part-b') {
@@ -201,6 +249,8 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
 
   // Load test data and create session
   useEffect(() => {
+    if (isNaN(testId) || isNaN(submissionId)) return;
+
     const initializeQuiz = async () => {
       try {
         setState('loading');
@@ -298,7 +348,55 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
     }
   }, [answers, testId]);
 
-  // Answer change handler
+  // Validate testId
+  if (isNaN(testId)) {
+    console.error('❌ Invalid testId - isNaN returned true. params.testId:', resolvedParams.testId);
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="w-full max-w-md border-red-200">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center gap-4">
+              <AlertCircle className="size-12 text-red-600" />
+              <div className="text-center">
+                <h2 className="text-lg font-semibold text-slate-900">Invalid Test ID</h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  The test ID in the URL is invalid. Received: &quot;{resolvedParams.testId}&quot;
+                </p>
+              </div>
+              <Button onClick={() => router.push('/participant/tests')}>Back to Tests</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Validate submissionId
+  if (isNaN(submissionId)) {
+    console.error('❌ Invalid submissionId - isNaN returned true. query param:', searchParams.get('submission'));
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="w-full max-w-md border-red-200">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center gap-4">
+              <AlertCircle className="size-12 text-red-600" />
+              <div className="text-center">
+                <h2 className="text-lg font-semibold text-slate-900">Invalid Submission ID</h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  Missing or invalid submission ID in URL.
+                </p>
+              </div>
+              <Button onClick={() => router.push('/participant/tests')}>Back to Tests</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  console.log('✅ testId validation passed:', testId);
+  console.log('✅ submissionId validation passed:', submissionId);
+
   const handleAnswerChange = (questionId: string, answer: AnswerValue) => {
     setAnswers((prev) => {
       const newAnswers = new Map(prev);
@@ -330,99 +428,6 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   const handleNext = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
-    }
-  };
-
-  // Submit Part A handler
-  const handleSubmitPartA = async () => {
-    if (!sessionId) return;
-
-    try {
-      setState('transitioning');
-      pauseTimer();
-
-      // Convert answers to API format
-      const answersArray: QuizAnswer[] = Array.from(answers.entries()).map(([qId, answer]) => ({
-        question_id: qId,
-        selected_answers: Array.isArray(answer)
-          ? answer
-          : typeof answer === 'boolean'
-            ? [answer ? 1 : 0]
-            : [answer],
-      }));
-
-      // Submit Part A
-      await submitPartA({
-        session_id: sessionId,
-        answers: answersArray,
-      });
-
-      // Load Part B questions
-      const partBData = await getPartBQuestions(sessionId);
-      setPartBQuestions(partBData.questions);
-      setQuestions(partBData.questions);
-      setCurrentPart('B');
-      setCurrentQuestionIndex(0);
-      setSubmittedPartAQuestionIds(new Set(partAQuestions.map((question) => question.question_id)));
-      setAnswers(new Map()); // Reset answers for Part B
-
-      // Update localStorage
-      localStorage.setItem(`quiz-part-${testId}`, 'B');
-      localStorage.removeItem(`quiz-answers-${testId}`); // Clear Part A answers
-
-      setState('part-b');
-      resumeTimer();
-      toast.success('Part A submitted! Starting Part B...');
-    } catch (err) {
-      console.error('Part A submission error:', err);
-      toast.error('Failed to submit Part A. Please try again.');
-      setState('part-a');
-      resumeTimer();
-    }
-  };
-
-  // Final submit handler
-  const handleFinalSubmit = async () => {
-    if (!sessionId) return;
-
-    try {
-      setState('submitting');
-      pauseTimer();
-
-      // Convert answers to API format
-      const answersArray: QuizAnswer[] = Array.from(answers.entries()).map(([qId, answer]) => ({
-        question_id: qId,
-        selected_answers: Array.isArray(answer)
-          ? answer
-          : typeof answer === 'boolean'
-            ? [answer ? 1 : 0]
-            : [answer],
-      }));
-
-      // Submit Part B
-      await submitPartB({
-        session_id: sessionId,
-        answers: answersArray,
-      });
-
-      // Clear localStorage
-      localStorage.removeItem(`quiz-session-${testId}`);
-      localStorage.removeItem(`quiz-part-${testId}`);
-      localStorage.removeItem(`quiz-answers-${testId}`);
-      localStorage.removeItem(`quiz-timer-${testId}`);
-
-      setState('completed');
-      toast.success('Quiz submitted successfully! Redirecting to your tests...');
-
-      // Redirect to tests list (results page not yet implemented)
-      setTimeout(() => {
-        router.push('/participant/tests');
-      }, 2000);
-    } catch (err) {
-      console.error('Final submission error:', err);
-      toast.error('Failed to submit quiz. Please try again.');
-      setState('part-b');
-      resumeTimer();
     }
   };
 
