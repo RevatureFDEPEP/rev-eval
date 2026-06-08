@@ -83,10 +83,15 @@ const mcqSchema = z
   );
 
 // True/False schema
-const trueFalseSchema = z.object({
-  ...baseSchema,
-  true_false_answer: z.boolean(),
-});
+const trueFalseSchema = z
+  .object({
+    ...baseSchema,
+    true_false_answer: z.boolean().optional(),
+  })
+  .refine((data) => data.true_false_answer !== undefined, {
+    message: "Please select True or False",
+    path: ["true_false_answer"],
+  });
 
 // Text schema
 const textSchema = z.object({
