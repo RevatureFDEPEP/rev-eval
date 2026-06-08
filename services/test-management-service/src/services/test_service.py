@@ -170,7 +170,9 @@ class TestService:
                         skills.append(skill)
 
                 results.append(
-                    TestOut.model_validate(test).model_copy(update={"skills": [SkillOut.model_validate(s) for s in skills]})
+                    TestOut.model_validate(test).model_copy(
+                        update={"skills": [SkillOut.model_validate(s) for s in skills]}
+                    )
                 )
 
         return results
