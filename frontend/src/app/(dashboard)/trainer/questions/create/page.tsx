@@ -54,10 +54,7 @@ const baseSchema = {
     .array(z.string())
     .min(1, "Select at least one skill")
     .max(20, "Maximum 20 skills allowed"),
-  tags: z
-    .string()
-    .optional()
-    .transform((val) => (val ? val.split(",").map((t) => t.trim()) : [])),
+  tags: z.string().optional(),
   answer_explanation: z.string().optional(),
 };
 
@@ -236,7 +233,7 @@ export default function CreateQuestionPage() {
       question_text: values.question_text,
       difficulty: values.difficulty,
       skills: values.skills,
-      tags: typeof values.tags === "string" ? [] : values.tags || [],
+      tags: values.tags ? values.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
       options,
       correct_answers,
       sample_answer: values.sample_answer || undefined,
