@@ -1,4 +1,4 @@
-# Feature 4: CI Quality Gates (Ruff / ESLint / Trivy / Coverage)
+# W2-F4 — CI Quality Gates (Ruff / ESLint / Trivy / Coverage)
 
 ## Context
 
@@ -119,7 +119,7 @@ Work on branch **`richardh-feat-linting`** (off `richardh`). Commit at each mile
 | `.github/workflows/ci-pipeline.yml` | lint hard fail; coverage artifact upload; docker build + Trivy + SARIF upload; checkout v4 |
 | `services/{api-gateway,user,question-management,test-management}-service/.coveragerc` | new — source/omit + measured `fail_under` |
 | `frontend/**` | only if `pnpm lint` currently fails — fix errors |
-| `docs/plans/ci-quality-gates.md` | new — this plan |
+| `docs/plans/w2-f4-ci-quality-gates.md` | new — this plan |
 
 No change: `pyproject.toml` (Ruff stays as-is), eslint.config.mjs (already Next recommended rule set).
 

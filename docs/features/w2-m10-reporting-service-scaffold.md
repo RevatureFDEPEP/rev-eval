@@ -1,4 +1,4 @@
-# M10 — Day 10 Milestone: Reporting Service Scaffold
+# W2-M10 — Day 10 Milestone: Reporting Service Scaffold
 
 **Status:** ❌ Not Started
 **Spec:** `days_6_10_features.md` milestone §5 (Day 10)
@@ -24,7 +24,7 @@ Alembic control.
       `reporting-and-analytics-service` with healthcheck and
       `condition: service_healthy` dependency on `reporting-postgres`.
 - [ ] **4. Alembic** — wire the reporting datastore to Alembic for schema
-      history (pattern from [F7](f7-alembic-category-domain.md)).
+      history (pattern from [W2-F7](w2-f7-alembic-category-domain.md)).
 - [ ] **5. Gateway routes** — once endpoints exist, add patterns to `ROUTES`
       in `services/api-gateway-service/main.py`.
 

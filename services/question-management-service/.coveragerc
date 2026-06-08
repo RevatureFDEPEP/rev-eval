@@ -11,4 +11,4 @@ omit =
     .venv/*
 
 [report]
-fail_under = 48
+fail_under = 63

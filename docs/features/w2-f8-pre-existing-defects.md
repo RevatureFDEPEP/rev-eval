@@ -1,12 +1,12 @@
-# F8 — Pre-Existing Defect Cleanup (found during F7)
+# W2-F8 — Pre-Existing Defect Cleanup (found during W2-F7)
 
 **Status:** 🟡 In Progress
 **Spec:** — (not a curriculum feature; defects surfaced while implementing
-and verifying [F7](f7-alembic-category-domain.md) on branch
+and verifying [W2-F7](w2-f7-alembic-category-domain.md) on branch
 `richardh-feat-alembic`)
 **Last updated:** 2026-06-05
 
-Defects that predate F7, discovered while mirroring the Skill vertical slice
+Defects that predate W2-F7, discovered while mirroring the Skill vertical slice
 and running the full stack through the gateway. Tracked here so they get
 fixed deliberately instead of rediscovered one 500 at a time.
 
@@ -17,7 +17,7 @@ fixed deliberately instead of rediscovered one 500 at a time.
       replies carry that content-type with an empty body, so **every
       successful DELETE through the gateway returned 500** (service-side
       delete still happened — clients saw an error for an operation that
-      succeeded). Fixed in F7: both proxy paths in
+      succeeded). Fixed in W2-F7: both proxy paths in
       `services/api-gateway-service/main.py` now short-circuit when
       `resp.content` is empty. Evidence: commit `cfac9ce`, verified live
       (unlink/delete = 204 through the gateway).
@@ -42,13 +42,13 @@ fixed deliberately instead of rediscovered one 500 at a time.
       test-management-service) and `.from_orm()` / `.copy()` throughout
       `test_service.py` and `skill_service.py`. All removed in Pydantic v3.
       Fix: `model_config = ConfigDict(...)`, `model_validate()`,
-      `model_copy()`. New F7 code already uses `model_validate` —
+      `model_copy()`. New W2-F7 code already uses `model_validate` —
       use it as the pattern.
 
 ## Notes
 
-- Item 1 was fixed inside the F7 branch because F7's verification could not
-  pass without it; the rest are untouched to keep F7 reviewable.
+- Item 1 was fixed inside the W2-F7 branch because W2-F7's verification could not
+  pass without it; the rest are untouched to keep W2-F7 reviewable.
 - Items 2–4 are well-shaped candidate tasks: small blast radius, each
   teaches something (route/service contract testing, engine lifecycle,
   Pydantic v2 migration).

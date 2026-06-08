@@ -1,0 +1,8 @@
+# Dev/test dependencies. Feeds both the Dockerfile `test` stage and local dev,
+# and replaces the inline `pip install pytest pytest-cov ruff` step in CI.
+-r requirements.txt
+pytest>=8,<9
+pytest-cov>=5,<7
+ruff>=0.6,<1
+# Sync SQLAlchemy tests run against an in-memory sqlite:// DB — sqlite ships
+# with CPython, so no extra driver is needed.

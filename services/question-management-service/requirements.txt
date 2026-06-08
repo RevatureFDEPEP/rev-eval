@@ -9,6 +9,10 @@ passlib[bcrypt]
 python-jose[cryptography]
 python-multipart
 pymongo[srv]
-beanie
+# Pinned: beanie 2.1+ calls list_collection_names(authorizedCollections=...)
+# in init_beanie, a kwarg no mongomock release supports, which breaks the
+# mongomock-motor test fixture. Floating beanie also made builds
+# non-reproducible (CI resolved 2.1.0 while local resolved 2.0.0).
+beanie>=2.0,<2.1
 motor
 boto3

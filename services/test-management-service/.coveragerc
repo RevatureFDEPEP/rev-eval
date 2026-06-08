@@ -13,4 +13,4 @@ omit =
     alembic/*
 
 [report]
-fail_under = 43
+fail_under = 75

@@ -1,0 +1,14 @@
+# Dev/test dependencies. Feeds both the Dockerfile `test` stage and local dev,
+# and replaces the inline `pip install pytest pytest-cov ruff` step in CI.
+-r requirements.txt
+pytest>=8,<9
+pytest-cov>=5,<7
+ruff>=0.6,<1
+# Beanie/Motor repo tests run against an in-memory Mongo mock (no Mongo needed).
+pytest-asyncio>=0.23,<0.25
+# mongomock>=4.3 is required: Beanie 2.x's init_beanie calls
+# list_collection_names(authorizedCollections=...), a kwarg older mongomock
+# releases reject (TypeError). mongomock-motor pulls mongomock transitively,
+# so pin the floor explicitly to stop the resolver picking an older one.
+mongomock>=4.3.0
+mongomock-motor>=0.0.36

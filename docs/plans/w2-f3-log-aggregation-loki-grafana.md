@@ -1,4 +1,4 @@
-# Centralized Log Aggregation — Loki + Promtail + Grafana
+# W2-F3 — Centralized Log Aggregation (Loki + Promtail + Grafana)
 
 ## Context
 

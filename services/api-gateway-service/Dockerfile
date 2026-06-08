@@ -1,6 +1,12 @@
 # API Gateway Service Dockerfile
+#
+# Multi-stage: base (runtime deps) -> test (dev deps + pytest gate) -> production.
+# The default build target is the final `production` stage, so
+# `docker compose up --build` is unchanged. Run the in-image test gate with
+# `docker build --target test .` (the build fails if any unit test fails).
 
-FROM python:3.11-slim
+# ===== base: runtime dependencies =====
+FROM python:3.11-slim AS base
 
 WORKDIR /app
 
@@ -17,6 +23,16 @@ COPY requirements.txt .
 # gate (CRITICAL/HIGH, ignore-unfixed) rejects.
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel "jaraco.context>=6.1.0" && \
     pip install --no-cache-dir -r requirements.txt
+
+# ===== test: dev deps + run the unit tests (build fails if a test fails) =====
+FROM base AS test
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
+COPY . .
+RUN pytest -q
+
+# ===== production (default target) =====
+FROM base AS production
 
 # Copy application code
 COPY . .

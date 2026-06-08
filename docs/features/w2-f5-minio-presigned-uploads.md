@@ -1,4 +1,4 @@
-# F5 — Direct-to-MinIO Diagram Uploads via Pre-Signed URLs
+# W2-F5 — Direct-to-MinIO Diagram Uploads via Pre-Signed URLs
 
 **Status:** ✅ Completed
 **Spec:** `days_6_10_features.md` §5 (Days 8–9)
@@ -8,7 +8,7 @@
 Let question authors upload diagrams/screenshots directly from the browser to
 MinIO via pre-signed PUT URLs, storing the object key on the question document.
 
-Implementation plan: [docs/plans/f5-minio-presigned-uploads.md](../plans/f5-minio-presigned-uploads.md)
+Implementation plan: [docs/plans/w2-f5-minio-presigned-uploads.md](../plans/w2-f5-minio-presigned-uploads.md)
 
 ## Steps
 
@@ -51,7 +51,7 @@ Implementation plan: [docs/plans/f5-minio-presigned-uploads.md](../plans/f5-mini
   startup (no `mc` init container exists).
 - **CORS:** `MINIO_API_CORS_ALLOW_ORIGIN` pinned in `docker-compose.yml` to
   both frontend origins — `https://localhost` (nginx TLS entrypoint, the
-  normal way the app is browsed since F1) and `http://localhost:3000`
+  normal way the app is browsed since W2-F1) and `http://localhost:3000`
   (next dev). The browser PUTs cross-origin to `localhost:9000`, so a missing
   origin here fails the preflight with no `Access-Control-Allow-Origin`.
   (`http://localhost:9000` from an `https://` page is allowed — browsers
@@ -64,7 +64,7 @@ Implementation plan: [docs/plans/f5-minio-presigned-uploads.md](../plans/f5-mini
 - **Orphan objects:** an upload followed by an abandoned form (or re-selecting
   a different file) leaves an unreferenced object in the bucket. No cleanup
   is built — acceptable for local-first dev.
-- Image display in quiz/participant components is out of scope for F5; only
+- Image display in quiz/participant components is out of scope for W2-F5; only
   the trainer form preview consumes `image_url`.
 
 ## Verification (performed 2026-06-05)
