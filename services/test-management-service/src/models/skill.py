@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, String, Text
 from sqlalchemy.orm import relationship
+
 from src.db.session import Base
+
 
 class Skill(Base):
     __tablename__ = "skills"
@@ -9,7 +11,9 @@ class Skill(Base):
     description = Column(Text, nullable=True)
 
     # Relationship to TestSkill association object
-    test_skills = relationship("TestSkill", back_populates="skill", cascade="all, delete-orphan")
+    test_skills = relationship(
+        "TestSkill", back_populates="skill", cascade="all, delete-orphan"
+    )
 
     # Convenience read-only relationship to Tests
     tests = relationship("Test", secondary="test_skills", viewonly=True)

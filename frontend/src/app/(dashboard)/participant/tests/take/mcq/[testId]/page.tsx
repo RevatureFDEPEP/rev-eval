@@ -293,7 +293,9 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   }, [sessionId, answers, partAQuestions, testId, pauseTimer, resumeTimer]);
 
   // Keep ref current so handleTimeExpired always calls the latest version
-  submitPartARef.current = handleSubmitPartA;
+  useEffect(() => {
+    submitPartARef.current = handleSubmitPartA;
+  }, [handleSubmitPartA]);
 
   // Final submit handler
   const handleFinalSubmit = useCallback(async () => {
@@ -341,7 +343,9 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   }, [sessionId, answers, testId, pauseTimer, resumeTimer, router]);
 
   // Keep ref current
-  finalSubmitRef.current = handleFinalSubmit;
+  useEffect(() => {
+    finalSubmitRef.current = handleFinalSubmit;
+  }, [handleFinalSubmit]);
 
   
   // Answer change handler

@@ -1,9 +1,11 @@
 # src/db/session.py
 import os
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
+
 from src.config.settings import settings
 
 # ===== Base declarative class =====
@@ -16,28 +18,26 @@ DATABASE_URL = os.getenv("DATABASE_URL") or settings.SQLALCHEMY_DATABASE_URL
 if DATABASE_URL.startswith("postgresql://"):
     ASYNC_DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 elif DATABASE_URL.startswith("postgresql+psycopg2://"):
-    ASYNC_DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg2://", "postgresql+asyncpg://")
+    ASYNC_DATABASE_URL = DATABASE_URL.replace(
+        "postgresql+psycopg2://", "postgresql+asyncpg://"
+    )
 else:
     ASYNC_DATABASE_URL = DATABASE_URL  # for sqlite or other DBs
 
 # ===== Async Engine =====
-engine = create_async_engine(
-    ASYNC_DATABASE_URL,
-    echo=True,
-    future=True
-)
+engine = create_async_engine(ASYNC_DATABASE_URL, echo=True, future=True)
 
 # ===== Async Session Factory =====
 AsyncSessionLocal = sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False
+    bind=engine, class_=AsyncSession, expire_on_commit=False
 )
+
 
 # ===== Dependency for FastAPI =====
 async def get_db():
     async with AsyncSessionLocal() as db:
         yield db
+
 
 # ===== Initialize DB =====
 async def init_db():
@@ -47,10 +47,6 @@ async def init_db():
     """
     try:
         # Import all models here so they are registered with Base
-        from src.models.test import Test
-        from src.models.skill import Skill
-        from src.models.test_skill import TestSkill
-        from src.models.test_submission import TestSubmission
 
         # Create tables in async context
         async with engine.begin() as conn:

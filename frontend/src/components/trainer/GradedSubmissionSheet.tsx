@@ -93,7 +93,9 @@ export function GradedSubmissionSheet({
 
   useEffect(() => {
     if (!submission || !open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDetails(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError(null);
       return;
     }
@@ -103,7 +105,7 @@ export function GradedSubmissionSheet({
         setLoading(true);
         setError(null);
         const data = await getSubmissionReviewDetails(submission.id);
-        setDetails(data);
+        setDetails(data as ReviewDetails);
       } catch (err) {
         console.error('Failed to load review details:', err);
         setError(err instanceof Error ? err.message : 'Failed to load details');

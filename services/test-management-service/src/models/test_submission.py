@@ -1,16 +1,20 @@
-from sqlalchemy import Column, Integer, ForeignKey, DateTime, Enum, Text
-from sqlalchemy.orm import relationship
-from datetime import datetime
-from src.db.session import Base
 import enum
+from datetime import datetime
 
-class SubmissionStatus(str, enum.Enum):
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, Text
+from sqlalchemy.orm import relationship
+
+from src.db.session import Base
+
+
+class SubmissionStatus(enum.StrEnum):
     ASSIGNED = "ASSIGNED"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     EVALUATED = "EVALUATED"  # AI evaluation complete, awaiting trainer review
     GRADED = "GRADED"  # Trainer has reviewed and scored
     ABANDONED = "ABANDONED"
+
 
 class TestSubmission(Base):
     __tablename__ = "test_submissions"
@@ -20,8 +24,8 @@ class TestSubmission(Base):
     test_id = Column(Integer, ForeignKey("tests.id"), nullable=False)
 
     # User IDs from external User Service
-    user_id = Column(Integer, nullable=False)          # participant
-    assigned_by_id = Column(Integer, nullable=True)    # trainer/admin
+    user_id = Column(Integer, nullable=False)  # participant
+    assigned_by_id = Column(Integer, nullable=True)  # trainer/admin
 
     assigned_at = Column(DateTime, default=datetime.utcnow)
     due_date = Column(DateTime, nullable=True)

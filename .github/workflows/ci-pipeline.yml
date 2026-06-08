@@ -30,13 +30,6 @@ jobs:
           cache: pip
           cache-dependency-path: services/${{ matrix.service }}/requirements.txt
 
-      - name: Set up Python
-        uses: actions/setup-python@v5 #tags are mutable -> change to immutable  pinned version style like SHA
-        with:
-          python-version: '3.11'
-          cache: pip
-          cache-dependency-path: services/${{ matrix.service }}/requirements.txt
-
       - name: Verify JWT_SECRET is set #might be a security vulnerability might leak log data -> modify echoing or length tracking to native runner step expressions 
         run: |
           if [ -z "${JWT_SECRET}" ]; then
@@ -50,19 +43,32 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov 
-    
+          pip install -r dev-requirements.txt
+          pip install pytest pytest-cov
 
-      - name: Run pytest #modify this for tests accordingly
+      - name: Lint (ruff)
+        working-directory: services/${{ matrix.service }}
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Run pytest
         working-directory: services/${{ matrix.service }}
         run: |
           if [ -d tests ]; then
-            pytest --cov --cov-report=xml
+            pytest --cov --cov-report=xml --cov-fail-under=70
           else
             echo "No tests/ directory in services/${{ matrix.service }} — skipping pytest."
           fi
 
-      # NOTE: Trivy + Ruff scans added in W2 D7 by candidates (not seeded here)
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.service }}
+          path: services/${{ matrix.service }}/coverage.xml
+
+      # NOTE: Trivy scans added in W2 D7 by candidates (not seeded here)
       
 
   frontend-build-test:
@@ -78,7 +84,9 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 8
+          # Must match the packageManager field in frontend/package.json —
+          # action-setup errors out if the two disagree
+          version: 9.15.0
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -92,7 +100,6 @@ jobs:
       - name: Lint
         working-directory: frontend
         run: pnpm lint
-        continue-on-error: true
 
       - name: Build
         working-directory: frontend

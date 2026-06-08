@@ -1,15 +1,15 @@
 from os import getenv
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from src.v1.routes.test_route import router as test_router
-from src.v1.routes.skill_route import router as skill_router
-from src.v1.routes.test_submission_route import router as test_submission_router
-from src.db.session import init_db
 from src.config.settings import settings
+from src.db.session import init_db
+from src.v1.routes.skill_route import router as skill_router
+from src.v1.routes.test_route import router as test_router
+from src.v1.routes.test_submission_route import router as test_submission_router
 
 load_dotenv()
 
@@ -35,15 +35,18 @@ app.include_router(test_router, prefix="/v1/api")
 app.include_router(skill_router, prefix="/v1/api")
 app.include_router(test_submission_router, prefix="/v1/api")
 
+
 # ---- Health Endpoint ----
 @app.get("/health", tags=["health"])
 def health_check():
     return {"status": "ok"}
 
+
 # ---- DB Init ----
 @app.on_event("startup")
 async def on_startup():
     await init_db()
+
 
 # ---- Run server ----
 if __name__ == "__main__":
