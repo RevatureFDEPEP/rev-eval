@@ -1,2 +1,6 @@
 # Dev-only dependencies — not installed in production Docker image
 ruff
+pytest
+pytest-asyncio
+pytest-cov
+aiosqlite

@@ -29,6 +29,10 @@ class TestSubmissionService:
     ) -> TestSubmissionOut:
 
         submission = await TestSubmissionRepository.create(db, submission_in)
+        # Re-fetch with the test relationship eager-loaded — serializing the
+        # freshly-created instance would lazy-load `.test` and raise
+        # MissingGreenlet in the async session
+        submission = await TestSubmissionRepository.get_by_id(db, submission.id)
         # test = await TestService.get_test_by_id(db, submission_in.test_id)
         # if not test:
         #     raise ValueError(f"Test with ID {request.test_id} not found")
@@ -261,6 +265,10 @@ class TestSubmissionService:
 
                     submission = await TestSubmissionRepository.create(
                         db, submission_data
+                    )
+                    # Re-fetch with eager-loaded test (see create_submission)
+                    submission = await TestSubmissionRepository.get_by_id(
+                        db, submission.id
                     )
                     submission_out = TestSubmissionOut.from_orm(submission)
                     created_submissions.append(submission_out)
