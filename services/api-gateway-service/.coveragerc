@@ -1,0 +1,6 @@
+[run]
+source = src
+        main
+omit =
+    tests/*
+    */__pycache__/*

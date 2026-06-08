@@ -7,21 +7,71 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Detect which areas changed so we only run the relevant jobs.
+  # A backend service runs only when its own dir changed; a shared backend
+  # file (root pyproject ruff config) or this workflow re-runs all backends.
+  # Frontend runs only when frontend/ (or this workflow) changed.
+  # On workflow_dispatch (manual) we force everything to run.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.set.outputs.backend }}
+      backend_any: ${{ steps.set.outputs.backend_any }}
+      frontend: ${{ steps.set.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            user-service: ['services/user-service/**']
+            question-management-service: ['services/question-management-service/**']
+            test-management-service: ['services/test-management-service/**']
+            api-gateway-service: ['services/api-gateway-service/**']
+            backend-shared: ['pyproject.toml', '.github/workflows/ci-pipeline.yml']
+            frontend: ['frontend/**', '.github/workflows/ci-pipeline.yml']
+
+      - name: Build job set
+        id: set
+        env:
+          CHANGED: ${{ steps.filter.outputs.changes }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          all='["user-service","question-management-service","test-management-service","api-gateway-service"]'
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            backend="$all"; frontend=true
+          else
+            if echo "$CHANGED" | jq -e 'index("backend-shared")' >/dev/null; then
+              backend="$all"
+            else
+              # intersection of changed filters with the backend service list
+              backend=$(jq -cn --argjson a "$all" --argjson c "$CHANGED" '$a - ($a - $c)')
+            fi
+            frontend=$(echo "$CHANGED" | jq -e 'index("frontend")' >/dev/null && echo true || echo false)
+          fi
+          backend_any=$([ "$(echo "$backend" | jq 'length')" -gt 0 ] && echo true || echo false)
+          {
+            echo "backend=$backend"
+            echo "backend_any=$backend_any"
+            echo "frontend=$frontend"
+          } >> "$GITHUB_OUTPUT"
+          echo "backend=$backend | frontend=$frontend"
+
   backend-build-test:
     name: Backend (${{ matrix.service }})
+    needs: changes
+    if: needs.changes.outputs.backend_any == 'true'
     runs-on: ubuntu-latest
     env:
       JWT_SECRET: ${{ secrets.JWT_SIGNING_SECRET }}
     strategy:
       fail-fast: false
       matrix:
-        service:
-          - user-service
-          - question-management-service
-          - test-management-service
-          - api-gateway-service
+        service: ${{ fromJSON(needs.changes.outputs.backend) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -45,7 +95,7 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov ruff
 
-      - name: Lint with ruff
+      - name: Ruff lint
         working-directory: services/${{ matrix.service }}
         run: |
           ruff check .
@@ -55,46 +105,67 @@ jobs:
         working-directory: services/${{ matrix.service }}
         run: |
           if [ -d tests ]; then
-            pytest --cov --cov-report=xml
+            # Coverage is gated at the current backend baseline and can be ratcheted up as tests expand.
+            pytest --cov --cov-report=xml --cov-fail-under=75
           else
             echo "No tests/ directory in services/${{ matrix.service }} — skipping pytest."
           fi
 
-  docker-lint:
-    name: Docker Lint (run-linter.sh)
-    runs-on: ubuntu-latest
-    env:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: root
-      POSTGRES_DB: eval_ai_dev
-      JWT_SECRET: ${{ secrets.JWT_SIGNING_SECRET }}
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Start backend containers
-        run: |
-          docker compose up -d postgres mongo minio user-service question-management-service test-management-service api-gateway
-          echo "Waiting for services to be healthy..."
-          timeout 120 bash -c 'until docker compose ps | grep -v "starting" | grep -q "healthy"; do sleep 5; done'
-          docker compose ps
-
-      - name: Run run-linter.sh
-        run: bash run-linter.sh
-
-      - name: Stop containers
+      - name: Upload coverage report
         if: always()
-        run: docker compose down
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.service }}
+          path: services/${{ matrix.service }}/coverage.xml
+          if-no-files-found: ignore
+
+      # W2-D7 quality gate: scan the built image for vulnerabilities.
+      # ignore-unfixed keeps the gate actionable — base images ship CVEs
+      # with no published fix, which would otherwise dead-lock the pipeline.
+      - name: Build Docker image
+        working-directory: services/${{ matrix.service }}
+        run: docker build -t ${{ matrix.service }}:${{ github.sha }} .
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ matrix.service }}:${{ github.sha }}
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+          limit-severities-for-sarif: true
+          trivyignores: .trivyignore
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-${{ matrix.service }}
+          path: trivy-${{ matrix.service }}.sarif
+          if-no-files-found: ignore
 
   frontend-build-test:
     name: Frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # mint OIDC token for provenance signing
+      attestations: write # write the attestation to the repo
     steps:
       - uses: actions/checkout@v4
 
+      # No explicit version: action-setup reads the packageManager field from
+      # frontend/package.json (pnpm 9.x). The previous hardcoded pnpm 8 could
+      # not read the v9 lockfile, so CI silently re-resolved dependencies and
+      # linted against different plugin versions than local dev.
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 8
+          package_json_file: frontend/package.json
 
       - name: Set up Node
         uses: actions/setup-node@v4

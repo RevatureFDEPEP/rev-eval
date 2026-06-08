@@ -5,15 +5,17 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     gcc \
     postgresql-client \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
+RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1" "wheel>=0.46.2" "jaraco.context>=6.1.0"
+
+# Copy requirements first for better application dependency caching
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .

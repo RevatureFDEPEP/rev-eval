@@ -1,0 +1,6 @@
+# CVEs in setuptools vendored copies (_vendor directory).
+# These packages are bundled internally by setuptools for its own use
+# and are not exposed to the application. The application installs
+# updated standalone versions (wheel>=0.46.2, jaraco.context>=6.1.0).
+CVE-2026-24049
+CVE-2026-23949
