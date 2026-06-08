@@ -21,7 +21,7 @@ jobs:
           - test-management-service
           - api-gateway-service
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,13 +30,13 @@ jobs:
           cache: pip
           cache-dependency-path: services/${{ matrix.service }}/requirements.txt
 
-      - name: Verify JWT_SECRET is set #might be a security vulnerability might leak log data -> modify echoing or length tracking to native runner step expressions 
+      - name: Verify JWT_SECRET is set
         run: |
           if [ -z "${JWT_SECRET}" ]; then
             echo "❌ JWT_SECRET is empty — was the repo secret configured?"
             exit 1
           fi
-          echo "✅ JWT_SECRET length: ${#JWT_SECRET}" 
+          echo "✅ JWT_SECRET is set"
 
       - name: Install dependencies
         working-directory: services/${{ matrix.service }}
@@ -68,8 +68,28 @@ jobs:
           name: coverage-${{ matrix.service }}
           path: services/${{ matrix.service }}/coverage.xml
 
-      # NOTE: Trivy scans added in W2 D7 by candidates (not seeded here)
-      
+      - name: Build production image
+        working-directory: services/${{ matrix.service }}
+        run: docker build --target production -t ${{ matrix.service }}:ci .
+
+      - name: Scan for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ matrix.service }}:ci
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-${{ matrix.service }}
+          path: trivy-${{ matrix.service }}.sarif
+
+
 
   frontend-build-test:
     name: Frontend
