@@ -72,8 +72,8 @@ async def test_delete_removes_record(async_db):
         async_db,
         TestCreate(name="To Be Deleted", test_type="QUIZ", created_by_id=99),
     )
+    deleted_id = created.id
     await TestRepository.delete(async_db, created)
 
-    # Verify deletion via list — get_by_id has a known bug when returning None
-    all_tests = await TestRepository.list_all(async_db)
-    assert not any(t.name == "To Be Deleted" for t in all_tests)
+    fetched = await TestRepository.get_by_id(async_db, deleted_id)
+    assert fetched is None

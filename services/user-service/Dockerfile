@@ -13,24 +13,24 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY user-service/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 
 
 FROM base AS test
 
-COPY ../requirements-dev.txt ./requirements-dev.txt
+COPY requirements-dev.txt ./requirements-dev.txt
 RUN pip install --no-cache-dir -r requirements-dev.txt
 
-COPY . .
+COPY user-service/ .
 
 RUN pytest tests/ --tb=short -q
 
 
 FROM base AS production
 
-COPY . .
+COPY user-service/ .
 
 EXPOSE 8002
 

@@ -70,8 +70,8 @@ services:
 
   user-service:
     build:
-      context: ./services/user-service
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: user-service/Dockerfile
     container_name: rev-eval-user-service
     restart: unless-stopped
     environment:
@@ -131,8 +131,8 @@ services:
 
   test-management-service:
     build:
-      context: ./services/test-management-service
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: test-management-service/Dockerfile
     container_name: rev-eval-test-management
     restart: unless-stopped
     environment:
