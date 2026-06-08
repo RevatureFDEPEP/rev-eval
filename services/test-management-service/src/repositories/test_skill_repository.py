@@ -25,7 +25,7 @@ class TestSkillRepository:
 
     @staticmethod
     async def create(db: AsyncSession, ts_in: TestSkillCreate) -> TestSkill:
-        ts = TestSkill(**ts_in.dict())  # ts_in is always a Pydantic model
+        ts = TestSkill(**ts_in.model_dump())  # ts_in is always a Pydantic model
         db.add(ts)
         await db.commit()
         await db.refresh(ts)

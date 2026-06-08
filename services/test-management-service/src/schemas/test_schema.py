@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from src.models.test import TestType
 from src.schemas.skill_schema import SkillOut
 
@@ -38,5 +38,4 @@ class TestOut(TestBase):
     updated_at: datetime
     skills: List[SkillOut] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -12,7 +12,7 @@ This file stays at summary level only.
 > start, advance, or finish a feature, update its detail file (check off steps,
 > add evidence) **and** its status row here, in the same PR as the code change.
 
-**Last assessed:** 2026-06-05 (branch `richardh-feat-alembic`)
+**Last assessed:** 2026-06-08 (branch `richardh-feat-w2f8`)
 
 ## Status values
 
@@ -35,7 +35,7 @@ Spec: `days_6_10_features.md`.
 | W2-F5 | Direct-to-MinIO diagram uploads (pre-signed URLs) | — | ✅ Completed | [w2-f5-minio-presigned-uploads.md](features/w2-f5-minio-presigned-uploads.md) |
 | W2-F6 | Structured question authoring interface | — | ✅ Completed | [w2-f6-question-authoring-ui.md](features/w2-f6-question-authoring-ui.md) |
 | W2-F7 | Alembic migrations & Category domain | — | ✅ Completed | [w2-f7-alembic-category-domain.md](features/w2-f7-alembic-category-domain.md) |
-| W2-F8 | Pre-existing defect cleanup (found during W2-F7) | — | 🟡 In Progress | [w2-f8-pre-existing-defects.md](features/w2-f8-pre-existing-defects.md) |
+| W2-F8 | Pre-existing defect cleanup (found during W2-F7) | — | ✅ Completed | [w2-f8-pre-existing-defects.md](features/w2-f8-pre-existing-defects.md) |
 | W2-M10 | Day 10 milestone: reporting service scaffold | milestone | ❌ Not Started | [w2-m10-reporting-service-scaffold.md](features/w2-m10-reporting-service-scaffold.md) |
 
 ## Days 11–15 (Week 3 — quiz-taking vertical slice)

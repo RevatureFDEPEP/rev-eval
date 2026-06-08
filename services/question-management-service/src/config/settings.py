@@ -2,7 +2,7 @@
 from typing import Optional
 from urllib.parse import quote_plus
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -84,10 +84,11 @@ class Settings(BaseSettings):
             return ["*"]
         return [origin.strip() for origin in self.ALLOW_ORIGINS.split(",")]
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
-        extra = "ignore"  # Ignore extra environment variables
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",  # Ignore extra environment variables
+    )
 
 
 # Create global settings instance

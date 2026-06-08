@@ -3,7 +3,7 @@ from enum import Enum
 from typing import List, Optional, Union
 
 from beanie import Document
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class QuestionType(str, Enum):
@@ -97,9 +97,8 @@ class Question(Document):
         use_enum_values = True  # Store enum values instead of enum names
         validate_on_save = True  # Validate before saving to database
 
-    class Config:
-        """Pydantic model configuration."""
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "type": "mcq",
                 "question_text": "What is the capital of France?",
@@ -116,3 +115,4 @@ class Question(Document):
                 "tags": ["europe", "capitals"]
             }
         }
+    )
