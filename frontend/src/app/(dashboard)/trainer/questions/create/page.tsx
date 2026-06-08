@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { ArrowLeft, Check, Plus, Trash2, X } from "lucide-react";
@@ -44,11 +44,32 @@ import {
 } from "@/lib/api";
 import { toast } from "sonner";
 
-// Base fields common to all question types
+// ---------------------------------------------------------------------------
+// Single flat form type — all type-specific fields optional.
+// Using a discriminated union here causes TypeScript to reject field accesses
+// (options, true_false_answer, sample_answer) that don't exist on every
+// union member, and breaks useFieldArray which requires options to be a
+// non-optional array.
+// ---------------------------------------------------------------------------
+interface QuestionFormValues {
+  question_text: string;
+  difficulty?: "easy" | "medium" | "hard";
+  skills: string[];
+  tags?: string; // raw comma-separated string; split in transformFormData
+  answer_explanation?: string;
+  // Always-present array so useFieldArray is satisfied; non-MCQ forms leave it empty.
+  options: Array<{ text: string; is_correct: boolean }>;
+  // Type-specific optional fields
+  true_false_answer?: boolean;
+  sample_answer?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Zod schemas — used for runtime validation only, not for type inference.
+// ---------------------------------------------------------------------------
+
 const baseSchema = {
-  question_text: z
-    .string()
-    .min(10, "Question must be at least 10 characters"),
+  question_text: z.string().min(10, "Question must be at least 10 characters"),
   difficulty: z.enum(["easy", "medium", "hard"]).optional(),
   skills: z
     .array(z.string())
@@ -58,7 +79,6 @@ const baseSchema = {
   answer_explanation: z.string().optional(),
 };
 
-// MCQ-specific schema
 const mcqSchema = z
   .object({
     ...baseSchema,
@@ -70,22 +90,20 @@ const mcqSchema = z
     ),
   })
   .refine(
-    (data) => {
-      if (data.options.length < 2 || data.options.length > 5) {
-        return false;
-      }
-      return data.options.some((opt) => opt.is_correct);
-    },
+    (data) =>
+      data.options.length >= 2 &&
+      data.options.length <= 5 &&
+      data.options.some((opt) => opt.is_correct),
     {
       message: "MCQ questions require 2-5 options with at least one marked correct",
       path: ["options"],
     }
   );
 
-// True/False schema
 const trueFalseSchema = z
   .object({
     ...baseSchema,
+    options: z.array(z.object({ text: z.string(), is_correct: z.boolean() })).optional(),
     true_false_answer: z.boolean().optional(),
   })
   .refine((data) => data.true_false_answer !== undefined, {
@@ -93,18 +111,11 @@ const trueFalseSchema = z
     path: ["true_false_answer"],
   });
 
-// Text schema
 const textSchema = z.object({
   ...baseSchema,
-  sample_answer: z
-    .string()
-    .min(10, "Sample answer must be at least 10 characters"),
+  options: z.array(z.object({ text: z.string(), is_correct: z.boolean() })).optional(),
+  sample_answer: z.string().min(10, "Sample answer must be at least 10 characters"),
 });
-
-type McqFormValues = z.infer<typeof mcqSchema>;
-type TrueFalseFormValues = z.infer<typeof trueFalseSchema>;
-type TextFormValues = z.infer<typeof textSchema>;
-type QuestionFormValues = McqFormValues | TrueFalseFormValues | TextFormValues;
 
 export default function CreateQuestionPage() {
   const router = useRouter();
@@ -116,11 +127,8 @@ export default function CreateQuestionPage() {
 
   const questionType = (searchParams.get("type") as QuestionType) || "mcq";
 
-  // Select the appropriate schema based on question type
   const getSchema = () => {
     switch (questionType) {
-      case "mcq":
-        return mcqSchema;
       case "true_false":
         return trueFalseSchema;
       case "text":
@@ -130,14 +138,14 @@ export default function CreateQuestionPage() {
     }
   };
 
-  // Get default values based on question type
   const getDefaultValues = (): QuestionFormValues => {
-    const base = {
+    const base: QuestionFormValues = {
       question_text: "",
       difficulty: undefined,
       skills: [],
       tags: "",
       answer_explanation: "",
+      options: [],
     };
 
     switch (questionType) {
@@ -150,22 +158,18 @@ export default function CreateQuestionPage() {
           ],
         };
       case "true_false":
-        return {
-          ...base,
-          true_false_answer: undefined,
-        };
+        return { ...base, true_false_answer: undefined };
       case "text":
-        return {
-          ...base,
-          sample_answer: "",
-        };
+        return { ...base, sample_answer: "" };
       default:
         return base;
     }
   };
 
   const form = useForm<QuestionFormValues>({
-    resolver: zodResolver(getSchema()),
+    // Cast required: Zod schema output types differ from the flat interface.
+    // Runtime validation is still correct — only the static type is widened.
+    resolver: zodResolver(getSchema()) as Resolver<QuestionFormValues>,
     defaultValues: getDefaultValues(),
   });
 
@@ -177,17 +181,16 @@ export default function CreateQuestionPage() {
   const watchSkills = form.watch("skills");
   const selectedSkills = Array.isArray(watchSkills) ? watchSkills : [];
   const [searchQuery, setSearchQuery] = useState("");
+
   const filteredSkills = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return skills;
-    }
+    if (!searchQuery.trim()) return skills;
     const query = searchQuery.toLowerCase();
     return skills.filter((skill) => skill.name.toLowerCase().includes(query));
   }, [skills, searchQuery]);
-  const skillListContainerClass =
-    'max-h-[55vh] overflow-x-hidden overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-white';
 
-  // Load skills
+  const skillListContainerClass =
+    "max-h-[55vh] overflow-x-hidden overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-white";
+
   useEffect(() => {
     const loadSkills = async () => {
       try {
@@ -203,42 +206,32 @@ export default function CreateQuestionPage() {
   }, []);
 
   const transformFormData = (values: QuestionFormValues): QuestionCreate => {
-    // For MCQ type, determine if it's actually MCQ (single answer) or MULTI (multiple answers)
     let actualType: QuestionType = questionType;
     let correct_answers: (number | boolean | string)[] | undefined = undefined;
     let options: { text: string }[] | undefined = undefined;
 
     if (questionType === "mcq") {
-      // Get all correct answers
-      const correctAnswerIndices = (values.options ?? [])
+      const correctIndices = values.options
         .map((opt, idx) => (opt.is_correct ? idx + 1 : null))
         .filter((id): id is number => id !== null);
 
-      // Determine if it's MCQ (1 answer) or MULTI (2+ answers)
-      if (correctAnswerIndices.length === 1) {
-        actualType = "mcq";
-      } else if (correctAnswerIndices.length > 1) {
-        actualType = "multi";
-      }
-
-      correct_answers = correctAnswerIndices;
-      options = (values.options ?? []).map((opt) => ({ text: opt.text }));
+      actualType = correctIndices.length > 1 ? "multi" : "mcq";
+      correct_answers = correctIndices;
+      options = values.options.map((opt) => ({ text: opt.text }));
     } else if (questionType === "true_false") {
-      // For TRUE_FALSE, send boolean in correct_answers, no options
-      correct_answers = [values.true_false_answer];
-      options = undefined;
-    } else if (questionType === "text") {
-      // For TEXT, no options or correct_answers
-      correct_answers = undefined;
-      options = undefined;
+      correct_answers =
+        values.true_false_answer !== undefined ? [values.true_false_answer] : [];
     }
+    // text: correct_answers and options stay undefined
 
     return {
       type: actualType,
       question_text: values.question_text,
       difficulty: values.difficulty,
       skills: values.skills,
-      tags: values.tags ? values.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
+      tags: values.tags
+        ? values.tags.split(",").map((t) => t.trim()).filter(Boolean)
+        : [],
       options,
       correct_answers,
       sample_answer: values.sample_answer || undefined,
@@ -258,11 +251,10 @@ export default function CreateQuestionPage() {
       router.push("/trainer/questions");
     } catch (err) {
       console.error("Failed to create question:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to create question";
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to create question";
       setError(errorMessage);
-      toast.error("Failed to create question", {
-        description: errorMessage,
-      });
+      toast.error("Failed to create question", { description: errorMessage });
     } finally {
       setSubmitting(false);
     }
@@ -270,14 +262,10 @@ export default function CreateQuestionPage() {
 
   const getTypeLabel = (type: string) => {
     switch (type) {
-      case "mcq":
-        return "MCQ";
-      case "true_false":
-        return "True/False";
-      case "text":
-        return "Text Answer";
-      default:
-        return type;
+      case "mcq":        return "MCQ";
+      case "true_false": return "True/False";
+      case "text":       return "Text Answer";
+      default:           return type;
     }
   };
 
@@ -297,9 +285,7 @@ export default function CreateQuestionPage() {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">
             Create New Question
           </h1>
-          <p className="text-sm text-slate-500">
-            {getTypeLabel(questionType)} question
-          </p>
+          <p className="text-sm text-slate-500">{getTypeLabel(questionType)} question</p>
         </div>
       </div>
 
@@ -317,9 +303,7 @@ export default function CreateQuestionPage() {
           <Card>
             <CardHeader>
               <CardTitle>Question Text</CardTitle>
-              <CardDescription>
-                Enter the question that students will see
-              </CardDescription>
+              <CardDescription>Enter the question that students will see</CardDescription>
             </CardHeader>
             <CardContent>
               <FormField
@@ -334,9 +318,7 @@ export default function CreateQuestionPage() {
                         {...field}
                       />
                     </FormControl>
-                    <FormDescription>
-                      Minimum 10 characters required
-                    </FormDescription>
+                    <FormDescription>Minimum 10 characters required</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -344,13 +326,14 @@ export default function CreateQuestionPage() {
             </CardContent>
           </Card>
 
-          {/* Options (for MCQ) */}
+          {/* Options (MCQ only) */}
           {questionType === "mcq" && (
             <Card>
               <CardHeader>
                 <CardTitle>Answer Options</CardTitle>
                 <CardDescription>
-                  Add 2-5 options and check the correct answer(s). You can select one or multiple correct answers.
+                  Add 2-5 options and check the correct answer(s). You can select one or
+                  multiple correct answers.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -380,10 +363,7 @@ export default function CreateQuestionPage() {
                       render={({ field }) => (
                         <FormItem className="flex-1">
                           <FormControl>
-                            <Input
-                              placeholder={`Option ${index + 1}`}
-                              {...field}
-                            />
+                            <Input placeholder={`Option ${index + 1}`} {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -439,24 +419,26 @@ export default function CreateQuestionPage() {
                       <FormControl>
                         <RadioGroup
                           onValueChange={(value) => field.onChange(value === "true")}
-                          value={field.value === true ? "true" : field.value === false ? "false" : undefined}
+                          value={
+                            field.value === true
+                              ? "true"
+                              : field.value === false
+                              ? "false"
+                              : undefined
+                          }
                           className="flex flex-col space-y-2"
                         >
                           <FormItem className="flex items-center space-x-3 space-y-0 rounded-lg border p-4 hover:bg-green-50">
                             <FormControl>
                               <RadioGroupItem value="true" />
                             </FormControl>
-                            <FormLabel className="cursor-pointer font-normal">
-                              True
-                            </FormLabel>
+                            <FormLabel className="cursor-pointer font-normal">True</FormLabel>
                           </FormItem>
                           <FormItem className="flex items-center space-x-3 space-y-0 rounded-lg border p-4 hover:bg-red-50">
                             <FormControl>
                               <RadioGroupItem value="false" />
                             </FormControl>
-                            <FormLabel className="cursor-pointer font-normal">
-                              False
-                            </FormLabel>
+                            <FormLabel className="cursor-pointer font-normal">False</FormLabel>
                           </FormItem>
                         </RadioGroup>
                       </FormControl>
@@ -468,7 +450,7 @@ export default function CreateQuestionPage() {
             </Card>
           )}
 
-          {/* Sample Answer (for Text questions) */}
+          {/* Sample Answer (Text questions only) */}
           {questionType === "text" && (
             <Card>
               <CardHeader>
@@ -488,6 +470,7 @@ export default function CreateQuestionPage() {
                           placeholder="Enter a sample answer..."
                           className="min-h-[100px]"
                           {...field}
+                          value={field.value ?? ""}
                         />
                       </FormControl>
                       <FormMessage />
@@ -502,9 +485,7 @@ export default function CreateQuestionPage() {
           <Card>
             <CardHeader>
               <CardTitle>Answer Explanation (Optional)</CardTitle>
-              <CardDescription>
-                Explain why the answer is correct
-              </CardDescription>
+              <CardDescription>Explain why the answer is correct</CardDescription>
             </CardHeader>
             <CardContent>
               <FormField
@@ -517,6 +498,7 @@ export default function CreateQuestionPage() {
                         placeholder="Explain the correct answer..."
                         className="min-h-[100px]"
                         {...field}
+                        value={field.value ?? ""}
                       />
                     </FormControl>
                     <FormMessage />
@@ -530,9 +512,7 @@ export default function CreateQuestionPage() {
           <Card>
             <CardHeader>
               <CardTitle>Difficulty Level (Optional)</CardTitle>
-              <CardDescription>
-                Rate the difficulty of this question
-              </CardDescription>
+              <CardDescription>Rate the difficulty of this question</CardDescription>
             </CardHeader>
             <CardContent>
               <FormField
@@ -540,10 +520,7 @@ export default function CreateQuestionPage() {
                 name="difficulty"
                 render={({ field }) => (
                   <FormItem>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select difficulty" />
@@ -596,7 +573,9 @@ export default function CreateQuestionPage() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const updated = selectedSkills.filter((value: string) => value !== skill);
+                                  const updated = selectedSkills.filter(
+                                    (value: string) => value !== skill
+                                  );
                                   form.setValue("skills", updated, {
                                     shouldValidate: true,
                                     shouldDirty: true,
@@ -641,8 +620,12 @@ export default function CreateQuestionPage() {
                                           checked={isChecked}
                                           onCheckedChange={(checked) => {
                                             const updated = checked
-                                              ? Array.from(new Set([...current, skill.name]))
-                                              : current.filter((value) => value !== skill.name);
+                                              ? Array.from(
+                                                  new Set([...current, skill.name])
+                                                )
+                                              : current.filter(
+                                                  (value) => value !== skill.name
+                                                );
                                             field.onChange(updated);
                                           }}
                                         />
@@ -675,9 +658,7 @@ export default function CreateQuestionPage() {
           <Card>
             <CardHeader>
               <CardTitle>Tags (Optional)</CardTitle>
-              <CardDescription>
-                Add tags separated by commas (max 30)
-              </CardDescription>
+              <CardDescription>Add tags separated by commas (max 30)</CardDescription>
             </CardHeader>
             <CardContent>
               <FormField
@@ -689,16 +670,10 @@ export default function CreateQuestionPage() {
                       <Input
                         placeholder="e.g., loops, arrays, basics"
                         {...field}
-                        value={
-                          typeof field.value === "string"
-                            ? field.value
-                            : field.value?.join(", ") || ""
-                        }
+                        value={field.value ?? ""}
                       />
                     </FormControl>
-                    <FormDescription>
-                      Separate tags with commas
-                    </FormDescription>
+                    <FormDescription>Separate tags with commas</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -706,7 +681,7 @@ export default function CreateQuestionPage() {
             </CardContent>
           </Card>
 
-          {/* Submit Button */}
+          {/* Submit */}
           <div className="flex justify-end gap-4">
             <Button
               type="button"

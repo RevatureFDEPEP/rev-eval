@@ -379,6 +379,95 @@ export interface QuizSubmitResponse {
   analysis?: string;
 }
 
+// ===== SUBMISSION REVIEW DETAILS =====
+
+export interface TranscriptMessage {
+  role: string;
+  content: string;
+  timestamp: string;
+}
+
+export interface TranscriptAudioUrl {
+  message_index: number;
+  audio_url: string;
+  uploaded_at: string;
+}
+
+export interface LambdaEvaluation {
+  overall_score: number;
+  score_breakdown: {
+    technical_knowledge?: number;
+    problem_solving?: number;
+    communication?: number;
+    code_quality?: number;
+    engagement?: number;
+  };
+  skill_breakdown: Record<
+    string,
+    {
+      score: number;
+      feedback: string;
+      proficiency_level: string;
+    }
+  >;
+  feedback: string;
+  strengths: string[];
+  improvements: string[];
+  key_highlights: string[];
+  red_flags: string[];
+  recommendation: string;
+  reasoning: string;
+  evaluated_at?: string;
+  evaluated_by?: string;
+}
+
+export interface InterviewTranscript {
+  session_id: string;
+  submission_id: number;
+  test_name: string;
+  test_role?: string;
+  messages: TranscriptMessage[];
+  audio_urls?: TranscriptAudioUrl[];
+  message_count: number;
+  duration_seconds?: number;
+  status: string;
+  created_at: string;
+  ended_at?: string;
+  lambda_evaluation?: LambdaEvaluation;
+  trainer_evaluation?: {
+    overall_score: number;
+    score_breakdown?: {
+      technical_knowledge?: number;
+      problem_solving?: number;
+      communication?: number;
+      code_quality?: number;
+      engagement?: number;
+    };
+    skill_breakdown?: Record<string, { score: number; feedback: string; proficiency_level: string }>;
+    feedback?: string;
+    strengths?: string[];
+    improvements?: string[];
+  };
+}
+
+export interface SubmissionReviewTest {
+  id: number;
+  name: string;
+  test_type: string;
+  role?: string;
+  curriculum?: string;
+  duration_seconds?: number;
+  skills: Array<{ id: number; name: string; description?: string }>;
+}
+
+/** Full payload returned by GET /v1/api/submissions/:id/review-details */
+export interface SubmissionReviewDetails {
+  submission: TestSubmission;
+  test: SubmissionReviewTest;
+  /** null when the submission has no associated interview session */
+  transcript: InterviewTranscript | null;
+}
+
 // ===== TYPE ALIASES (for backwards compatibility) =====
 
 /** @deprecated Use SubmissionStatus instead */
