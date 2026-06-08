@@ -500,15 +500,18 @@ class TestSubmissionService:
             raise ValueError(f"Test {submission.test_id} not found")
 
         # Get interview transcript from interview service
-        interview_service_url = settings.INTERVIEW_SERVICE_URL
         transcript_data = None
 
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(
-                    f"{interview_service_url}/v1/api/interview/submissions/{submission_id}/transcript",
-                    headers={"X-Correlation-Id": get_correlation_id()},
-                )
+        if not settings.INTERVIEW_SERVICE_URL:
+            logger.warning("INTERVIEW_SERVICE_URL not configured; skipping transcript fetch")
+        else:
+            interview_service_url = settings.INTERVIEW_SERVICE_URL
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.get(
+                        f"{interview_service_url}/v1/api/interview/submissions/{submission_id}/transcript",
+                        headers={"X-Correlation-Id": get_correlation_id()},
+                    )
 
                 if response.status_code == 200:
                     transcript_data = response.json()
@@ -516,10 +519,10 @@ class TestSubmissionService:
                     logger.warning(
                         f"⚠️ Could not fetch transcript for submission {submission_id}: {response.status_code}"
                     )
-        except Exception as e:
-            logger.error(
-                f"❌ Error fetching transcript for submission {submission_id}: {e}"
-            )
+            except Exception as e:
+                logger.error(
+                    f"❌ Error fetching transcript for submission {submission_id}: {e}"
+                )
 
         # Build response
         return {
@@ -592,7 +595,11 @@ class TestSubmissionService:
 
         # Save comprehensive trainer evaluation to MongoDB (for interviews)
         # This stores the full evaluation structure alongside AI evaluation
-        if review.trainer_evaluation and submission.test.test_type.value == "INTERVIEW":
+        if (
+            review.trainer_evaluation
+            and submission.test.test_type.value == "INTERVIEW"
+            and settings.INTERVIEW_SERVICE_URL
+        ):
             interview_service_url = settings.INTERVIEW_SERVICE_URL
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:
