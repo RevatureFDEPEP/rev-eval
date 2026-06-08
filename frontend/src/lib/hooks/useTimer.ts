@@ -98,7 +98,27 @@ export function useTimer(options: UseTimerOptions): UseTimerReturn {
 
   // Timer countdown
   useEffect(() => {
-    if (!isRunning || timeRemaining <= 0) return;
+    // Already at zero — either ticked down to it or hydrated from storage with
+    // the stored time fully elapsed. Finalize expiry once: clear storage and
+    // fire onTimeExpired so a returning user with an expired session is handled
+    // the same as one whose timer ran out on screen. State updates and the
+    // callback are deferred (like the tick path) so we don't setState
+    // synchronously inside the effect.
+    if (timeRemaining <= 0) {
+      if (!expiredCallbackFired.current) {
+        expiredCallbackFired.current = true;
+        clearLocalStorage();
+        const id = setTimeout(() => {
+          setIsExpired(true);
+          setIsRunning(false);
+          onTimeExpired();
+        }, 0);
+        return () => clearTimeout(id);
+      }
+      return;
+    }
+
+    if (!isRunning) return;
 
     const intervalId = setInterval(() => {
       setTimeRemaining((prev) => {

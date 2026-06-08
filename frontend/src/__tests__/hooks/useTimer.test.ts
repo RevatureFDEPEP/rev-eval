@@ -104,25 +104,35 @@ describe('useTimer', () => {
     expect(result.current.isExpired).toBe(true)
   })
 
-  it('sets isWarning under 5 minutes and isCritical under 1 minute', () => {
+  it('fires each warning exactly once as the 5- and 1-minute thresholds are crossed', () => {
     const { result } = renderTimer({ durationSeconds: 302 })
 
     expect(result.current.isWarning).toBe(false)
 
-    act(() => vi.advanceTimersByTime(2000)) // 300s left
+    act(() => vi.advanceTimersByTime(2000)) // 300s left — crosses 5-minute mark
     expect(result.current.isWarning).toBe(true)
     expect(result.current.isCritical).toBe(false)
     expect(toast.warning).toHaveBeenCalledWith(
       '5 Minutes Remaining',
       expect.objectContaining({ description: expect.any(String) }),
     )
+    expect(toast.warning).toHaveBeenCalledTimes(1)
 
-    act(() => vi.advanceTimersByTime(240_000)) // 60s left
+    // staying under 5 minutes must not re-fire the warning every tick
+    act(() => vi.advanceTimersByTime(5000)) // 295s left
+    expect(toast.warning).toHaveBeenCalledTimes(1)
+
+    act(() => vi.advanceTimersByTime(235_000)) // 60s left — crosses 1-minute mark
     expect(result.current.isCritical).toBe(true)
     expect(toast.warning).toHaveBeenCalledWith(
       '1 Minute Remaining!',
       expect.objectContaining({ description: expect.any(String) }),
     )
+    expect(toast.warning).toHaveBeenCalledTimes(2)
+
+    // the 1-minute warning likewise fires once, not on every subsequent second
+    act(() => vi.advanceTimersByTime(5000)) // 55s left
+    expect(toast.warning).toHaveBeenCalledTimes(2)
   })
 
   it('persists remaining time to localStorage on each tick', () => {
@@ -146,6 +156,28 @@ describe('useTimer', () => {
 
     const { result } = renderTimer()
     expect(result.current.timeRemaining).toBe(40)
+  })
+
+  it('finalizes expiry when the stored time has already fully elapsed on hydration', () => {
+    vi.setSystemTime(new Date('2026-06-06T12:00:00Z'))
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        timeRemaining: 20,
+        timestamp: Date.now() - 30_000, // saved 30s ago — the 20s budget is gone
+      }),
+    )
+
+    const { result, onTimeExpired } = renderTimer()
+
+    // Hydrated value is immediately clamped to 0 and storage cleared...
+    expect(result.current.timeRemaining).toBe(0)
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+
+    // ...and expiry finalization is flushed on the next tick (deferred state).
+    act(() => vi.advanceTimersByTime(0))
+    expect(result.current.isExpired).toBe(true)
+    expect(onTimeExpired).toHaveBeenCalledTimes(1)
   })
 
   it('clears localStorage when the timer expires', () => {

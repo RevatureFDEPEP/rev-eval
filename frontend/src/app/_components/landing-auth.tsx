@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { loginSchema, registerSchema } from '@/lib/schemas/auth';
 
 export function LandingAuth() {
   const router = useRouter();
@@ -19,17 +20,30 @@ export function LandingAuth() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    // Validate client-side with the shared Zod schemas before hitting the API,
+    // so bad input (e.g. a sub-8-char password) is caught without a round trip.
+    const rawInput =
+      mode === 'login'
+        ? { email, password }
+        : { email, password, full_name: fullName || undefined, role };
+    const parsed =
+      mode === 'login'
+        ? loginSchema.safeParse(rawInput)
+        : registerSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0].message);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
-      const body = mode === 'login'
-        ? { email, password }
-        : { email, password, full_name: fullName || undefined, role };
 
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(parsed.data),
       });
 
       if (!res.ok) {
