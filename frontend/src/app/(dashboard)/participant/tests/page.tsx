@@ -291,7 +291,7 @@ export default function ParticipantTestsPage() {
                       {upcomingTests.map((test) => {
                         const isQuiz = test.test_type === TestType.QUIZ || (test.test_type as string) === 'MCQ';
                         const friendlyType = isQuiz ? 'Quiz' : 'Interview';
-                        const { formatted: dueDate, status: dueStatus } = formatDueDate(test.due_date);
+                        const { formatted: dueDate } = formatDueDate(test.due_date);
                         const href = getActionHref(test, isQuiz);
                         const scoreLabel =
                           test.final_score != null ? `${Math.round(test.final_score)}%` : '—';
