@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     MONGODB_PASSWORD: str | None = None  # Optional - service uses PostgreSQL only
     ALLOW_ORIGINS: str
     SERVICE_NAME: str
+    LOG_LEVEL: str = "INFO"
     PORT: int
     SERVICE_HOSTNAME: str
 

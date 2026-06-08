@@ -1,4 +1,5 @@
 # src/db/session.py
+import logging
 import os
 
 from sqlalchemy import text
@@ -23,6 +24,8 @@ elif DATABASE_URL.startswith("postgresql+psycopg2://"):
     )
 else:
     ASYNC_DATABASE_URL = DATABASE_URL  # for sqlite or other DBs
+
+logger = logging.getLogger(__name__)
 
 # ===== Async Engine =====
 engine = create_async_engine(ASYNC_DATABASE_URL, echo=True, future=True)
@@ -55,7 +58,6 @@ async def init_db():
         # Test async connection
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-        print("✅ Async DB connected successfully and tables are ready.")
+        logger.info("Async DB connected successfully and tables are ready.")
     except OperationalError as e:
-        print("❌ Async DB connection failed!")
-        print(str(e))
+        logger.error("Async DB connection failed: %s", e, exc_info=True)

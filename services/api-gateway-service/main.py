@@ -10,13 +10,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from src.middleware.auth import add_user_context_headers, verify_jwt_token
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from src.utils.logging_config import setup_logging
 
 # Load environment variables
 load_dotenv()
+setup_logging("api-gateway", getenv("LOG_LEVEL", "INFO"))
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="API Gateway")
 
@@ -251,10 +250,7 @@ async def smart_gateway(
             detail=f"Cannot connect to service '{service_name}': {str(e)}",
         ) from e
     except Exception as e:
-        logger.error(f"❌ ERROR: {str(e)}")
-        import traceback
-
-        traceback.print_exc()
+        logger.error("Gateway error in smart route: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Gateway error: {str(e)}") from e
 
 
@@ -299,8 +295,7 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
                 timeout=30.0,
             )
 
-        print(f"✅ Response: {resp.status_code}")
-        print("=" * 80)
+        logger.info("Legacy route response: %s", resp.status_code)
 
         if resp.headers.get("content-type", "").startswith("application/json"):
             return JSONResponse(content=resp.json(), status_code=resp.status_code)
@@ -314,15 +309,12 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
     except HTTPException:
         raise
     except httpx.ConnectError as e:
-        print(f"❌ Connection Error: {str(e)}")
+        logger.error("Legacy route connection error: %s", e)
         raise HTTPException(
             status_code=503, detail=f"Cannot connect to service: {str(e)}"
         ) from e
     except Exception as e:
-        print(f"❌ ERROR: {str(e)}")
-        import traceback
-
-        traceback.print_exc()
+        logger.error("Gateway error in legacy route: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Gateway error: {str(e)}") from e
 
 
