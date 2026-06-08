@@ -72,7 +72,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov aiosqlite diff-cover
+          pip install pytest pytest-cov aiosqlite diff-cover ruff
+
+      - name: Lint (ruff)
+        working-directory: services/${{ matrix.service }}
+        run: ruff check .
 
       - name: Run pytest with coverage
         working-directory: services/${{ matrix.service }}
@@ -88,7 +92,7 @@ jobs:
         run: |
           if [ -f coverage.xml ]; then
             git fetch origin main --depth=1 || true
-            diff-cover coverage.xml --compare-branch=origin/main --fail-under=80 || true
+            diff-cover coverage.xml --compare-branch=origin/main --fail-under=70
           fi
 
   trivy-scan:
