@@ -1,7 +1,7 @@
 import os
 
-os.environ.setdefault("JWT_SECRET", "test-gateway-secret-key")
-os.environ.setdefault("JWT_ALGORITHM", "HS256")
+os.environ["JWT_SECRET"] = "test-gateway-secret-key"
+os.environ["JWT_ALGORITHM"] = "HS256"
 
 from datetime import UTC, datetime, timedelta
 
