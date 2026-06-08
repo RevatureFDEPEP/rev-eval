@@ -5,7 +5,12 @@
  */
 
 import { api } from './client';
-import { Question, QuestionCreate, QuestionUpdate } from './types';
+import {
+  Question,
+  QuestionCreate,
+  QuestionCreateResponse,
+  QuestionUpdate,
+} from './types';
 
 /**
  * Get all questions
@@ -24,8 +29,10 @@ export async function getQuestion(id: string): Promise<Question> {
 /**
  * Create a new question
  */
-export async function createQuestion(data: QuestionCreate): Promise<Question> {
-  return api.post<Question>('/v1/api/questions', data);
+export async function createQuestion(
+  data: QuestionCreate
+): Promise<QuestionCreateResponse> {
+  return api.post<QuestionCreateResponse>('/v1/api/questions', data);
 }
 
 /**

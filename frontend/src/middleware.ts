@@ -13,6 +13,7 @@ const PUBLIC_PATH_PREFIXES = ['/api/auth/'];
 
 const roleProtectedRoutes: Record<string, string[]> = {
   '/trainer': ['TRAINER', 'ADMIN'],
+  '/admin': ['TRAINER', 'ADMIN'],
   '/participant': ['PARTICIPANT'],
   '/dashboard': ['TRAINER', 'PARTICIPANT', 'ADMIN'],
 };
@@ -54,6 +55,14 @@ export function middleware(request: NextRequest) {
   if (!session || session.expired) {
     const loginUrl = new URL('/', request.url);
     return NextResponse.redirect(loginUrl);
+  }
+
+  if (pathname === '/admin/questions/create') {
+    const trainerCreateUrl = new URL('/trainer/questions/create', request.url);
+    request.nextUrl.searchParams.forEach((value, key) => {
+      trainerCreateUrl.searchParams.append(key, value);
+    });
+    return NextResponse.redirect(trainerCreateUrl);
   }
 
   // Dashboard auto-redirect by role

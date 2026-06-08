@@ -35,7 +35,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     public statusText: string,
-    public body: any
+    public body: unknown
   ) {
     super(`API Error: ${status} ${statusText}`);
     this.name = 'ApiError';
@@ -70,8 +70,16 @@ async function fetchApi(
     logApiCall(options.method || 'GET', endpoint, response.status);
 
     if (!response.ok) {
-      const body = await response.text();
-      logApiCall(options.method || 'GET', endpoint, response.status, body);
+      const bodyText = await response.text();
+      let body: unknown = bodyText;
+
+      try {
+        body = bodyText ? JSON.parse(bodyText) : null;
+      } catch {
+        body = bodyText;
+      }
+
+      logApiCall(options.method || 'GET', endpoint, response.status, bodyText);
       throw new ApiError(response.status, response.statusText, body);
     }
 
@@ -108,7 +116,7 @@ export const api = {
   /**
    * POST request
    */
-  async post<T>(endpoint: string, data?: any): Promise<T> {
+  async post<T>(endpoint: string, data?: unknown): Promise<T> {
     const response = await fetchApi(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
@@ -120,7 +128,7 @@ export const api = {
   /**
    * PUT request
    */
-  async put<T>(endpoint: string, data: any): Promise<T> {
+  async put<T>(endpoint: string, data: unknown): Promise<T> {
     const response = await fetchApi(endpoint, {
       method: 'PUT',
       body: JSON.stringify(data),
