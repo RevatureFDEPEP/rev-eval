@@ -6,12 +6,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import settings
 from src.db.session import init_db
+from src.logging_config import configure_json_logging, install_request_logging
 from src.v1.routes.auth_route import router as auth_router
 from src.v1.routes.user_route import router as user_router
 
 load_dotenv()
+configure_json_logging()
 
 app = FastAPI(title="User Service", version="1.0.0")
+install_request_logging(app)
 
 # ---- CORS ----
 origins = settings.ALLOW_ORIGINS or "*"

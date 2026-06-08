@@ -9,16 +9,16 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from src.logging_config import configure_json_logging, install_request_logging
 from src.middleware.auth import add_user_context_headers, verify_jwt_token
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
+configure_json_logging()
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="API Gateway")
+install_request_logging(app)
 
 # Configure CORS
 origins = getenv("ALLOW_ORIGINS", "http://localhost:3000").split(",")
@@ -239,15 +239,13 @@ async def smart_gateway(
     except HTTPException:
         raise
     except httpx.ConnectError as e:
-        logger.error(f"❌ Connection Error: {str(e)}")
+        logger.exception("Connection Error")
         raise HTTPException(
             status_code=503,
             detail=f"Cannot connect to service '{service_name}': {str(e)}"
         )
     except Exception as e:
-        logger.error(f"❌ ERROR: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Gateway error")
         raise HTTPException(
             status_code=500,
             detail=f"Gateway error: {str(e)}"
@@ -291,8 +289,7 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
                 timeout=30.0
             )
 
-        print(f"✅ Response: {resp.status_code}")
-        print("=" * 80)
+        logger.info("Legacy response", extra={"status_code": resp.status_code})
 
         if resp.headers.get("content-type", "").startswith("application/json"):
             return JSONResponse(content=resp.json(), status_code=resp.status_code)
@@ -306,12 +303,10 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
     except HTTPException:
         raise
     except httpx.ConnectError as e:
-        print(f"❌ Connection Error: {str(e)}")
+        logger.exception("Legacy connection error")
         raise HTTPException(status_code=503, detail=f"Cannot connect to service: {str(e)}")
     except Exception as e:
-        print(f"❌ ERROR: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Legacy gateway error")
         raise HTTPException(status_code=500, detail=f"Gateway error: {str(e)}")
 
 if __name__ == "__main__":
