@@ -1,8 +1,11 @@
 from fastapi import APIRouter, HTTPException, status, Query
+from pydantic import BaseModel
 from pydantic import ValidationError
 from typing import List, Optional
 from src.schemas.question import QuestionCreate, QuestionUpdate, QuestionResponse
 from src.services.question_service import QuestionService
+from src.utils.s3_client import generate_presigned_get_url, generate_presigned_put_url, ensure_bucket
+from src.config.settings import settings
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
 
@@ -162,6 +165,62 @@ async def delete_question(id: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while deleting the question: {str(e)}"
         )
+
+
+# ============================================================================
+# IMAGE PRESIGNED URL ENDPOINTS (MinIO / S3)
+# ============================================================================
+
+
+class PresignedUrlResponse(BaseModel):
+    url: str
+    key: str
+    expires_in: int
+
+
+@router.get(
+    "/{id}/image/download-url",
+    response_model=PresignedUrlResponse,
+    summary="Get pre-signed download URL for question image",
+    description="Returns a time-limited GET URL to download the question's image directly from MinIO/S3.",
+)
+async def get_image_download_url(id: str):
+    question = await QuestionService.get_question_by_id(id)
+    if not question:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Question '{id}' not found")
+    key = f"questions/{id}/image"
+    try:
+        url = generate_presigned_get_url(key)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Storage error: {e}")
+    return PresignedUrlResponse(url=url, key=key, expires_in=settings.S3_PRESIGN_EXPIRY_SECONDS)
+
+
+@router.post(
+    "/{id}/image/upload-url",
+    response_model=PresignedUrlResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get pre-signed upload URL for question image",
+    description=(
+        "Returns a time-limited PUT URL. Client uploads the image directly to MinIO/S3 "
+        "using this URL — the server never receives the binary payload. "
+        "Content-Type must match the `content_type` parameter."
+    ),
+)
+async def get_image_upload_url(
+    id: str,
+    content_type: str = Query("image/jpeg", description="MIME type of the file being uploaded"),
+):
+    question = await QuestionService.get_question_by_id(id)
+    if not question:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Question '{id}' not found")
+    try:
+        ensure_bucket()
+        key = f"questions/{id}/image"
+        url = generate_presigned_put_url(key, content_type=content_type)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Storage error: {e}")
+    return PresignedUrlResponse(url=url, key=key, expires_in=settings.S3_PRESIGN_EXPIRY_SECONDS)
 
 
 # ============================================================================

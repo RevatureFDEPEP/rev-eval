@@ -14,6 +14,7 @@ class SubmissionStatus(str, enum.Enum):
 
 class TestSubmission(Base):
     __tablename__ = "test_submissions"
+    __table_args__ = {"extend_existing": True}
     id = Column(Integer, primary_key=True, index=True)
 
     # Foreign key to local Test table

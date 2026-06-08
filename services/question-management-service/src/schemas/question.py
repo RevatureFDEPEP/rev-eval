@@ -271,6 +271,67 @@ class QuestionUpdate(BaseModel):
         return self
 
 
+# ---------------------------------------------------------------------------
+# Discriminated union — single-select vs multi-select (W2 D8)
+# Use this when you need strict type-level separation between MCQ and MULTI
+# without runtime model_validator branching.
+# ---------------------------------------------------------------------------
+from typing import Annotated, Literal
+
+class SingleSelectPayload(BaseModel):
+    """MCQ — exactly one correct answer by option position (1-indexed)."""
+    question_type: Literal["mcq"] = "mcq"
+    question_text: str = Field(..., min_length=10, max_length=2000)
+    options: List[OptionCreate] = Field(..., min_length=2, max_length=10)
+    correct_answer: int = Field(..., ge=1, description="1-indexed position of correct option")
+    answer_explanation: Optional[str] = Field(None, max_length=2000)
+    difficulty: Optional[str] = Field("medium", pattern="^(easy|medium|hard)$")
+    skills: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def answer_in_range(self):
+        if self.correct_answer > len(self.options):
+            raise ValueError(
+                f"correct_answer {self.correct_answer} exceeds option count {len(self.options)}"
+            )
+        return self
+
+
+class MultiSelectPayload(BaseModel):
+    """MULTI — one or more correct answers by option positions (1-indexed)."""
+    question_type: Literal["multi"] = "multi"
+    question_text: str = Field(..., min_length=10, max_length=2000)
+    options: List[OptionCreate] = Field(..., min_length=2, max_length=10)
+    correct_answers: List[int] = Field(..., min_length=1)
+    answer_explanation: Optional[str] = Field(None, max_length=2000)
+    difficulty: Optional[str] = Field("medium", pattern="^(easy|medium|hard)$")
+    skills: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def answers_in_range(self):
+        max_pos = len(self.options)
+        bad = [a for a in self.correct_answers if a < 1 or a > max_pos]
+        if bad:
+            raise ValueError(f"correct_answers out of range: {bad} (max {max_pos})")
+        if len(set(self.correct_answers)) != len(self.correct_answers):
+            raise ValueError("correct_answers contains duplicates")
+        if len(self.correct_answers) == max_pos:
+            raise ValueError("MULTI questions cannot mark all options correct")
+        return self
+
+
+# Pydantic v2 discriminated union — Pydantic picks the right model from
+# question_type before validation, so invalid combos fail early with a clear
+# error (e.g. sending correct_answers to an MCQ returns 422 immediately).
+ChoiceQuestionPayload = Annotated[
+    Union[SingleSelectPayload, MultiSelectPayload],
+    Field(discriminator="question_type"),
+]
+# ---------------------------------------------------------------------------
+
+
 class QuestionResponse(BaseModel):
     """
     Response schema for Question documents.
