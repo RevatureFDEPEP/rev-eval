@@ -9,7 +9,6 @@ from typing import Any
 
 from fastapi import Request
 
-
 RESERVED_LOG_RECORD_KEYS = set(
     logging.LogRecord("", 0, "", 0, "", (), None).__dict__.keys()
 ) | {"message", "asctime"}
