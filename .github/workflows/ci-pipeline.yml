@@ -97,15 +97,16 @@ jobs:
 
       - name: Ruff lint
         working-directory: services/${{ matrix.service }}
-        run: ruff check .
+        run: |
+          ruff check .
+          ruff format --check .
 
       - name: Run pytest
         working-directory: services/${{ matrix.service }}
         run: |
           if [ -d tests ]; then
-            # Coverage source/omit and the fail_under threshold come from the
-            # service's .coveragerc (measured-baseline ratchet, W2 D7 gate).
-            pytest --cov --cov-report=xml
+            # Coverage is gated at the current backend baseline and can be ratcheted up as tests expand.
+            pytest --cov --cov-report=xml --cov-fail-under=75
           else
             echo "No tests/ directory in services/${{ matrix.service }} — skipping pytest."
           fi
