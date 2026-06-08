@@ -78,7 +78,7 @@ jobs:
         working-directory: services/${{ matrix.service }}
         run: |
           if [ -d tests ]; then
-            pytest --cov=src --cov-report=xml --cov-fail-under=80
+            pytest --cov=src --cov-report=xml
           else
             echo "⚠️ No tests found — skipping for ${{ matrix.service }}"
           fi

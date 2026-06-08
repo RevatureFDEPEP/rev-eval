@@ -42,17 +42,6 @@ import {
   getSkills,
   SkillInfo,
 } from "@/lib/api";
-
-interface QuestionFormValues {
-  question_text: string;
-  difficulty?: "easy" | "medium" | "hard";
-  skills: string[];
-  tags?: string | string[];
-  answer_explanation?: string;
-  options?: Array<{ text: string; is_correct: boolean }>;
-  true_false_answer?: boolean;
-  sample_answer?: string;
-}
 import { toast } from "sonner";
 
 // Base fields common to all question types
