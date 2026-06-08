@@ -1,7 +1,8 @@
-from typing import List, Optional
-from src.models.question import Question
-from beanie.operators import In
+
 from beanie import PydanticObjectId
+from beanie.operators import In
+
+from src.models.question import Question
 
 
 class QuestionRepository:
@@ -31,7 +32,7 @@ class QuestionRepository:
         return str(question.id)
 
     @staticmethod
-    async def get_all(limit: int = 100, skip: int = 0) -> List[Question]:
+    async def get_all(limit: int = 100, skip: int = 0) -> list[Question]:
         """
         Retrieve all questions from the database with pagination.
 
@@ -46,7 +47,7 @@ class QuestionRepository:
         return questions
 
     @staticmethod
-    async def get_by_id(qid: str) -> Optional[Question]:
+    async def get_by_id(qid: str) -> Question | None:
         """
         Retrieve a question by its MongoDB _id using Beanie.
 
@@ -128,7 +129,7 @@ class QuestionRepository:
         return await Question.find(filter_dict).count()
 
     @staticmethod
-    async def find_by_type(question_type: str, limit: int = 100) -> List[Question]:
+    async def find_by_type(question_type: str, limit: int = 100) -> list[Question]:
         """
         Find questions by type using Beanie.
 
@@ -142,7 +143,7 @@ class QuestionRepository:
         return await Question.find(Question.type == question_type).limit(limit).to_list()
 
     @staticmethod
-    async def find_by_skill(skill: str, limit: int = 100) -> List[Question]:
+    async def find_by_skill(skill: str, limit: int = 100) -> list[Question]:
         """
         Find questions by skill using Beanie.
 
@@ -156,7 +157,7 @@ class QuestionRepository:
         return await Question.find(In(Question.skills, [skill])).limit(limit).to_list()
 
     @staticmethod
-    async def find_by_difficulty(difficulty: str, limit: int = 100) -> List[Question]:
+    async def find_by_difficulty(difficulty: str, limit: int = 100) -> list[Question]:
         """
         Find questions by difficulty level.
 
@@ -170,7 +171,7 @@ class QuestionRepository:
         return await Question.find(Question.difficulty == difficulty).limit(limit).to_list()
 
     @staticmethod
-    async def find_by_tags(tags: List[str], limit: int = 100) -> List[Question]:
+    async def find_by_tags(tags: list[str], limit: int = 100) -> list[Question]:
         """
         Find questions that have any of the specified tags.
 

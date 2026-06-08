@@ -333,11 +333,11 @@ export interface TestSession {
     evaluation_timestamp?: string;
     algorithm_version?: string;
     audit_log?: {
-      part_a_scoring?: Record<string, any>;
-      part_b_scoring?: Record<string, any>;
+      part_a_scoring?: Record<string, unknown>;
+      part_b_scoring?: Record<string, unknown>;
       difficulty_weights?: Record<string, number>;
-      score_calculation?: Record<string, any>;
-      final_score?: Record<string, any>;
+      score_calculation?: Record<string, unknown>;
+      final_score?: Record<string, unknown>;
       fairness_notes?: string;
     };
   };  // AI evaluation metadata including audit log and scoring details (set by Lambda)

@@ -1,23 +1,23 @@
-from typing import List, Dict, Any
-import httpx
-import os
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.config import settings
 from src.repositories.test_submission_repository import TestSubmissionRepository
-from src.repositories.test_repository import TestRepository
-from src.services.test_service import TestService
 from src.schemas.test_submission_schema import (
-    TestSubmissionCreate,
-    TestSubmissionUpdate,
-    TestSubmissionOut,
     BulkAssignRequest,
     BulkAssignResult,
+    SubmissionStatus,
+    TestSubmissionCreate,
+    TestSubmissionOut,
+    TestSubmissionUpdate,
     TrainerReviewRequest,
     TrainerReviewResponse,
-    SubmissionStatus
 )
-from src.config import settings
+from src.services.test_service import TestService
 
 logger = logging.getLogger(__name__)
 
@@ -158,12 +158,12 @@ class TestSubmissionService:
         return TestSubmissionOut.from_orm(submission)
 
     @staticmethod
-    async def list_all_submissions(db: AsyncSession) -> List[TestSubmissionOut]:
+    async def list_all_submissions(db: AsyncSession) -> list[TestSubmissionOut]:
         submissions = await TestSubmissionRepository.list_all(db)
         return [TestSubmissionOut.from_orm(s) for s in submissions]
 
     @staticmethod
-    async def list_submissions_by_user(db: AsyncSession, user_id: int) -> List[TestSubmissionOut]:
+    async def list_submissions_by_user(db: AsyncSession, user_id: int) -> list[TestSubmissionOut]:
         """Get all submissions for a specific user (participant view)"""
         submissions = await TestSubmissionRepository.list_by_user(db, user_id)
         return [TestSubmissionOut.from_orm(s) for s in submissions]
@@ -268,7 +268,7 @@ class TestSubmissionService:
         )
 
     @staticmethod
-    async def get_evaluated_submissions_for_trainer(db: AsyncSession, trainer_id: int) -> List[TestSubmissionOut]:
+    async def get_evaluated_submissions_for_trainer(db: AsyncSession, trainer_id: int) -> list[TestSubmissionOut]:
         """
         Get list of EVALUATED submissions for any trainer to review.
 
@@ -281,8 +281,9 @@ class TestSubmissionService:
         """
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
-        from src.models.test_submission import TestSubmission
+
         from src.models.test import Test
+        from src.models.test_submission import TestSubmission
 
         # Get all EVALUATED submissions (any trainer can review any interview)
         query = (
@@ -333,7 +334,7 @@ class TestSubmissionService:
         return submission_outs
 
     @staticmethod
-    async def get_graded_submissions(db: AsyncSession) -> List[TestSubmissionOut]:
+    async def get_graded_submissions(db: AsyncSession) -> list[TestSubmissionOut]:
         """
         Get list of GRADED submissions (already reviewed by trainer).
 
@@ -343,8 +344,9 @@ class TestSubmissionService:
         """
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
-        from src.models.test_submission import TestSubmission
+
         from src.models.test import Test
+        from src.models.test_submission import TestSubmission
 
         # Get all GRADED submissions
         query = (
@@ -361,7 +363,7 @@ class TestSubmissionService:
         return [TestSubmissionOut.from_orm(s) for s in submissions]
 
     @staticmethod
-    async def get_all_submissions_for_trainer(db: AsyncSession, trainer_id: int) -> List[TestSubmissionOut]:
+    async def get_all_submissions_for_trainer(db: AsyncSession, trainer_id: int) -> list[TestSubmissionOut]:
         """
         Get ALL submissions for tests created by this trainer across all statuses.
 
@@ -375,8 +377,9 @@ class TestSubmissionService:
         """
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
-        from src.models.test_submission import TestSubmission
+
         from src.models.test import Test
+        from src.models.test_submission import TestSubmission
 
         # Get all submissions for tests created by this trainer (exclude EVALUATED)
         query = (
@@ -430,7 +433,7 @@ class TestSubmissionService:
         return submission_outs
 
     @staticmethod
-    async def get_submission_review_details(db: AsyncSession, submission_id: int) -> Dict[str, Any]:
+    async def get_submission_review_details(db: AsyncSession, submission_id: int) -> dict[str, Any]:
         """
         Get full review details for a submission including:
         - Submission metadata
@@ -513,7 +516,7 @@ class TestSubmissionService:
             )
 
         # Update submission with trainer review
-        now = datetime.now(timezone.utc).replace(tzinfo=None)  # Strip timezone for POC
+        now = datetime.now(UTC).replace(tzinfo=None)  # Strip timezone for POC
 
         update_data = TestSubmissionUpdate(
             trainer_score=review.trainer_score,

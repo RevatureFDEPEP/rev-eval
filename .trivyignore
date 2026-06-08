@@ -1,0 +1,3 @@
+# Trivy CVE suppression list.
+# Format: one CVE ID per line.
+# Add entries here after reviewing Trivy scan output for false positives.

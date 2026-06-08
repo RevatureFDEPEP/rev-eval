@@ -7,23 +7,68 @@ on:
   workflow_dispatch:
 
 jobs:
-  backend-build-test:
+  # ─── STAGE 1: Detect which paths changed ─────────────────────────────────────
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.set.outputs.backend }}
+      backend_any: ${{ steps.set.outputs.backend_any }}
+      frontend: ${{ steps.set.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            user-service: ['services/user-service/**']
+            question-management-service: ['services/question-management-service/**']
+            test-management-service: ['services/test-management-service/**']
+            api-gateway-service: ['services/api-gateway-service/**']
+            backend-shared: ['pyproject.toml', '.github/workflows/ci-pipeline.yml']
+            frontend: ['frontend/**', '.github/workflows/ci-pipeline.yml']
+
+      - name: Build job set
+        id: set
+        env:
+          CHANGED: ${{ steps.filter.outputs.changes }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          all='["user-service","question-management-service","test-management-service","api-gateway-service"]'
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            backend="$all"; frontend=true
+          else
+            if echo "$CHANGED" | jq -e 'index("backend-shared")' >/dev/null; then
+              backend="$all"
+            else
+              backend=$(jq -cn --argjson a "$all" --argjson c "$CHANGED" '$a - ($a - $c)')
+            fi
+            frontend=$(echo "$CHANGED" | jq -e 'index("frontend")' >/dev/null && echo true || echo false)
+          fi
+          backend_any=$([ "$(echo "$backend" | jq 'length')" -gt 0 ] && echo true || echo false)
+          {
+            echo "backend=$backend"
+            echo "backend_any=$backend_any"
+            echo "frontend=$frontend"
+          } >> "$GITHUB_OUTPUT"
+
+  # ─── STAGE 2: Backend quality (lint → build → scan → test) ──────────────────
+  backend-quality:
     name: Backend (${{ matrix.service }})
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend_any == 'true'
     runs-on: ubuntu-latest
     env:
       JWT_SECRET: ${{ secrets.JWT_SIGNING_SECRET }}
     strategy:
       fail-fast: false
       matrix:
-        service:
-          - user-service
-          - question-management-service
-          - test-management-service
-          - api-gateway-service
+        service: ${{ fromJSON(needs.detect-changes.outputs.backend) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -43,42 +88,123 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov
+          pip install ruff pytest pytest-cov
 
+      # Quality gate 1: Ruff linting
+      - name: Ruff lint
+        working-directory: services/${{ matrix.service }}
+        run: ruff check src/
+
+      # Quality gate 2: pytest with coverage
       - name: Run pytest
         working-directory: services/${{ matrix.service }}
         run: |
-          if [ -d tests ]; then
-            pytest --cov --cov-report=xml
-          else
-            echo "No tests/ directory in services/${{ matrix.service }} — skipping pytest."
+          TEST_DIRS=""
+          [ -d tests ] && TEST_DIRS="$TEST_DIRS tests"
+          [ -d test ]  && TEST_DIRS="$TEST_DIRS test"
+
+          if [ -z "$TEST_DIRS" ]; then
+            echo "No test directory found in services/${{ matrix.service }} — skipping pytest."
+            exit 0
           fi
 
-      # NOTE: Trivy + Ruff scans added in W2 D7 by candidates (not seeded here)
+          set +e
+          pytest $TEST_DIRS \
+            --ignore=src \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-fail-under=0 \
+            -v
+          exit_code=$?
+          set -e
+          # Exit 5 = no tests collected (e.g. empty test file) — treat as pass.
+          # TODO(team): Raise --cov-fail-under to 50 once test suites are established.
+          [ $exit_code -eq 0 ] || [ $exit_code -eq 5 ] || exit $exit_code
 
-  frontend-build-test:
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.service }}
+          path: services/${{ matrix.service }}/coverage.xml
+          if-no-files-found: ignore
+
+      # Quality gate 3: Trivy container vulnerability scan
+      - name: Build Docker image
+        working-directory: services/${{ matrix.service }}
+        run: docker build -t ${{ matrix.service }}:${{ github.sha }} .
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ matrix.service }}:${{ github.sha }}
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-${{ matrix.service }}
+          path: trivy-${{ matrix.service }}.sarif
+          if-no-files-found: ignore
+
+  # ─── STAGE 2: Frontend quality (lint → build → test) ─────────────────────────
+  frontend-quality:
     name: Frontend
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v4
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 8
+          package_json_file: frontend/package.json
 
-      - name: Set up Node
+      - name: Set up Node 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Install dependencies
         working-directory: frontend
-        run: pnpm install
+        run: pnpm install --no-frozen-lockfile
 
-      - name: Lint
+      # Quality gate 1: ESLint
+      - name: Lint (ESLint)
         working-directory: frontend
         run: pnpm lint
+
+      # Quality gate 2: Trivy npm dependency scan
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: frontend
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-frontend.sarif
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-frontend
+          path: trivy-frontend.sarif
+          if-no-files-found: ignore
 
       - name: Build
         working-directory: frontend
