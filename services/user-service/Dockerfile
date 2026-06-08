@@ -12,6 +12,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade "wheel>=0.46.2" "jaraco.context>=6.1.0"
 
 # Copy application code
 COPY . .
