@@ -29,7 +29,7 @@ Spec: `days_6_10_features.md`.
 | # | Feature | Spec priority | Status | Detail |
 |---|---|---|---|---|
 | W2-F1 | Nginx path-based routing & local TLS | REQUIRED | ✅ Completed | [w2-f1-nginx-routing-tls.md](features/w2-f1-nginx-routing-tls.md) |
-| W2-F2 | Unit test scaffolding (frontend + backend) | — | 🟡 In Progress | [w2-f2-unit-test-scaffolding.md](features/w2-f2-unit-test-scaffolding.md) |
+| W2-F2 | Unit test scaffolding (frontend + backend) | — | ✅ Completed | [w2-f2-unit-test-scaffolding.md](features/w2-f2-unit-test-scaffolding.md) |
 | W2-F3 | Centralized log aggregation (Loki/Grafana) | — | ✅ Completed | [w2-f3-log-aggregation.md](features/w2-f3-log-aggregation.md) |
 | W2-F4 | CI quality gates (Ruff / ESLint / Trivy / coverage) | REQUIRED | ✅ Completed | [w2-f4-ci-quality-gates.md](features/w2-f4-ci-quality-gates.md) |
 | W2-F5 | Direct-to-MinIO diagram uploads (pre-signed URLs) | — | ✅ Completed | [w2-f5-minio-presigned-uploads.md](features/w2-f5-minio-presigned-uploads.md) |
@@ -71,7 +71,7 @@ Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 1. ~~**W2-F4 finish**~~ — done (PR #40).
 2. ~~**W2-F5 pre-signed uploads**~~ — done (PR #49).
 3. ~~**W2-F7 Alembic + Category**~~ — done (branch `richardh-feat-alembic`).
-4. **W2-F2 deepen** — multi-stage Dockerfiles + model/repo test depth.
+4. ~~**W2-F2 deepen**~~ — done (branch `richardh-feat-W2-F2`): multi-stage Dockerfiles + model/repo test depth + hermetic test DBs.
 5. **W2-M10 reporting scaffold** — pairs naturally with W2-F7's Alembic work.
 6. **W2-F8 defect cleanup** — small fixes, good filler tasks between features (gateway 204 item already done in W2-F7).
 7. **W3-F1 sessions backend** — strict prerequisite for the whole Week 3 slice; lands as Alembic `0004` on W2-F7's chain.
