@@ -31,7 +31,7 @@ class TestRepository:
         return tests
     @staticmethod
     async def create(db: AsyncSession, test_in: TestCreate) -> Test:
-        test_data = test_in.dict(exclude={"skill_ids", "duration_seconds"})
+        test_data = test_in.model_dump(exclude={"skill_ids", "duration_seconds"})
 
         # Convert seconds → timedelta
         if test_in.duration_seconds is not None:
@@ -46,7 +46,7 @@ class TestRepository:
 
     @staticmethod
     async def update(db: AsyncSession, test: Test, test_in: TestUpdate) -> Test:
-        update_data = test_in.dict(exclude_unset=True, exclude={"skill_ids"})
+        update_data = test_in.model_dump(exclude_unset=True, exclude={"skill_ids"})
 
         # Convert seconds → timedelta
         if "duration_seconds" in update_data:

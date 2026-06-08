@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class SubmissionStatus(str, Enum):
@@ -32,8 +32,7 @@ class TestSubmissionCreate(TestSubmissionBase):
             return v.replace(tzinfo=None)
         return v
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TestSubmissionUpdate(BaseModel):
     due_date: Optional[datetime] = None
@@ -66,8 +65,7 @@ class TestSubmissionUpdate(BaseModel):
             return v.replace(tzinfo=None)
         return v
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TestInfo(BaseModel):
     """Minimal test information for submission display"""
@@ -77,8 +75,7 @@ class TestInfo(BaseModel):
     role: Optional[str] = None
     curriculum: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TestSubmissionOut(TestSubmissionBase):
     id: int
@@ -98,8 +95,7 @@ class TestSubmissionOut(TestSubmissionBase):
     participant_name: Optional[str] = None  # Fetched from User Service
     participant_email: Optional[str] = None  # Fetched from User Service
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class BulkAssignRequest(BaseModel):
     test_id: int
@@ -114,8 +110,7 @@ class BulkAssignRequest(BaseModel):
             return v.replace(tzinfo=None)
         return v
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class BulkAssignResult(BaseModel):
     success_count: int
@@ -123,8 +118,7 @@ class BulkAssignResult(BaseModel):
     created_submissions: list[TestSubmissionOut]
     errors: list[dict]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TrainerReviewRequest(BaseModel):
@@ -133,8 +127,7 @@ class TrainerReviewRequest(BaseModel):
     feedback: Optional[str] = None  # Optional feedback from trainer (deprecated, use trainer_evaluation)
     trainer_evaluation: Optional[dict] = None  # Comprehensive trainer evaluation structure
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TrainerReviewResponse(BaseModel):
@@ -148,5 +141,4 @@ class TrainerReviewResponse(BaseModel):
     reviewed_by_id: int
     status: SubmissionStatus
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

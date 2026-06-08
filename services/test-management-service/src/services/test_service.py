@@ -17,7 +17,7 @@ class TestService:
         Create a new test and automatically link skills
         """
         # Step 1: create test
-        test_data = test_in.dict(exclude={"skill_ids"})
+        test_data = test_in.model_dump(exclude={"skill_ids"})
         test_data["created_by_id"] = creator_id
         test = await TestRepository.create(db, TestCreate(**test_data))
 
@@ -33,7 +33,7 @@ class TestService:
             if skill:
                 skills.append(skill)
 
-        return TestOut.from_orm(test).copy(update={"skills": [SkillOut.from_orm(s) for s in skills]})
+        return TestOut.model_validate(test).model_copy(update={"skills": [SkillOut.model_validate(s) for s in skills]})
 
     @staticmethod
     async def update_test(db: AsyncSession, test_id: int, test_in: TestUpdate) -> TestOut:
@@ -76,7 +76,7 @@ class TestService:
                 if skill:
                     skills.append(skill)
 
-        return TestOut.from_orm(test).copy(update={"skills": [SkillOut.from_orm(s) for s in skills]})
+        return TestOut.model_validate(test).model_copy(update={"skills": [SkillOut.model_validate(s) for s in skills]})
 
     @staticmethod
     async def delete_test(db: AsyncSession, test_id: int) -> None:
@@ -99,7 +99,7 @@ class TestService:
             if skill:
                 skills.append(skill)
 
-        return TestOut.from_orm(test).copy(update={"skills": [SkillOut.from_orm(s) for s in skills]})
+        return TestOut.model_validate(test).model_copy(update={"skills": [SkillOut.model_validate(s) for s in skills]})
 
     @staticmethod
     async def list_all_tests(db: AsyncSession) -> List[TestOut]:
@@ -116,7 +116,7 @@ class TestService:
                     skills.append(skill)
 
             results.append(
-                TestOut.from_orm(test).copy(update={"skills": [SkillOut.from_orm(s) for s in skills]})
+                TestOut.model_validate(test).model_copy(update={"skills": [SkillOut.model_validate(s) for s in skills]})
             )
 
         return results
@@ -139,7 +139,7 @@ class TestService:
                     skills.append(skill)
 
             results.append(
-                TestOut.from_orm(test).copy(update={"skills": [SkillOut.from_orm(s) for s in skills]})
+                TestOut.model_validate(test).model_copy(update={"skills": [SkillOut.model_validate(s) for s in skills]})
             )
 
         return results
@@ -170,7 +170,7 @@ class TestService:
                         skills.append(skill)
 
                 results.append(
-                    TestOut.from_orm(test).copy(update={"skills": [SkillOut.from_orm(s) for s in skills]})
+                    TestOut.model_validate(test).model_copy(update={"skills": [SkillOut.model_validate(s) for s in skills]})
                 )
 
         return results

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from src.models.question import OptionCreate, QuestionType
 
 
@@ -310,12 +310,9 @@ class QuestionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        """Pydantic configuration."""
-        populate_by_name = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+    # datetime serializes to ISO 8601 by default in v2 json mode, so the old
+    # json_encoders={datetime: isoformat} was redundant (and deprecated) — dropped.
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class PresignedUploadResponse(BaseModel):
