@@ -132,7 +132,11 @@ jobs:
 
       - name: Test
         working-directory: frontend
-        run: pnpm test --if-present
+        run: pnpm test:coverage
 
-        #There's no step to push images to a registry or deploy anywhere, making it CI-only with no CD.
-        #docker related actions?? should we not build a new image everytime?? is it an exercise for us to include?? 
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-frontend
+          path: frontend/coverage/

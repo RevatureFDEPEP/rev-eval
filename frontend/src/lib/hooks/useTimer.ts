@@ -61,6 +61,7 @@ export function useTimer(options: UseTimerOptions): UseTimerReturn {
   const warning5MinShown = useRef<boolean>(false);
   const warning1MinShown = useRef<boolean>(false);
   const expiredCallbackFired = useRef<boolean>(false);
+  const timeRemainingRef = useRef<number>(timeRemaining);
 
   // Save time to localStorage
   const saveToLocalStorage = useCallback((remaining: number) => {
@@ -97,7 +98,27 @@ export function useTimer(options: UseTimerOptions): UseTimerReturn {
 
   // Timer countdown
   useEffect(() => {
-    if (!isRunning || timeRemaining <= 0) return;
+    // Already at zero — either ticked down to it or hydrated from storage with
+    // the stored time fully elapsed. Finalize expiry once: clear storage and
+    // fire onTimeExpired so a returning user with an expired session is handled
+    // the same as one whose timer ran out on screen. State updates and the
+    // callback are deferred (like the tick path) so we don't setState
+    // synchronously inside the effect.
+    if (timeRemaining <= 0) {
+      if (!expiredCallbackFired.current) {
+        expiredCallbackFired.current = true;
+        clearLocalStorage();
+        const id = setTimeout(() => {
+          setIsExpired(true);
+          setIsRunning(false);
+          onTimeExpired();
+        }, 0);
+        return () => clearTimeout(id);
+      }
+      return;
+    }
+
+    if (!isRunning) return;
 
     const intervalId = setInterval(() => {
       setTimeRemaining((prev) => {
@@ -156,14 +177,21 @@ export function useTimer(options: UseTimerOptions): UseTimerReturn {
     saveToLocalStorage(nextDuration);
   }, [durationSeconds, autoStart, saveToLocalStorage]);
 
-  // Cleanup on unmount
+  // Track latest time in a ref so the unmount effect below doesn't need
+  // timeRemaining in its deps — depending on it made the cleanup run on every
+  // tick, writing a stale value back to storage (and undoing the clear on expiry).
+  useEffect(() => {
+    timeRemainingRef.current = timeRemaining;
+  }, [timeRemaining]);
+
+  // Persist on unmount only
   useEffect(() => {
     return () => {
-      if (timeRemaining > 0) {
-        saveToLocalStorage(timeRemaining);
+      if (timeRemainingRef.current > 0) {
+        saveToLocalStorage(timeRemainingRef.current);
       }
     };
-  }, [timeRemaining, saveToLocalStorage]);
+  }, [saveToLocalStorage]);
 
   return {
     timeRemaining,

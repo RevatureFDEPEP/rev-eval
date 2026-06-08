@@ -25,8 +25,9 @@ EXPOSE 3000
 CMD ["pnpm", "dev"]
 
 
-# Production build stage
-FROM node:20-alpine AS builder
+# Test stage — runs the unit test suite; the production build depends on this
+# stage, so a failing test suite blocks the production image from being built
+FROM node:20-alpine AS test
 
 WORKDIR /app
 
@@ -36,11 +37,18 @@ RUN npm install -g pnpm
 # Copy package files
 COPY package.json pnpm-lock.yaml* ./
 
-# Install dependencies
+# Install dependencies (including dev deps — vitest lives there)
 RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY . .
+
+# Run the test suite — non-zero exit aborts the build here
+RUN pnpm test
+
+
+# Production build stage
+FROM test AS builder
 
 # Build-time environment variables (NEXT_PUBLIC_* vars must be set at build time)
 # These are baked into the JavaScript bundle for client-side use
