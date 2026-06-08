@@ -1,4 +1,4 @@
-# F4 — CI Quality Gates (Ruff / ESLint / Trivy / Coverage)
+# W2-F4 — CI Quality Gates (Ruff / ESLint / Trivy / Coverage)
 
 **Status:** ✅ Completed
 **Spec:** `days_6_10_features.md` §4 (Day 7) — priority REQUIRED
@@ -31,13 +31,13 @@ comment ("Trivy + Ruff scans added in W2 D7 by candidates").
       aspirational 70 (smoke tests only; cohort decision):
       api-gateway 47%→45, user 60%→58, question-mgmt 50%→48,
       test-mgmt 45%→43. `coverage.xml` uploaded as per-service artifact
-      (PR #40, `7251a55`). Raise thresholds as test depth grows (F2).
+      (PR #40, `7251a55`). Raise thresholds as test depth grows (W2-F2).
 
 ## Evidence
 
 - PR [#40](https://github.com/RevatureFDEPEP/rev-eval/pull/40) — merged
   2026-06-04, all checks green (4 backend matrix jobs + frontend).
-- Plan: [`docs/plans/ci-quality-gates.md`](../plans/ci-quality-gates.md).
+- Plan: [`docs/plans/w2-f4-ci-quality-gates.md`](../plans/w2-f4-ci-quality-gates.md).
 - Gate proven live: first Trivy run failed on real fixable HIGH CVEs shipped
   in `python:3.11-slim` tooling (`jaraco.context` 5.3.0 CVE-2026-23949,
   `wheel` 0.45.1 CVE-2026-24049); fixed by upgrading
@@ -55,4 +55,4 @@ comment ("Trivy + Ruff scans added in W2 D7 by candidates").
 ## Remaining
 
 - Nothing for the spec. Follow-ups live elsewhere: raise coverage ratchets as
-  F2 adds tests; W3-F5 extends this job structure with service containers.
+  W2-F2 adds tests; W3-F5 extends this job structure with service containers.

@@ -1,4 +1,4 @@
-# F6 — Structured Question Authoring Interface
+# W2-F6 — Structured Question Authoring Interface
 
 **Status:** ✅ Completed
 **Spec:** `days_6_10_features.md` §6 (Day 9)
@@ -31,8 +31,8 @@ Interactive Next.js form letting trainers author questions into MongoDB.
 - Edit page `trainer/questions/edit/[id]/page.tsx` (commit `422e0db`, branch
   `richardh-feat-questions`).
 - Unit tests for form utils (commit `908dcb6`) — see
-  [F2](f2-unit-test-scaffolding.md).
+  [W2-F2](w2-f2-unit-test-scaffolding.md).
 
 ## Remaining
 
-None. (File-upload field belongs to [F5](f5-minio-presigned-uploads.md).)
+None. (File-upload field belongs to [W2-F5](w2-f5-minio-presigned-uploads.md).)

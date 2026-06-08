@@ -1,8 +1,8 @@
-# F5 — Direct-to-MinIO Diagram Uploads via Pre-Signed URLs
+# W2-F5 — Direct-to-MinIO Diagram Uploads via Pre-Signed URLs
 
 ## Context
 
-F5 (`docs/features/f5-minio-presigned-uploads.md`, spec `days_6_10_features.md` §5, Days 8–9) lets question authors attach diagrams/screenshots: browser fetches a pre-signed PUT URL from question-management-service, uploads the file directly to MinIO, and the object key is stored on the question's Mongo document. Currently ❌ Not Started; it unblocks W3-F1 (quiz sessions need seeded question docs). `src/utils/s3_client.py` is already seeded with `generate_presigned_put_url` / `generate_presigned_get_url` / `ensure_bucket` (boto3, sigv4) — unused. User opted **in** to the edit-form preview extension (presigned GET `image_url` in responses); quiz/participant display stays out of scope.
+W2-F5 (`docs/features/w2-f5-minio-presigned-uploads.md`, spec `days_6_10_features.md` §5, Days 8–9) lets question authors attach diagrams/screenshots: browser fetches a pre-signed PUT URL from question-management-service, uploads the file directly to MinIO, and the object key is stored on the question's Mongo document. Currently ❌ Not Started; it unblocks W3-F1 (quiz sessions need seeded question docs). `src/utils/s3_client.py` is already seeded with `generate_presigned_put_url` / `generate_presigned_get_url` / `ensure_bucket` (boto3, sigv4) — unused. User opted **in** to the edit-form preview extension (presigned GET `image_url` in responses); quiz/participant display stays out of scope.
 
 ## Key design decisions
 
@@ -18,13 +18,13 @@ F5 (`docs/features/f5-minio-presigned-uploads.md`, spec `days_6_10_features.md` 
 
 Feature branch off `richardh` following the established pattern (cf. `richardh-feat-linting`, PR #40): **`richardh-feat-minio-uploads`**. PR back into `richardh`. Regular commits at each logical boundary (conventional-commit style, matching repo history):
 
-1. `docs(plans): add F5 MinIO presigned uploads implementation plan` — plan file under `docs/plans/` (first commit, before code).
+1. `docs(plans): add W2-F5 MinIO presigned uploads implementation plan` — plan file under `docs/plans/` (first commit, before code).
 2. `feat(question-service): presigned upload URL endpoint + public signing endpoint` — steps 1–6 backend.
 3. `feat(question-service): image_object_key on question document + schemas` — step 7 (+ schema parts of 5 if not already in #2).
 4. `chore(compose): MinIO CORS pin + S3_PUBLIC_ENDPOINT_URL env` — step 8.
 5. `feat(frontend): question diagram upload via presigned PUT` — steps 9–12.
 6. `test(question-service): presign upload service unit tests` — step 13.
-7. `docs: mark F5 completed in feature tracker` — steps 14–15.
+7. `docs: mark W2-F5 completed in feature tracker` — steps 14–15.
 
 ## Backend (services/question-management-service/)
 
@@ -55,7 +55,7 @@ Feature branch off `richardh` following the established pattern (cf. `richardh-f
 
 ## Tests
 
-13. **`services/question-management-service/tests/test_upload_service.py`** (tests/ exists from F2; mock/patch `generate_presigned_put_url`, no Mongo):
+13. **`services/question-management-service/tests/test_upload_service.py`** (tests/ exists from W2-F2; mock/patch `generate_presigned_put_url`, no Mongo):
     - png → key matches `^questions/[0-9a-f]{32}\.png$`, response shape correct.
     - jpeg → `.jpg` extension.
     - `application/pdf`, `image/gif` → HTTPException 400.
@@ -63,9 +63,9 @@ Feature branch off `richardh` following the established pattern (cf. `richardh-f
 
 ## Docs (same PR — project workflow rule)
 
-14. `docs/features/f5-minio-presigned-uploads.md`: check off steps 1–6, status ✅, evidence (paths/PR), note signing-host decision + orphan-object limitation.
-15. `docs/FEATURE_STATUS.md` line 34: F5 row → ✅ Completed; bump "Last assessed".
-16. Save this plan to `docs/plans/f5-minio-presigned-uploads.md` as the **first commit** on the feature branch (version-controlled plans rule).
+14. `docs/features/w2-f5-minio-presigned-uploads.md`: check off steps 1–6, status ✅, evidence (paths/PR), note signing-host decision + orphan-object limitation.
+15. `docs/FEATURE_STATUS.md` line 34: W2-F5 row → ✅ Completed; bump "Last assessed".
+16. Save this plan to `docs/plans/w2-f5-minio-presigned-uploads.md` as the **first commit** on the feature branch (version-controlled plans rule).
 
 ## Verification
 

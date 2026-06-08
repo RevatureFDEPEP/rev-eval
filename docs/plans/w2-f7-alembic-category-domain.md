@@ -1,8 +1,8 @@
-# F7 — Alembic Migrations & Category Domain
+# W2-F7 — Alembic Migrations & Category Domain
 
 ## Context
 
-F7 (`docs/features/f7-alembic-category-domain.md`, spec `days_6_10_features.md` §7, Day 10) brings test-management-service's relational schema under Alembic and adds a Category domain (M2M with Skill). Currently no `alembic/` exists anywhere; tables are made by SQLAlchemy `create_all` on every boot (`start.sh` + app startup), which can only create missing tables — never evolve them. F7 unblocks W3-F1 (sessions migration) and M10 (reporting Alembic pattern).
+W2-F7 (`docs/features/w2-f7-alembic-category-domain.md`, spec `days_6_10_features.md` §7, Day 10) brings test-management-service's relational schema under Alembic and adds a Category domain (M2M with Skill). Currently no `alembic/` exists anywhere; tables are made by SQLAlchemy `create_all` on every boot (`start.sh` + app startup), which can only create missing tables — never evolve them. W2-F7 unblocks W3-F1 (sessions migration) and W2-M10 (reporting Alembic pattern).
 
 **User decisions (locked):**
 1. **Baseline + categories revisions** — 0001 baseline of existing schema, 0002 categories; `alembic stamp` for legacy volumes.
@@ -29,7 +29,7 @@ Use readable revision ids (`0001`, `0002`, `0003` via `alembic revision --rev-id
 
 ### 0. Branch & commit workflow
 - **`git fetch && git pull origin richardh`** (update local `richardh`), then **create feature branch `richardh-feat-alembic` from `richardh`** before any code change.
-- **First commit: save this plan to `docs/plans/f7-alembic-category-domain.md`** (version-controlled plans convention).
+- **First commit: save this plan to `docs/plans/w2-f7-alembic-category-domain.md`** (version-controlled plans convention).
 - **Commit regularly** — one commit per logical chunk, roughly per lettered section below (user-service seed move; Category domain; gateway route; Alembic init + migrations; startup rewiring; tests; docs). Conventional Commits style as in repo history.
 
 ### A. user-service: own its users seeding
@@ -74,17 +74,17 @@ Use readable revision ids (`0001`, `0002`, `0003` via `alembic revision --rev-id
 19. **user-service test** for `seed_users` idempotency (it has tests/ + conftest already).
 
 ### G. Docs (same PR — tracker convention)
-20. **`docs/FEATURE_STATUS.md`** — F7 row → ✅/🟡, update "Last assessed".
-21. **`docs/features/f7-alembic-category-domain.md`** — check off steps, evidence (paths, rev ids, PR), record decisions (create_all removed; Alembic owns structure+seed; users seeding moved to user-service) under Notes.
+20. **`docs/FEATURE_STATUS.md`** — W2-F7 row → ✅/🟡, update "Last assessed".
+21. **`docs/features/w2-f7-alembic-category-domain.md`** — check off steps, evidence (paths, rev ids, PR), record decisions (create_all removed; Alembic owns structure+seed; users seeding moved to user-service) under Notes.
 22. **`rev-eval/CLAUDE.md`** — update seed command line (`seed_db.py` gone; seeding now via migrations / user-service startup).
-23. ~~`docs/plans/f7-alembic-category-domain.md`~~ — saved in step 0 (first commit on the branch).
+23. ~~`docs/plans/w2-f7-alembic-category-domain.md`~~ — saved in step 0 (first commit on the branch).
 
 ## Verification
 
 1. **Fresh stack:** `docker compose down -v && docker compose up --build` — logs show user-service seeding users, then test-management `alembic upgrade head` applying 0001→0003; `alembic_version`=0003; `\dt` shows `categories`, `category_skills`; login as trainer1@revature.com/password123 works.
 2. **Legacy volume sim:** start once on old code's volume (or restore), then new code — logs show `stamp 0001` + upgrade applying only 0002/0003; no duplicate-table errors; no duplicate seed rows.
 3. **API through gateway:** create category, link skill, fetch with nested skills, unlink, delete (curl per route list above); 404s on bad ids; gateway routes `/v1/api/categories` correctly.
-4. **`pytest --cov`** in test-management-service and user-service; **`ruff check`** clean (F4 CI gates).
+4. **`pytest --cov`** in test-management-service and user-service; **`ruff check`** clean (W2-F4 CI gates).
 5. **Migration chain:** `alembic history` shows 0001→0002→0003; `alembic downgrade 0002 && alembic upgrade head` round-trips.
 
 ## Risks / watch-items

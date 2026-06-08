@@ -1,4 +1,4 @@
-# F1 — Nginx Path-Based Routing & Local TLS
+# W2-F1 — Nginx Path-Based Routing & Local TLS
 
 **Status:** ✅ Completed
 **Spec:** `days_6_10_features.md` §1 (Day 6) — priority REQUIRED
@@ -29,7 +29,7 @@ to the frontend and the API gateway.
 ## Beyond spec
 
 - JSON access logs (`log_format json_combined`) to stdout, shipped to Loki by
-  Promtail — feeds [F3](f3-log-aggregation.md).
+  Promtail — feeds [W2-F3](w2-f3-log-aggregation.md).
 - `X-Correlation-Id` pass-through with `$request_id` fallback for distributed
   log tracing.
 

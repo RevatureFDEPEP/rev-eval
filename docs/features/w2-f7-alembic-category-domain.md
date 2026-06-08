@@ -1,4 +1,4 @@
-# F7 — Relational Schema Evolution: Alembic Migrations & Category Domain
+# W2-F7 — Relational Schema Evolution: Alembic Migrations & Category Domain
 
 **Status:** ✅ Completed
 **Spec:** `days_6_10_features.md` §7 (Day 10)
@@ -54,7 +54,7 @@ domain and bring schema changes under Alembic migration control.
   before `/health` responds — compose ordering guarantees the trainer ids
   that `0003` needs. If users are missing, `0003` raises and is *not*
   recorded, so the container retry self-heals.
-- The reporting service ([M10](m10-reporting-service-scaffold.md)) reuses the
+- The reporting service ([W2-M10](w2-m10-reporting-service-scaffold.md)) reuses the
   Alembic pattern established here.
 
 ## Remaining

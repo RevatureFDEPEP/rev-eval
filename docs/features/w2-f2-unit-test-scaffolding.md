@@ -1,4 +1,4 @@
-# F2 — Unit Test Scaffolding (Frontend + Backend)
+# W2-F2 — Unit Test Scaffolding (Frontend + Backend)
 
 **Status:** 🟡 In Progress
 **Spec:** `days_6_10_features.md` §2 (Days 5 & 7)
@@ -36,4 +36,4 @@ Python backend services.
 ## Notes
 
 CI runs `pytest --cov` only when `services/<svc>/tests/` exists — all 4 now
-qualify. Coverage *gating* belongs to [F4](f4-ci-quality-gates.md).
+qualify. Coverage *gating* belongs to [W2-F4](w2-f4-ci-quality-gates.md).
