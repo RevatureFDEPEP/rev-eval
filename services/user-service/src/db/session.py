@@ -2,13 +2,10 @@ import logging
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 from src.config.settings import settings
-from src.db.init_db import Base
 
-# Import all models to register them with Base.metadata before create_all.
-# Removing this import breaks table creation (the model would never register).
-from src.models.user import User  # noqa: F401
+Base = declarative_base()
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +31,9 @@ def init_db():
     Call this on app startup.
     """
     try:
-        # Import all models here so they are registered with Base
+        # Deferred import so the model registers with Base.metadata before
+        # create_all, without a module-level session <-> user import cycle.
+        from src.models import user  # noqa: F401
 
         # Create tables
         Base.metadata.create_all(bind=engine)
