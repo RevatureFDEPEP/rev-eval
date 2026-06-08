@@ -9,10 +9,11 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1" "wheel>=0.46.2" "jaraco.context>=6.1.0"
+
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir --upgrade "wheel>=0.46.2" "jaraco.context>=6.1.0"
+RUN python -m pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
