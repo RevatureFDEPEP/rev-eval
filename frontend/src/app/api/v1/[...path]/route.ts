@@ -37,6 +37,9 @@ async function handleRequest(
     headers: {
       Authorization: `Bearer ${session.token}`,
       'Content-Type': 'application/json',
+      'X-Correlation-Id':
+        request.headers.get('x-correlation-id') ??
+        crypto.randomUUID().replace(/-/g, ''),
     },
     body,
   });

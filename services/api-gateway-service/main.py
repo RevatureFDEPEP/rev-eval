@@ -10,7 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from src.middleware.auth import add_user_context_headers, verify_jwt_token
-from src.utils.logging_config import setup_logging
+from src.middleware.correlation import CorrelationIdMiddleware
+from src.utils.logging_config import get_correlation_id, setup_logging
 
 # Load environment variables
 load_dotenv()
@@ -28,6 +29,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(CorrelationIdMiddleware)
 
 # Service name to port mapping (compose-internal DNS)
 SERVICE_PORTS = {
@@ -138,6 +140,8 @@ async def public_auth_proxy(auth_path: str, request: Request):
     for h in ("host", "content-length", "x-forwarded-proto", "x-forwarded-scheme"):
         headers.pop(h, None)
 
+    headers["X-Correlation-Id"] = get_correlation_id()
+
     async with httpx.AsyncClient(follow_redirects=True) as client:
         resp = await client.request(
             request.method,
@@ -210,6 +214,7 @@ async def smart_gateway(
 
             # Add user context headers for downstream services
             headers = add_user_context_headers(headers, user_context)
+            headers["X-Correlation-Id"] = get_correlation_id()
 
             resp = await client.request(
                 method,
@@ -286,6 +291,7 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
             headers.pop("content-length", None)
             headers.pop("x-forwarded-proto", None)
             headers.pop("x-forwarded-scheme", None)
+            headers["X-Correlation-Id"] = get_correlation_id()
 
             resp = await client.request(
                 method,
