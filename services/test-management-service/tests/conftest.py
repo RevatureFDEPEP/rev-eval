@@ -16,10 +16,10 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from src.db.session import Base
+from src.models.skill import Skill  # noqa: F401
 
 # Import all models to register table metadata
 from src.models.test import Test  # noqa: F401
-from src.models.skill import Skill  # noqa: F401
 from src.models.test_skill import TestSkill  # noqa: F401
 from src.models.test_submission import TestSubmission  # noqa: F401
 
