@@ -1,0 +1,14 @@
+# Coverage config for the W2-D7 CI quality gate. `pytest --cov` in CI picks
+# this up automatically. fail_under is a measured-baseline ratchet: set just
+# below current coverage so regressions fail the build without demanding
+# tests that don't exist yet. Raise it as test coverage grows (W4-F1).
+[run]
+source = .
+omit =
+    tests/*
+    conftest.py
+    seed_*.py
+    .venv/*
+
+[report]
+fail_under = 75
