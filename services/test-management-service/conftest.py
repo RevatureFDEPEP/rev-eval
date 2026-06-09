@@ -42,6 +42,7 @@ async def db_session() -> AsyncSession:
     # Register all models so Base.metadata is fully populated before create_all.
     # Mirror the import list in src/db/session.py:init_db.
     from src.models.category import Category  # noqa: F401
+    from src.models.session import Session  # noqa: F401
     from src.models.skill import Skill  # noqa: F401
     from src.models.test import Test  # noqa: F401
     from src.models.test_skill import TestSkill  # noqa: F401

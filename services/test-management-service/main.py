@@ -7,8 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import settings
 from src.db.session import init_db
 from src.middleware.correlation import CorrelationIdMiddleware
-from src.utils.logging_config import setup_logging
 from src.utils import question_client
+from src.utils.logging_config import setup_logging
 from src.v1.routes.category_route import router as category_router
 from src.v1.routes.session_route import router as session_router
 from src.v1.routes.skill_route import router as skill_router
