@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -64,7 +64,7 @@ class QuizSessionRepository:
     ) -> QuizSession:
         session.status = status
         if status == QuizSessionStatus.SUBMITTED:
-            session.submitted_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            session.submitted_at = datetime.now(UTC).replace(tzinfo=None)
         await db.commit()
         await db.refresh(session)
         return session

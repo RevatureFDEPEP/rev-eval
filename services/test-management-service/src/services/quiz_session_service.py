@@ -10,7 +10,7 @@ stripped. The client never computes timing state.
 import logging
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -123,7 +123,7 @@ class QuizSessionService:
         if test.test_type != TestType.QUIZ:
             raise QuizSessionError("Test is not a quiz", status_code=400)
 
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
 
         # Idempotent: reuse an existing, non-expired active session.
         existing = await QuizSessionRepository.get_active_by_test_and_user(
@@ -208,7 +208,7 @@ class QuizSessionService:
         if session.user_id != user_id:
             raise QuizSessionError("Not authorized for this session", status_code=403)
 
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
 
         if session.status == QuizSessionStatus.ACTIVE and session.expires_at <= now:
             session = await QuizSessionRepository.set_status(

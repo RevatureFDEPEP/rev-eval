@@ -249,6 +249,7 @@ class TestCreateSessionExpiredResume:
 
         # Backdate expires_at so the session appears expired.
         from sqlalchemy import update
+
         from src.models.quiz_session import QuizSession
         await db_session.execute(
             update(QuizSession)
