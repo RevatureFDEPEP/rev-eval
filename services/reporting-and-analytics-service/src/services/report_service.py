@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import and_, case, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -13,19 +13,53 @@ from src.schemas.report_schemas import (
 )
 
 PASSING_SCORE = settings.PASSING_SCORE
+_SCORED_VALUES = [s.value for s in SCORED_STATUSES]
 
 
-def _score_stats(scores: list[int]) -> tuple[float | None, float | None]:
-    if not scores:
-        return None, None
-    avg = round(sum(scores) / len(scores), 2)
-    pass_rate = round(sum(1 for s in scores if s >= PASSING_SCORE) / len(scores) * 100, 2)
-    return avg, pass_rate
+# ---------------------------------------------------------------------------
+# SQL expression helpers
+# ---------------------------------------------------------------------------
+
+def _is_scored():
+    return TestSubmission.status.in_(_SCORED_VALUES)
+
+
+def _has_score():
+    return and_(_is_scored(), TestSubmission.final_score.isnot(None))
+
+
+def _is_passed():
+    return and_(_has_score(), TestSubmission.final_score >= PASSING_SCORE)
+
+
+def _agg_cols():
+    """Standard aggregate columns reused across queries."""
+    return (
+        func.count(TestSubmission.id).label("total"),
+        func.count(case((_is_scored(), 1))).label("completed"),
+        func.avg(case((_has_score(), TestSubmission.final_score))).label("avg_score"),
+        func.count(case((_has_score(), 1))).label("scored_count"),
+        func.count(case((_is_passed(), 1))).label("passed_count"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Python-side helpers (shaping only, no iteration over large sets)
+# ---------------------------------------------------------------------------
+
+def _to_float(value) -> float | None:
+    return round(float(value), 2) if value is not None else None
+
+
+def _pass_rate(passed: int, scored: int) -> float | None:
+    if not scored:
+        return None
+    return round(passed / scored * 100, 2)
 
 
 def _submission_to_detail(sub: TestSubmission, test_name: str, skill_names: list[str]) -> SubmissionDetail:
-    scored = sub.status in SCORED_STATUSES
-    passed = (sub.final_score is not None and sub.final_score >= PASSING_SCORE) if scored else None
+    in_scored = sub.status in SCORED_STATUSES
+    passed = (sub.final_score is not None and sub.final_score >= PASSING_SCORE) if in_scored else None
     return SubmissionDetail(
         submission_id=sub.id,
         test_id=sub.test_id,
@@ -38,88 +72,104 @@ def _submission_to_detail(sub: TestSubmission, test_name: str, skill_names: list
     )
 
 
+# ---------------------------------------------------------------------------
+# Report functions
+# ---------------------------------------------------------------------------
+
 async def get_dashboard(db: AsyncSession) -> DashboardReport:
-    tests_result = await db.execute(
-        select(Test)
-        .options(selectinload(Test.submissions), selectinload(Test.test_skills).selectinload(TestSkill.skill))
-    )
-    tests = tests_result.scalars().all()
+    # Overall totals — single row
+    overall = (await db.execute(select(*_agg_cols()))).one()
 
-    all_subs = [sub for t in tests for sub in t.submissions]
-    completed = [s for s in all_subs if s.status in SCORED_STATUSES]
-    scores = [s.final_score for s in completed if s.final_score is not None]
-    avg, pass_rate = _score_stats(scores)
+    # Per-test — one row per test via GROUP BY
+    test_rows = (await db.execute(
+        select(Test.id, Test.name, Test.test_type, *_agg_cols())
+        .join(TestSubmission, TestSubmission.test_id == Test.id, isouter=True)
+        .group_by(Test.id, Test.name, Test.test_type)
+        .order_by(Test.id)
+    )).all()
 
-    test_summaries = []
-    for test in tests:
-        t_completed = [s for s in test.submissions if s.status in SCORED_STATUSES]
-        t_scores = [s.final_score for s in t_completed if s.final_score is not None]
-        t_avg, t_pass = _score_stats(t_scores)
-        test_summaries.append({
-            "test_id": test.id,
-            "test_name": test.name,
-            "test_type": test.test_type,
-            "total_assigned": len(test.submissions),
-            "total_completed": len(t_completed),
-            "avg_score": t_avg,
-            "pass_rate": t_pass,
-        })
+    test_summaries = [
+        {
+            "test_id": row.id,
+            "test_name": row.name,
+            "test_type": row.test_type,
+            "total_assigned": row.total,
+            "total_completed": row.completed,
+            "avg_score": _to_float(row.avg_score),
+            "pass_rate": _pass_rate(row.passed_count, row.scored_count),
+        }
+        for row in test_rows
+    ]
 
-    skills_result = await db.execute(
-        select(Skill).options(selectinload(Skill.test_skills).selectinload(TestSkill.test).selectinload(Test.submissions))
-    )
-    skills = skills_result.scalars().all()
+    # Per-skill — one row per skill via GROUP BY (only scored submissions)
+    skill_rows = (await db.execute(
+        select(
+            Skill.id,
+            Skill.name,
+            func.count(TestSubmission.id).label("total"),
+            func.avg(case((_has_score(), TestSubmission.final_score))).label("avg_score"),
+            func.count(case((_has_score(), 1))).label("scored_count"),
+            func.count(case((_is_passed(), 1))).label("passed_count"),
+        )
+        .join(TestSkill, TestSkill.skill_id == Skill.id)
+        .join(TestSubmission, TestSubmission.test_id == TestSkill.test_id)
+        .where(_is_scored())
+        .group_by(Skill.id, Skill.name)
+        .order_by(Skill.id)
+    )).all()
 
-    skill_summaries = []
-    for skill in skills:
-        skill_subs = [
-            sub
-            for ts in skill.test_skills
-            for sub in ts.test.submissions
-            if sub.status in SCORED_STATUSES
-        ]
-        s_scores = [s.final_score for s in skill_subs if s.final_score is not None]
-        s_avg, s_pass = _score_stats(s_scores)
-        skill_summaries.append(SkillSummary(
-            skill_id=skill.id,
-            skill_name=skill.name,
-            total_submissions=len(skill_subs),
-            avg_score=s_avg,
-            pass_rate=s_pass,
-        ))
+    skill_summaries = [
+        SkillSummary(
+            skill_id=row.id,
+            skill_name=row.name,
+            total_submissions=row.total,
+            avg_score=_to_float(row.avg_score),
+            pass_rate=_pass_rate(row.passed_count, row.scored_count),
+        )
+        for row in skill_rows
+    ]
 
-    total = len(all_subs)
+    total = overall.total or 0
+    completed = overall.completed or 0
     return DashboardReport(
         total_submissions=total,
-        total_completed=len(completed),
-        completion_rate=round(len(completed) / total * 100, 2) if total else 0.0,
-        avg_score=avg,
-        pass_rate=pass_rate,
+        total_completed=completed,
+        completion_rate=round(completed / total * 100, 2) if total else 0.0,
+        avg_score=_to_float(overall.avg_score),
+        pass_rate=_pass_rate(overall.passed_count, overall.scored_count),
         tests=test_summaries,
         skills=skill_summaries,
     )
 
 
-async def get_test_report(db: AsyncSession, test_id: int) -> TestReport:
-    result = await db.execute(
+async def get_test_report(db: AsyncSession, test_id: int) -> TestReport | None:
+    # Test metadata + skills
+    test_result = await db.execute(
         select(Test)
         .where(Test.id == test_id)
-        .options(selectinload(Test.submissions), selectinload(Test.test_skills).selectinload(TestSkill.skill))
+        .options(selectinload(Test.test_skills).selectinload(TestSkill.skill))
     )
-    test = result.scalar_one_or_none()
+    test = test_result.scalar_one_or_none()
     if not test:
         return None
 
     skill_names = [ts.skill.name for ts in test.test_skills if ts.skill]
-    completed = [s for s in test.submissions if s.status in SCORED_STATUSES]
-    scores = [s.final_score for s in completed if s.final_score is not None]
-    avg, pass_rate = _score_stats(scores)
-    total = len(test.submissions)
 
-    submission_details = [
-        _submission_to_detail(s, test.name, skill_names) for s in test.submissions
-    ]
+    # Aggregate stats — one query
+    agg = (await db.execute(
+        select(*_agg_cols()).where(TestSubmission.test_id == test_id)
+    )).one()
 
+    # Submission details — rows still needed for the detail list
+    subs_result = await db.execute(
+        select(TestSubmission)
+        .where(TestSubmission.test_id == test_id)
+        .order_by(TestSubmission.id)
+    )
+    subs = subs_result.scalars().all()
+
+    total = agg.total or 0
+    completed = agg.completed or 0
     return TestReport(
         test_id=test.id,
         test_name=test.name,
@@ -127,78 +177,84 @@ async def get_test_report(db: AsyncSession, test_id: int) -> TestReport:
         role=test.role,
         curriculum=test.curriculum,
         total_assigned=total,
-        total_completed=len(completed),
-        completion_rate=round(len(completed) / total * 100, 2) if total else 0.0,
-        avg_score=avg,
-        pass_rate=pass_rate,
+        total_completed=completed,
+        completion_rate=round(completed / total * 100, 2) if total else 0.0,
+        avg_score=_to_float(agg.avg_score),
+        pass_rate=_pass_rate(agg.passed_count, agg.scored_count),
         skills=skill_names,
-        submissions=submission_details,
+        submissions=[_submission_to_detail(s, test.name, skill_names) for s in subs],
     )
 
 
 async def get_participant_report(db: AsyncSession, user_id: int) -> ParticipantReport:
-    result = await db.execute(
+    # Aggregate stats — one query
+    agg = (await db.execute(
+        select(*_agg_cols()).where(TestSubmission.user_id == user_id)
+    )).one()
+
+    # Skills covered — distinct via join, no Python set comprehension over rows
+    skills_result = await db.execute(
+        select(distinct(Skill.name))
+        .join(TestSkill, TestSkill.skill_id == Skill.id)
+        .join(TestSubmission, TestSubmission.test_id == TestSkill.test_id)
+        .where(TestSubmission.user_id == user_id)
+        .order_by(Skill.name)
+    )
+    skills_covered = [row[0] for row in skills_result.all()]
+
+    # Submission details with test + skill names (row fetch still needed for detail list)
+    subs_result = await db.execute(
         select(TestSubmission)
         .where(TestSubmission.user_id == user_id)
         .options(selectinload(TestSubmission.test).selectinload(Test.test_skills).selectinload(TestSkill.skill))
+        .order_by(TestSubmission.id)
     )
-    subs = result.scalars().all()
+    subs = subs_result.scalars().all()
 
-    completed = [s for s in subs if s.status in SCORED_STATUSES]
-    scores = [s.final_score for s in completed if s.final_score is not None]
-    avg, pass_rate = _score_stats(scores)
-
-    skills_covered = list({
-        ts.skill.name
-        for s in subs
-        for ts in s.test.test_skills
-        if ts.skill
-    })
-
-    details = [
-        _submission_to_detail(
-            s,
-            s.test.name,
-            [ts.skill.name for ts in s.test.test_skills if ts.skill],
-        )
-        for s in subs
-    ]
-
+    total = agg.total or 0
+    completed = agg.completed or 0
     return ParticipantReport(
         user_id=user_id,
-        total_assigned=len(subs),
-        total_completed=len(completed),
-        avg_score=avg,
-        pass_rate=pass_rate,
+        total_assigned=total,
+        total_completed=completed,
+        avg_score=_to_float(agg.avg_score),
+        pass_rate=_pass_rate(agg.passed_count, agg.scored_count),
         skills_covered=skills_covered,
-        submissions=details,
+        submissions=[
+            _submission_to_detail(
+                s,
+                s.test.name,
+                [ts.skill.name for ts in s.test.test_skills if ts.skill],
+            )
+            for s in subs
+        ],
     )
 
 
 async def get_skills_report(db: AsyncSession) -> list[SkillSummary]:
-    result = await db.execute(
-        select(Skill).options(
-            selectinload(Skill.test_skills).selectinload(TestSkill.test).selectinload(Test.submissions)
+    rows = (await db.execute(
+        select(
+            Skill.id,
+            Skill.name,
+            func.count(TestSubmission.id).label("total"),
+            func.avg(case((_has_score(), TestSubmission.final_score))).label("avg_score"),
+            func.count(case((_has_score(), 1))).label("scored_count"),
+            func.count(case((_is_passed(), 1))).label("passed_count"),
         )
-    )
-    skills = result.scalars().all()
+        .join(TestSkill, TestSkill.skill_id == Skill.id)
+        .join(TestSubmission, TestSubmission.test_id == TestSkill.test_id)
+        .where(_is_scored())
+        .group_by(Skill.id, Skill.name)
+        .order_by(Skill.id)
+    )).all()
 
-    summaries = []
-    for skill in skills:
-        skill_subs = [
-            sub
-            for ts in skill.test_skills
-            for sub in ts.test.submissions
-            if sub.status in SCORED_STATUSES
-        ]
-        scores = [s.final_score for s in skill_subs if s.final_score is not None]
-        avg, pass_rate = _score_stats(scores)
-        summaries.append(SkillSummary(
-            skill_id=skill.id,
-            skill_name=skill.name,
-            total_submissions=len(skill_subs),
-            avg_score=avg,
-            pass_rate=pass_rate,
-        ))
-
-    return summaries
+    return [
+        SkillSummary(
+            skill_id=row.id,
+            skill_name=row.name,
+            total_submissions=row.total,
+            avg_score=_to_float(row.avg_score),
+            pass_rate=_pass_rate(row.passed_count, row.scored_count),
+        )
+        for row in rows
+    ]
