@@ -35,7 +35,7 @@ Spec: `days_6_10_features.md`.
 | W2-F3 | Centralized log aggregation (Loki/Grafana) | — | ✅ Completed | [w2-f3-log-aggregation.md](features/w2-f3-log-aggregation.md) |
 | W2-F4 | CI quality gates (Ruff / ESLint / Trivy / coverage) | REQUIRED | ✅ Completed | [w2-f4-ci-quality-gates.md](features/w2-f4-ci-quality-gates.md) |
 | W2-F5 | Direct-to-MinIO diagram uploads (pre-signed URLs) | — | ✅ Completed | [w2-f5-minio-presigned-uploads.md](features/w2-f5-minio-presigned-uploads.md) |
-| W2-F6 | Structured question authoring interface | — | 🟡 In Progress | [w2-f6-question-authoring-ui.md](features/w2-f6-question-authoring-ui.md) |
+| W2-F6 | Structured question authoring interface | — | ✅ Completed | [w2-f6-question-authoring-ui.md](features/w2-f6-question-authoring-ui.md) |
 | W2-F7 | Alembic migrations & Category domain | — | ✅ Completed | [w2-f7-alembic-category-domain.md](features/w2-f7-alembic-category-domain.md) |
 | W2-F8 | Pre-existing defect cleanup (found during W2-F7) | — | ✅ Completed | [w2-f8-pre-existing-defects.md](features/w2-f8-pre-existing-defects.md) |
 | W2-M10 | Day 10 milestone: reporting service scaffold | milestone | ❌ Not Started | [w2-m10-reporting-service-scaffold.md](features/w2-m10-reporting-service-scaffold.md) |
