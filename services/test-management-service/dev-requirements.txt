@@ -1,5 +1,5 @@
 # Dev-only dependencies — not installed in production Docker image
-ruff
+ruff==0.15.15
 pytest
 pytest-asyncio
 pytest-cov
