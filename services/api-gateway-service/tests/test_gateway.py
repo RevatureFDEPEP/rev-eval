@@ -31,6 +31,10 @@ def test_route_submissions_path():
     assert find_service_for_path("/v1/api/submissions") == "test-management-service"
 
 
+def test_route_sessions_path():
+    assert find_service_for_path("/v1/api/sessions/abc") == "test-management-service"
+
+
 def test_route_skills_path():
     assert find_service_for_path("/v1/api/skills") == "test-management-service"
 

@@ -38,6 +38,8 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 COPY --from=test /app/src ./src
 COPY --from=test /app/main.py .
 COPY --from=test /app/start.sh .
+COPY --from=test /app/alembic.ini .
+COPY --from=test /app/migrations ./migrations
 
 RUN chmod +x start.sh
 

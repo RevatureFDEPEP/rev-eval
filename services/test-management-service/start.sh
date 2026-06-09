@@ -30,23 +30,38 @@ done
 
 echo "✅ Database is ready!"
 
-# Create database tables using init_db
-echo "📦 Creating database tables..."
-python -c "
-import asyncio
-from src.db.session import init_db
+# Apply database migrations (Alembic owns the schema).
+echo "📦 Applying database migrations..."
 
-async def create_tables():
-    await init_db()
-    print('✅ Tables created successfully!')
+# Adopt Alembic over a database created by the old create_all path: if the app
+# tables already exist but Alembic has never recorded a version, stamp the
+# baseline so only new migrations (e.g. quiz_sessions) are applied.
+NEEDS_STAMP=$(python -c "
+import os, psycopg2
+conn = psycopg2.connect(
+    host=os.getenv('DB_HOST', 'postgres'),
+    port=os.getenv('DB_PORT', '5432'),
+    user=os.getenv('DB_USERNAME', 'root'),
+    password=os.getenv('DB_PASSWORD', 'root'),
+    dbname=os.getenv('DB_NAME', 'eval_ai_dev'))
+cur = conn.cursor()
+cur.execute(\"select to_regclass('public.alembic_version'), to_regclass('public.tests')\")
+av, tests = cur.fetchone()
+conn.close()
+print('yes' if (av is None and tests is not None) else 'no')
+")
 
-asyncio.run(create_tables())
-"
+if [ "$NEEDS_STAMP" = "yes" ]; then
+    echo "🔖 Existing schema found; stamping Alembic baseline (0001)..."
+    alembic stamp 0001
+fi
+
+alembic upgrade head
 
 if [ $? -eq 0 ]; then
-    echo "✅ Database tables ready!"
+    echo "✅ Database migrations applied!"
 else
-    echo "⚠️ Table creation failed, but continuing..."
+    echo "⚠️ Migration step failed, but continuing..."
 fi
 
 # Seed the database with mock data

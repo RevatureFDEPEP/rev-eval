@@ -188,3 +188,35 @@ class QuestionRepository:
             List[Question]: List of matching Question documents
         """
         return await Question.find(In(Question.tags, tags)).limit(limit).to_list()
+
+    @staticmethod
+    async def sample_by_skills(
+        skills: list[str],
+        count: int,
+        question_type: str | None = None,
+        difficulty: str | None = None,
+    ) -> list[Question]:
+        """
+        Randomly sample up to `count` questions matching any of `skills`.
+
+        Uses MongoDB's $sample aggregation stage for server-side uniform
+        sampling. Returns at most `count` documents (no padding, no
+        duplicates); fewer are returned when the matching pool is smaller.
+
+        Args:
+            skills: Skills to match (OR / $in on Question.skills)
+            count: Number of questions to sample (size of $sample)
+            question_type: Optional type filter (mcq, multi, true_false, text)
+            difficulty: Optional difficulty filter (easy, medium, hard)
+
+        Returns:
+            List[Question]: Randomly sampled matching Question documents
+        """
+        match: dict = {"skills": {"$in": skills}}
+        if question_type:
+            match["type"] = question_type
+        if difficulty:
+            match["difficulty"] = difficulty
+
+        pipeline = [{"$match": match}, {"$sample": {"size": count}}]
+        return await Question.aggregate(pipeline, projection_model=Question).to_list()
