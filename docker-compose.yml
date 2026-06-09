@@ -170,6 +170,7 @@ services:
       PORT: 8001
       SERVICE_HOSTNAME: test-management-service
       USER_SERVICE_URL: http://user-service:8002
+      QUESTION_SERVICE_URL: http://question-management-service:8003
       ALLOW_ORIGINS: http://localhost:3000
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
@@ -178,6 +179,8 @@ services:
       postgres:
         condition: service_healthy
       user-service:
+        condition: service_healthy
+      question-management-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
