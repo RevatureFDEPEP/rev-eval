@@ -39,7 +39,19 @@ to the frontend and the API gateway.
 - `X-Correlation-Id` pass-through with `$request_id` fallback for distributed
   log tracing.
 
+## Verification (full stack, 2026-06-09)
+
+- Gateway Bearer-only: `Bearer` → 200; no header → 401; **cookie-only → 401**
+  (fallback gone).
+- Full path login + data call: BFF login (httpOnly cookie set) → `GET
+  /api/v1/api/tests` through nginx → BFF → gateway → 200; gateway log shows
+  `👤 User: trainer1@revature.com (TRAINER)` (Bearer-derived `X-User-*`).
+- 204 path: routing `/api/v1` through the BFF exposed a latent BFF bug —
+  `NextResponse.json(null, {204})` made a successful DELETE (gateway 204)
+  surface as 500. **Fixed** (`api/v1/[...path]/route.ts` now passes bodyless
+  204/205 through); re-verified unlink → 204.
+
 ## Remaining
 
 None. Trace path is now nginx → frontend (BFF) → gateway for data calls; the
-gateway is Bearer-only (cookie fallback removed in commit on `richardh-feat-W2F1`).
+gateway is Bearer-only (cookie fallback removed on `richardh-feat-W2F1`).
