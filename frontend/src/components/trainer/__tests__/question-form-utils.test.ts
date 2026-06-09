@@ -146,6 +146,41 @@ describe("transformFormData — create mode", () => {
     expect(result.correct_answers).toEqual([2]);
   });
 
+  it("keeps multi type with a single correct answer (no down-promote to mcq)", () => {
+    const result = transformFormData(
+      {
+        ...validFormBase,
+        tags: [],
+        options: [
+          { text: "A", is_correct: true },
+          { text: "B", is_correct: false },
+        ],
+      },
+      "create",
+      "multi"
+    );
+    expect(result.type).toBe("multi");
+    expect(result.correct_answers).toEqual([1]);
+  });
+
+  it("keeps multi type with several correct answers", () => {
+    const result = transformFormData(
+      {
+        ...validFormBase,
+        tags: [],
+        options: [
+          { text: "A", is_correct: true },
+          { text: "B", is_correct: true },
+          { text: "C", is_correct: false },
+        ],
+      },
+      "create",
+      "multi"
+    );
+    expect(result.type).toBe("multi");
+    expect(result.correct_answers).toEqual([1, 2]);
+  });
+
   it("sends boolean correct_answers and no options for true_false", () => {
     const result = transformFormData(
       { ...validFormBase, tags: [], true_false_answer: true },
