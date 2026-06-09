@@ -224,14 +224,14 @@ class TestTestSubmissionService:
     async def test_bulk_assign_mixed_outcomes(self, db_session):
         test = await self._make_test(db_session)
 
-        def fake_get(url):
+        def fake_get(url, headers=None):
             if "by-email/exists@x.com" in url:
                 return make_response(200, {"id": 11})
             if "by-email/new@x.com" in url:
                 return make_response(404)
             return make_response(500, text="user service exploded")
 
-        def fake_post(url, json=None):
+        def fake_post(url, json=None, headers=None):
             return make_response(201, {"id": 22})
 
         with patch(HTTPX_CLIENT, return_value=mock_async_client(fake_get, fake_post)):
@@ -262,7 +262,7 @@ class TestTestSubmissionService:
         await self._make_submission(db_session, test.id, status=SubmissionStatus.GRADED)
         await db_session.commit()
 
-        def fake_get(url):
+        def fake_get(url, headers=None):
             return make_response(
                 200,
                 {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@x.com"},
@@ -285,7 +285,7 @@ class TestTestSubmissionService:
         submission.submitted_at = datetime(2026, 1, 1)
         await db_session.commit()
 
-        def fake_get(url):
+        def fake_get(url, headers=None):
             raise RuntimeError("user service down")
 
         with patch(HTTPX_CLIENT, return_value=mock_async_client(fake_get)):

@@ -2,3 +2,4 @@
 ruff
 pytest
 pytest-cov
+httpx  # required by fastapi.testclient.TestClient in tests/test_correlation.py
