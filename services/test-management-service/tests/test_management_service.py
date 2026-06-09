@@ -767,7 +767,15 @@ class TestServiceCoverageGaps:
         with pytest.raises(ValueError, match="not found"):
             asyncio.run(run())
 
-    # test_submission_service.py lines 255-260: httpx.RequestError inside bulk_assign
+    # test_submission_service.py line 196: bulk_assign raises ValueError when test_id not found
+    def test_bulk_assign_test_not_found_http(self):
+        resp = client.post("/v1/api/submissions/bulk-assign", json={
+            "test_id": 99999,
+            "participant_emails": ["ghost@test.com"]
+        })
+        assert resp.status_code == 404
+
+    # test_submission_service.py lines 253-258: httpx.RequestError inside bulk_assign
     def test_bulk_assign_request_error(self):
         import httpx as _httpx
 
@@ -783,6 +791,24 @@ class TestServiceCoverageGaps:
             resp = client.post("/v1/api/submissions/bulk-assign", json={
                 "test_id": tid,
                 "participant_emails": ["neterr@test.com"]
+            })
+        assert resp.status_code == 201
+        assert resp.json()["failure_count"] == 1
+
+    # test_submission_service.py lines 259-264: generic Exception inside bulk_assign
+    def test_bulk_assign_generic_exception(self):
+        class ExcClient:
+            def __init__(self, **kw): pass
+            async def __aenter__(self): return self
+            async def __aexit__(self, *a): pass
+            async def get(self, *a, **k): raise RuntimeError("unexpected")
+            async def post(self, *a, **k): raise RuntimeError("unexpected")
+
+        tid = self._create_test()
+        with patch("httpx.AsyncClient", ExcClient):
+            resp = client.post("/v1/api/submissions/bulk-assign", json={
+                "test_id": tid,
+                "participant_emails": ["exc@test.com"]
             })
         assert resp.status_code == 201
         assert resp.json()["failure_count"] == 1

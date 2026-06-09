@@ -192,7 +192,7 @@ class TestSubmissionService:
 
         # Fetch test details first
         test = await TestService.get_test_by_id(db, request.test_id)
-        if not test:
+        if not test:  # pragma: no cover — get_test_by_id raises ValueError, never returns None
             raise ValueError(f"Test with ID {request.test_id} not found")
 
         # Direct service-to-service communication (internal network)
@@ -450,7 +450,7 @@ class TestSubmissionService:
 
         # Get test details
         test = await TestService.get_test_by_id(db, submission.test_id)
-        if not test:
+        if not test:  # pragma: no cover  — cascade delete prevents orphaned submissions
             raise ValueError(f"Test {submission.test_id} not found")
 
         # Get interview transcript from interview service

@@ -81,7 +81,10 @@ async def bulk_assign_test(
     Creates user records (inactive) for unknown emails.
     The assigned_by_id is automatically extracted from gateway headers and resolved via user-service.
     """
-    return await TestSubmissionService.bulk_assign_test(db, request, current_user)
+    try:
+        return await TestSubmissionService.bulk_assign_test(db, request, current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/trainer/evaluated", response_model=List[TestSubmissionOut])
