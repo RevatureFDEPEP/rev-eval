@@ -97,23 +97,30 @@ const editMcqSchema = z
     }
   );
 
-// Edit mode, stored type multi: at least one correct, but not all (backend rules)
+// Multi-select rule (both create and edit): at least one correct, but not all (backend rules)
+const multiOptionsRefine = (data: { options: { is_correct: boolean }[] }) => {
+  if (data.options.length < 2 || data.options.length > 5) {
+    return false;
+  }
+  const correctCount = data.options.filter((opt) => opt.is_correct).length;
+  return correctCount >= 1 && correctCount < data.options.length;
+};
+const multiOptionsError = {
+  message:
+    "Multi-select questions require at least one correct option, but not all options correct",
+  path: ["options"],
+};
+
+// Create mode, type multi: multi-select is a first-class create type with the same
+// "at least one, but not all" rule the backend enforces (no mcq auto-promotion).
+const createMultiSchema = z
+  .object({ ...baseSchema, options: optionsShape })
+  .refine(multiOptionsRefine, multiOptionsError);
+
+// Edit mode, stored type multi: same rule.
 const editMultiSchema = z
   .object({ ...baseSchema, options: optionsShape })
-  .refine(
-    (data) => {
-      if (data.options.length < 2 || data.options.length > 5) {
-        return false;
-      }
-      const correctCount = data.options.filter((opt) => opt.is_correct).length;
-      return correctCount >= 1 && correctCount < data.options.length;
-    },
-    {
-      message:
-        "Multi-select questions require at least one correct option, but not all options correct",
-      path: ["options"],
-    }
-  );
+  .refine(multiOptionsRefine, multiOptionsError);
 
 const trueFalseSchema = z.object({
   ...baseSchema,
@@ -135,9 +142,9 @@ export function buildQuestionSchema(
     case "mcq":
       return mode === "edit" ? editMcqSchema : createOptionsSchema;
     case "multi":
-      // Create flow never starts as "multi" (mcq promotes at submit), but
-      // edit loads stored multi questions into the same options form.
-      return mode === "edit" ? editMultiSchema : createOptionsSchema;
+      // Multi-select is a first-class create type (strict ≥1-not-all); edit
+      // loads stored multi questions into the same options form.
+      return mode === "edit" ? editMultiSchema : createMultiSchema;
     case "true_false":
       return trueFalseSchema;
     case "text":
@@ -199,15 +206,15 @@ export function transformFormData(
       )
       .filter((id: number | null): id is number => id !== null);
 
-    if (mode === "create") {
-      // Create: determine if it's MCQ (1 answer) or MULTI (2+ answers)
-      if (correctAnswerIndices.length === 1) {
-        actualType = "mcq";
-      } else if (correctAnswerIndices.length > 1) {
+    if (mode === "create" && questionType === "mcq") {
+      // Create mcq: lenient — auto-promote to MULTI when 2+ answers are checked.
+      // (Authoring as "multi" keeps its type regardless of count — see below.)
+      if (correctAnswerIndices.length > 1) {
         actualType = "multi";
       }
     }
-    // Edit: type is immutable on the backend — keep the stored type
+    // Create multi: keep "multi" as chosen (no down-promote to mcq).
+    // Edit: type is immutable on the backend — keep the stored type.
 
     correct_answers = correctAnswerIndices;
     options = values.options.map((opt: { text: string }) => ({

@@ -305,7 +305,7 @@ export function QuestionForm({
                 <CardDescription>
                   {mode === "edit" && questionType === "mcq"
                     ? "Add 2-5 options and check the single correct answer."
-                    : mode === "edit" && questionType === "multi"
+                    : questionType === "multi"
                       ? "Add 2-5 options and check the correct answers (at least one, but not all)."
                       : "Add 2-5 options and check the correct answer(s). You can select one or multiple correct answers."}
                 </CardDescription>

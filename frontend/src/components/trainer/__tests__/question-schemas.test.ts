@@ -185,6 +185,48 @@ describe("buildQuestionSchema — edit multi (editMultiSchema)", () => {
   });
 });
 
+describe("buildQuestionSchema — create multi (createMultiSchema)", () => {
+  const schema = buildQuestionSchema("create", "multi");
+
+  it("accepts at least one correct but not all correct", () => {
+    const options = [
+      { text: "a", is_correct: true },
+      { text: "b", is_correct: false },
+      { text: "c", is_correct: true },
+    ];
+    expect(schema.safeParse({ ...validBase, options }).success).toBe(true);
+  });
+
+  it("accepts a single correct option", () => {
+    expect(schema.safeParse({ ...validBase, options: twoOptions }).success).toBe(true);
+  });
+
+  it("rejects when every option is correct", () => {
+    const options = [
+      { text: "a", is_correct: true },
+      { text: "b", is_correct: true },
+    ];
+    expect(schema.safeParse({ ...validBase, options }).success).toBe(false);
+  });
+
+  it("rejects when no option is correct", () => {
+    const options = [
+      { text: "a", is_correct: false },
+      { text: "b", is_correct: false },
+    ];
+    expect(schema.safeParse({ ...validBase, options }).success).toBe(false);
+  });
+
+  it("rejects fewer than 2 options", () => {
+    expect(schema.safeParse({ ...validBase, options: [{ text: "a", is_correct: true }] }).success).toBe(false);
+  });
+
+  it("rejects more than 5 options", () => {
+    const options = Array.from({ length: 6 }, (_, i) => ({ text: `o${i}`, is_correct: i === 0 }));
+    expect(schema.safeParse({ ...validBase, options }).success).toBe(false);
+  });
+});
+
 describe("buildQuestionSchema — true_false (trueFalseSchema)", () => {
   const schema = buildQuestionSchema("create", "true_false");
 

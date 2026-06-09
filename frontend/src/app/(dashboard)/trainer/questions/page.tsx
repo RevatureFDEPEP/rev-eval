@@ -280,6 +280,12 @@ export default function QuestionsPage() {
                   <div className="text-xs text-slate-500">Multiple choice with one or more correct answers</div>
                 </div>
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/trainer/questions/create?type=multi")}>
+                <div className="flex flex-col gap-1">
+                  <div className="font-medium">Multi-Select</div>
+                  <div className="text-xs text-slate-500">Multiple choice with several correct answers</div>
+                </div>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push("/trainer/questions/create?type=true_false")}>
                 <div className="flex flex-col gap-1">
                   <div className="font-medium">True/False</div>
@@ -366,6 +372,13 @@ export default function QuestionsPage() {
                       }
                     >
                       MCQ
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        router.push("/trainer/questions/create?type=multi")
+                      }
+                    >
+                      Multi-Select
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() =>
