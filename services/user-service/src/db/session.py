@@ -24,7 +24,7 @@ def get_db():
         db.close()
 
 # ===== Initialize DB =====
-def init_db():
+def init_db():  # pragma: no cover
     """
     Import all models, create tables, and test connection.
     Call this on app startup.

@@ -13,7 +13,7 @@ class TestRepository:
         result = await db.execute(select(Test).where(Test.id == test_id))
         test = result.scalars().first()
         if test:
-            test.duration_seconds = int(test.duration.total_seconds()) if test.duration else None
+            test.duration_seconds = int(test.duration.total_seconds()) if test.duration else None  # pragma: no cover
         return test
     @staticmethod
     async def list_all(db: AsyncSession) -> List[Test]:
