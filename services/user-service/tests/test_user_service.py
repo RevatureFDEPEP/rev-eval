@@ -137,3 +137,132 @@ class TestUser:
         })
         assert response.status_code == 200
         assert response.json()["first_name"] == "Updated"
+
+    async def test_update_user_all_fields(self, client):
+        reg_resp = await client.post("/v1/api/auth/register", json={
+            "email": "updateall@example.com",
+            "password": "Pass123!",
+            "full_name": "Original Name",
+            "role": "PARTICIPANT"
+        })
+        user_id = reg_resp.json()["user"]["id"]
+
+        response = await client.patch(f"/v1/api/users/{user_id}", json={
+            "first_name": "New",
+            "last_name": "Name",
+            "role": "TRAINER",
+            "is_active": True
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["last_name"] == "Name"
+        assert data["role"] == "TRAINER"
+
+    async def test_update_user_not_found(self, client):
+        response = await client.patch("/v1/api/users/99999", json={"first_name": "X"})
+        assert response.status_code == 404
+
+    async def test_get_user_by_id_not_found(self, client):
+        response = await client.get("/v1/api/users/99999")
+        assert response.status_code == 404
+
+    async def test_get_user_by_email(self, client):
+        await client.post("/v1/api/auth/register", json={
+            "email": "byemail@example.com",
+            "password": "Pass123!",
+            "full_name": "By Email",
+            "role": "PARTICIPANT"
+        })
+        response = await client.get("/v1/api/users/by-email/byemail@example.com")
+        assert response.status_code == 200
+        assert response.json()["email"] == "byemail@example.com"
+
+    async def test_get_user_by_email_not_found(self, client):
+        response = await client.get("/v1/api/users/by-email/nobody@test.com")
+        assert response.status_code == 404
+
+    async def test_list_users(self, client):
+        await client.post("/v1/api/auth/register", json={
+            "email": "list1@example.com",
+            "password": "Pass123!",
+            "full_name": "List User",
+            "role": "PARTICIPANT"
+        })
+        response = await client.get("/v1/api/users/")
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)
+
+    async def test_list_users_with_role_filter(self, client):
+        await client.post("/v1/api/auth/register", json={
+            "email": "trainer1@example.com",
+            "password": "Pass123!",
+            "full_name": "Trainer One",
+            "role": "TRAINER"
+        })
+        response = await client.get("/v1/api/users/?role=TRAINER")
+        assert response.status_code == 200
+        users = response.json()
+        assert all(u["role"] == "TRAINER" for u in users)
+
+    async def test_invite_user_new(self, client):
+        response = await client.post("/v1/api/users/invite", json={
+            "email": "invited@example.com",
+            "first_name": "New",
+            "last_name": "Invite",
+            "role": "PARTICIPANT"
+        })
+        assert response.status_code == 201
+        data = response.json()
+        assert data["email"] == "invited@example.com"
+
+    async def test_invite_user_existing(self, client):
+        await client.post("/v1/api/auth/register", json={
+            "email": "existing@example.com",
+            "password": "Pass123!",
+            "full_name": "Existing User",
+            "role": "PARTICIPANT"
+        })
+        response = await client.post("/v1/api/users/invite", json={
+            "email": "existing@example.com"
+        })
+        assert response.status_code == 201
+        assert "already exists" in response.json()["message"]
+
+    async def test_get_me_with_valid_token(self, client):
+        await client.post("/v1/api/auth/register", json={
+            "email": "getme@example.com",
+            "password": "Pass123!",
+            "full_name": "Get Me",
+            "role": "PARTICIPANT"
+        })
+        login_resp = await client.post("/v1/api/auth/login", json={
+            "email": "getme@example.com",
+            "password": "Pass123!"
+        })
+        token = login_resp.json()["access_token"]
+
+        response = await client.get("/v1/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+        assert response.status_code == 200
+        assert response.json()["email"] == "getme@example.com"
+
+    async def test_get_me_invalid_token(self, client):
+        response = await client.get("/v1/api/auth/me", headers={"Authorization": "Bearer invalid.token.here"})
+        assert response.status_code == 401
+
+    async def test_login_nonexistent_user(self, client):
+        response = await client.post("/v1/api/auth/login", json={
+            "email": "ghost@example.com",
+            "password": "Pass123!"
+        })
+        assert response.status_code == 401
+
+    async def test_login_inactive_invited_user(self, client):
+        # Invite creates an inactive user with no password — login must fail
+        await client.post("/v1/api/users/invite", json={
+            "email": "inactive@example.com"
+        })
+        response = await client.post("/v1/api/auth/login", json={
+            "email": "inactive@example.com",
+            "password": "anypass"
+        })
+        assert response.status_code == 401
