@@ -10,7 +10,14 @@ class SkillService:
     @staticmethod
     async def create_skill(db: AsyncSession, skill_in: SkillCreate) -> SkillOut:
         skill = await SkillRepository.create(db, skill_in)
-        return SkillOut.from_orm(skill)
+        return SkillOut.model_validate(skill)
+
+    @staticmethod
+    async def get_skill_by_id(db: AsyncSession, skill_id: int) -> SkillOut:
+        skill = await SkillRepository.get_by_id(db, skill_id)
+        if not skill:
+            raise ValueError("Skill not found")
+        return SkillOut.model_validate(skill)
 
     @staticmethod
     async def update_skill(db: AsyncSession, skill_id: int, skill_in: SkillUpdate) -> SkillOut:
@@ -18,7 +25,7 @@ class SkillService:
         if not skill:
             raise ValueError("Skill not found")
         skill = await SkillRepository.update(db, skill, skill_in)
-        return SkillOut.from_orm(skill)
+        return SkillOut.model_validate(skill)
 
     @staticmethod
     async def delete_skill(db: AsyncSession, skill_id: int) -> None:
@@ -30,4 +37,4 @@ class SkillService:
     @staticmethod
     async def list_skills(db: AsyncSession) -> List[SkillOut]:
         skills = await SkillRepository.list_all(db)
-        return [SkillOut.from_orm(skill) for skill in skills]
+        return [SkillOut.model_validate(skill) for skill in skills]

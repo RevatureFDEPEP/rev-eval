@@ -19,8 +19,7 @@ class SkillRepository:
 
     @staticmethod
     async def create(db: AsyncSession, skill_in: SkillCreate) -> Skill:
-        # Use model_dump() for Pydantic v2, dict() for v1
-        skill_data = skill_in.model_dump() if hasattr(skill_in, 'model_dump') else skill_in.dict()
+        skill_data = skill_in.model_dump()
         skill = Skill(**skill_data)
         db.add(skill)
         await db.commit()
@@ -29,11 +28,7 @@ class SkillRepository:
 
     @staticmethod
     async def update(db: AsyncSession, skill: Skill, skill_in: SkillUpdate) -> Skill:
-        update_data = (
-            skill_in.model_dump(exclude_unset=True)
-            if hasattr(skill_in, 'model_dump')
-            else skill_in.dict(exclude_unset=True)
-        )
+        update_data = skill_in.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(skill, field, value)
         db.add(skill)  # Ensure it's tracked

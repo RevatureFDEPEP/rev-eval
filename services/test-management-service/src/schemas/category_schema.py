@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from src.schemas.skill_schema import SkillOut
 
 
@@ -20,5 +20,4 @@ class CategoryOut(CategoryBase):
     id: int
     skills: List[SkillOut] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

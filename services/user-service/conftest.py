@@ -15,13 +15,7 @@ os.environ.setdefault("DB_NAME", "test")
 os.environ.setdefault("JWT_SECRET", "test-secret-key-0123456789abcdef-32b")
 os.environ.setdefault("JWT_ALGORITHM", "HS256")
 
-# src/db/session.py and src/models/user.py import each other (session re-exports
-# Base and imports User to register it). It only resolves when session loads
-# first — the order main.py uses. Preload it (import src.db.session below) so
-# tests can import models in any order. Engine creation is lazy, so no DB
-# connection is opened.
 import pytest  # noqa: E402
-import src.db.session  # noqa: E402,F401
 from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
@@ -38,7 +32,7 @@ def db_session():
     fixture. The user repository is an empty stub, so these tests target the
     model directly.
     """
-    from src.db.init_db import Base
+    from src.db.session import Base
     from src.models.user import User  # noqa: F401  (register the table)
 
     engine = create_engine(

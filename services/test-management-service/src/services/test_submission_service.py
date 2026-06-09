@@ -79,7 +79,7 @@ class TestSubmissionService:
         #                 )
 
         #                 submission = await TestSubmissionRepository.create(db, submission_data)
-        #                 submission_out = TestSubmissionOut.from_orm(submission)
+        #                 submission_out = TestSubmissionOut.model_validate(submission)
         #                 created_submissions.append(submission_out)
         #                 submission_ids.append(submission.id)
         #                 success_count += 1
@@ -133,7 +133,7 @@ class TestSubmissionService:
         #                 })
         #                 failure_count += 1
 
-        return TestSubmissionOut.from_orm(submission)
+        return TestSubmissionOut.model_validate(submission)
 
     @staticmethod
     async def update_submission(
@@ -143,7 +143,7 @@ class TestSubmissionService:
         if not submission:
             raise ValueError("Submission not found")
         submission = await TestSubmissionRepository.update(db, submission, submission_in)
-        return TestSubmissionOut.from_orm(submission)
+        return TestSubmissionOut.model_validate(submission)
 
     @staticmethod
     async def delete_submission(db: AsyncSession, submission_id: int) -> None:
@@ -157,18 +157,18 @@ class TestSubmissionService:
         submission = await TestSubmissionRepository.get_by_id(db, submission_id)
         if not submission:
             raise ValueError("Submission not found")
-        return TestSubmissionOut.from_orm(submission)
+        return TestSubmissionOut.model_validate(submission)
 
     @staticmethod
     async def list_all_submissions(db: AsyncSession) -> List[TestSubmissionOut]:
         submissions = await TestSubmissionRepository.list_all(db)
-        return [TestSubmissionOut.from_orm(s) for s in submissions]
+        return [TestSubmissionOut.model_validate(s) for s in submissions]
 
     @staticmethod
     async def list_submissions_by_user(db: AsyncSession, user_id: int) -> List[TestSubmissionOut]:
         """Get all submissions for a specific user (participant view)"""
         submissions = await TestSubmissionRepository.list_by_user(db, user_id)
-        return [TestSubmissionOut.from_orm(s) for s in submissions]
+        return [TestSubmissionOut.model_validate(s) for s in submissions]
 
     @staticmethod
     async def bulk_assign_test(db: AsyncSession, request: BulkAssignRequest, current_user: dict) -> BulkAssignResult:
@@ -246,7 +246,7 @@ class TestSubmissionService:
                     )
 
                     submission = await TestSubmissionRepository.create(db, submission_data)
-                    submission_out = TestSubmissionOut.from_orm(submission)
+                    submission_out = TestSubmissionOut.model_validate(submission)
                     created_submissions.append(submission_out)
                     submission_ids.append(submission.id)
                     success_count += 1
@@ -308,7 +308,7 @@ class TestSubmissionService:
             timeout=30.0, headers={"X-Correlation-Id": get_correlation_id()}
         ) as client:
             for submission in submissions:
-                submission_out = TestSubmissionOut.from_orm(submission)
+                submission_out = TestSubmissionOut.model_validate(submission)
 
                 # Fetch participant details
                 try:
@@ -364,7 +364,7 @@ class TestSubmissionService:
         result = await db.execute(query)
         submissions = result.scalars().all()
 
-        return [TestSubmissionOut.from_orm(s) for s in submissions]
+        return [TestSubmissionOut.model_validate(s) for s in submissions]
 
     @staticmethod
     async def get_all_submissions_for_trainer(db: AsyncSession, trainer_id: int) -> List[TestSubmissionOut]:
@@ -407,7 +407,7 @@ class TestSubmissionService:
             timeout=30.0, headers={"X-Correlation-Id": get_correlation_id()}
         ) as client:
             for submission in submissions:
-                submission_out = TestSubmissionOut.from_orm(submission)
+                submission_out = TestSubmissionOut.model_validate(submission)
 
                 # Fetch participant details
                 try:
@@ -482,7 +482,7 @@ class TestSubmissionService:
 
         # Build response
         return {
-            "submission": TestSubmissionOut.from_orm(submission),
+            "submission": TestSubmissionOut.model_validate(submission),
             "test": {
                 "id": test.id,
                 "name": test.name,

@@ -6,7 +6,7 @@ Pydantic models for API request/response validation.
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from src.models.user import UserRole
 
 
@@ -42,8 +42,7 @@ class UserOut(UserBase):
     updated_at: datetime
     last_login: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class InviteUserRequest(BaseModel):
@@ -61,5 +60,4 @@ class InviteUserResponse(BaseModel):
     invite_sent: bool
     message: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -85,7 +85,7 @@ class TestSubmissionRepository:
     @staticmethod
     async def create(db: AsyncSession, submission_in: TestSubmissionCreate) -> TestSubmission:
         # Convert to dict and strip timezones (POC fix)
-        submission_data = submission_in.model_dump() if hasattr(submission_in, 'model_dump') else submission_in.dict()
+        submission_data = submission_in.model_dump()
         submission_data = TestSubmissionRepository._strip_timezone_from_dict(submission_data)
 
         submission = TestSubmission(**submission_data)
@@ -99,11 +99,7 @@ class TestSubmissionRepository:
         db: AsyncSession, submission: TestSubmission, submission_in: TestSubmissionUpdate
     ) -> TestSubmission:
         # Convert to dict and strip timezones (POC fix)
-        update_data = (
-            submission_in.model_dump(exclude_unset=True)
-            if hasattr(submission_in, 'model_dump')
-            else submission_in.dict(exclude_unset=True)
-        )
+        update_data = submission_in.model_dump(exclude_unset=True)
         update_data = TestSubmissionRepository._strip_timezone_from_dict(update_data)
 
         for field, value in update_data.items():
