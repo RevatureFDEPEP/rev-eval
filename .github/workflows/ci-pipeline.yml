@@ -119,6 +119,14 @@ jobs:
           path: services/${{ matrix.service }}/coverage.xml
           if-no-files-found: ignore
 
+      # Run the Dockerfile `test` stage: installs requirements-dev.txt and runs
+      # `pytest -q` inside the container, so the build fails if container-level
+      # tests fail. This gates on the same suite as the runner step above, but
+      # proves it passes in the built image (W2-F2 spec: tests run in-container).
+      - name: Build & run container test stage
+        working-directory: services/${{ matrix.service }}
+        run: docker build --target test -t ${{ matrix.service }}-test:${{ github.sha }} .
+
       # W2-D7 quality gate: scan the built image for vulnerabilities.
       # ignore-unfixed keeps the gate actionable — base images ship CVEs
       # with no published fix, which would otherwise dead-lock the pipeline.
