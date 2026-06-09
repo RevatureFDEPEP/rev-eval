@@ -503,7 +503,9 @@ class TestSubmissionService:
         transcript_data = None
 
         if not settings.INTERVIEW_SERVICE_URL:
-            logger.warning("INTERVIEW_SERVICE_URL not configured; skipping transcript fetch")
+            logger.warning(
+                "INTERVIEW_SERVICE_URL not configured; skipping transcript fetch"
+            )
         else:
             interview_service_url = settings.INTERVIEW_SERVICE_URL
             try:

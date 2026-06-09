@@ -68,7 +68,9 @@ async def init_db():
         raise
 
     except Exception as e:
-        logger.error("Unexpected error during MongoDB initialization: %s", e, exc_info=True)
+        logger.error(
+            "Unexpected error during MongoDB initialization: %s", e, exc_info=True
+        )
         raise
 
 
