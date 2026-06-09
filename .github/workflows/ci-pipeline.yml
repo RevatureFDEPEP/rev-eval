@@ -92,7 +92,7 @@ jobs:
         run: |
           if [ -f coverage.xml ]; then
             git fetch origin main --depth=1 || true
-            diff-cover coverage.xml --compare-branch=origin/main --fail-under=70
+            diff-cover coverage.xml --compare-branch=origin/main --fail-under=80
           fi
 
   trivy-scan:
