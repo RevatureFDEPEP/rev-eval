@@ -3,7 +3,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import settings
 from src.db.session import close_db, init_db
+from src.logging_config import configure_json_logging, install_request_logging
 from src.v1.routes.question_routes import router as question_router
+
+configure_json_logging()
 
 app = FastAPI(
     title="Question Management Service",
@@ -12,6 +15,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+install_request_logging(app)
 
 # ---- CORS ----
 app.add_middleware(
@@ -39,8 +43,10 @@ async def on_shutdown():
     """Close MongoDB connection on shutdown."""
     try:
         await close_db()
-    except Exception as e:
-        print(f"⚠️ MongoDB connection close failed: {e}")
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception("MongoDB connection close failed")
 
 # ---- Run server ----
 if __name__ == "__main__":

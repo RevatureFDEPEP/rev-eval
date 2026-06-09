@@ -6,13 +6,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import settings
 from src.db.session import init_db
+from src.logging_config import configure_json_logging, install_request_logging
 from src.v1.routes.skill_route import router as skill_router
 from src.v1.routes.test_route import router as test_router
 from src.v1.routes.test_submission_route import router as test_submission_router
 
 load_dotenv()
+configure_json_logging()
 
 app = FastAPI(title="Test Management Service", version="1.0.0")
+install_request_logging(app)
 
 # ---- CORS ----
 origins = settings.ALLOW_ORIGINS or "*"
