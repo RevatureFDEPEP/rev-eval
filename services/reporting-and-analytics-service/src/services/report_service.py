@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.config.settings import settings
-from src.models.models import SCORED_STATUSES, Skill, Test, TestSubmission
+from src.models.models import SCORED_STATUSES, Skill, Test, TestSkill, TestSubmission
 from src.schemas.report_schemas import (
     DashboardReport,
     ParticipantReport,
@@ -41,7 +41,7 @@ def _submission_to_detail(sub: TestSubmission, test_name: str, skill_names: list
 async def get_dashboard(db: AsyncSession) -> DashboardReport:
     tests_result = await db.execute(
         select(Test)
-        .options(selectinload(Test.submissions), selectinload(Test.test_skills).selectinload("skill"))
+        .options(selectinload(Test.submissions), selectinload(Test.test_skills).selectinload(TestSkill.skill))
     )
     tests = tests_result.scalars().all()
 
@@ -66,7 +66,7 @@ async def get_dashboard(db: AsyncSession) -> DashboardReport:
         })
 
     skills_result = await db.execute(
-        select(Skill).options(selectinload(Skill.test_skills).selectinload("test").selectinload(Test.submissions))
+        select(Skill).options(selectinload(Skill.test_skills).selectinload(TestSkill.test).selectinload(Test.submissions))
     )
     skills = skills_result.scalars().all()
 
@@ -104,7 +104,7 @@ async def get_test_report(db: AsyncSession, test_id: int) -> TestReport:
     result = await db.execute(
         select(Test)
         .where(Test.id == test_id)
-        .options(selectinload(Test.submissions), selectinload(Test.test_skills).selectinload("skill"))
+        .options(selectinload(Test.submissions), selectinload(Test.test_skills).selectinload(TestSkill.skill))
     )
     test = result.scalar_one_or_none()
     if not test:
@@ -140,7 +140,7 @@ async def get_participant_report(db: AsyncSession, user_id: int) -> ParticipantR
     result = await db.execute(
         select(TestSubmission)
         .where(TestSubmission.user_id == user_id)
-        .options(selectinload(TestSubmission.test).selectinload(Test.test_skills).selectinload("skill"))
+        .options(selectinload(TestSubmission.test).selectinload(Test.test_skills).selectinload(TestSkill.skill))
     )
     subs = result.scalars().all()
 
@@ -178,7 +178,7 @@ async def get_participant_report(db: AsyncSession, user_id: int) -> ParticipantR
 async def get_skills_report(db: AsyncSession) -> list[SkillSummary]:
     result = await db.execute(
         select(Skill).options(
-            selectinload(Skill.test_skills).selectinload("test").selectinload(Test.submissions)
+            selectinload(Skill.test_skills).selectinload(TestSkill.test).selectinload(Test.submissions)
         )
     )
     skills = result.scalars().all()
