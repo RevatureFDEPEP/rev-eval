@@ -8,7 +8,7 @@ from src.schemas.quiz_session_schema import (
     SessionStateResponse,
 )
 from src.services.quiz_session_service import QuizSessionError, QuizSessionService
-from src.utils.dependencies import get_current_participant
+from src.utils.dependencies import get_current_participant_id
 
 router = APIRouter(prefix="/sessions", tags=["Quiz Sessions"])
 
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/sessions", tags=["Quiz Sessions"])
 )
 async def create_session(
     request: SessionCreateRequest,
-    current_user: dict = Depends(get_current_participant),
+    user_id: int = Depends(get_current_participant_id),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -28,9 +28,6 @@ async def create_session(
     of questions, and returns the first question (answers stripped).
     Re-posting for the same test returns the existing active session.
     """
-    user_id = current_user.get("id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid user")
     try:
         return await QuizSessionService.create_session(db, request.test_id, user_id)
     except ValueError as e:
@@ -42,13 +39,10 @@ async def create_session(
 @router.get("/{session_id}", response_model=SessionStateResponse)
 async def get_session(
     session_id: str,
-    current_user: dict = Depends(get_current_participant),
+    user_id: int = Depends(get_current_participant_id),
     db: AsyncSession = Depends(get_db),
 ):
     """Return current session state (with lazy expiry) for the owning participant."""
-    user_id = current_user.get("id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid user")
     try:
         return await QuizSessionService.get_session(db, session_id, user_id)
     except ValueError as e:

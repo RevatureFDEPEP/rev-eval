@@ -10,12 +10,13 @@ stripped. The client never computes timing state.
 import logging
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.settings import settings
+from src.models.quiz_session import QuizSessionStatus
 from src.models.test import TestType
 from src.repositories.quiz_session_repository import QuizSessionRepository
 from src.repositories.skill_repository import SkillRepository
@@ -57,12 +58,10 @@ class QuizSessionService:
     @staticmethod
     async def _get_skill_names(db: AsyncSession, test_id: int) -> list[str]:
         links = await TestSkillRepository.list_by_test(db, test_id)
-        names = []
-        for link in links:
-            skill = await SkillRepository.get_by_id(db, link.skill_id)
-            if skill and skill.name:
-                names.append(skill.name)
-        return names
+        if not links:
+            return []
+        skills = await SkillRepository.get_by_ids(db, [link.skill_id for link in links])
+        return [s.name for s in skills if s.name]
 
     @staticmethod
     async def _sample_questions(skills: list[str], count: int) -> list[dict]:
@@ -124,27 +123,34 @@ class QuizSessionService:
         if test.test_type != TestType.QUIZ:
             raise QuizSessionError("Test is not a quiz", status_code=400)
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         # Idempotent: reuse an existing, non-expired active session.
         existing = await QuizSessionRepository.get_active_by_test_and_user(
             db, test_id, user_id
         )
-        if existing and existing.expires_at > now:
-            raw = await QuizSessionService._fetch_question(
-                existing.question_ids[existing.current_index]
-            )
-            question = _participant_question(raw, existing.current_index)
-            return SessionCreateResponse(
-                session_id=existing.session_id,
-                session_token=existing.session_token,
-                status=existing.status,
-                server_now=now,
-                expires_at=existing.expires_at,
-                total_questions=len(existing.question_ids),
-                current_index=existing.current_index,
-                question=question,
-            )
+        if existing:
+            if existing.expires_at <= now:
+                # Transition the stale row to EXPIRED before creating a new one,
+                # so we never have two ACTIVE rows for the same (test_id, user_id).
+                await QuizSessionRepository.set_status(
+                    db, existing, QuizSessionStatus.EXPIRED
+                )
+            else:
+                raw = await QuizSessionService._fetch_question(
+                    existing.question_ids[existing.current_index]
+                )
+                question = _participant_question(raw, existing.current_index)
+                return SessionCreateResponse(
+                    session_id=existing.session_id,
+                    session_token=existing.session_token,
+                    status=existing.status,
+                    server_now=now,
+                    expires_at=existing.expires_at,
+                    total_questions=len(existing.question_ids),
+                    current_index=existing.current_index,
+                    question=question,
+                )
 
         skill_names = await QuizSessionService._get_skill_names(db, test_id)
         if not skill_names:
@@ -202,12 +208,16 @@ class QuizSessionService:
         if session.user_id != user_id:
             raise QuizSessionError("Not authorized for this session", status_code=403)
 
-        now = datetime.utcnow()
-        from src.models.quiz_session import QuizSessionStatus
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         if session.status == QuizSessionStatus.ACTIVE and session.expires_at <= now:
             session = await QuizSessionRepository.set_status(
                 db, session, QuizSessionStatus.EXPIRED
+            )
+
+        if session.current_index >= len(session.question_ids):
+            raise QuizSessionError(
+                "Session has no remaining questions", status_code=422
             )
 
         raw = await QuizSessionService._fetch_question(

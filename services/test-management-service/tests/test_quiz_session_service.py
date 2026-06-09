@@ -223,3 +223,47 @@ class TestGetSession:
     async def test_missing_session_raises_value_error(self, db_session):
         with pytest.raises(ValueError):
             await QuizSessionService.get_session(db_session, "nope", 42)
+
+    async def test_exhausted_index_raises_422(self, db_session):
+        # current_index == len(question_ids) — OOB guard must trigger, not IndexError
+        session = await self._seed_session(db_session)
+        session.current_index = 2  # question_ids has 2 entries (q1, q2)
+        await db_session.commit()
+        with pytest.raises(QuizSessionError) as exc:
+            await QuizSessionService.get_session(db_session, "sess-1", 42)
+        assert exc.value.status_code == 422
+
+
+@pytest.mark.asyncio
+class TestCreateSessionExpiredResume:
+    async def test_expired_active_session_is_transitioned_and_replaced(
+        self, db_session
+    ):
+        # Seed an ACTIVE session that is already past its expiry.
+        test = await make_quiz(db_session, number_of_questions=1)
+        docs = [question_doc(1)]
+        with patch(
+            QUESTION_CLIENT, return_value=mock_question_client(sample_handler(docs))
+        ):
+            first = await QuizSessionService.create_session(db_session, test.id, 42)
+
+        # Backdate expires_at so the session appears expired.
+        from sqlalchemy import update
+        from src.models.quiz_session import QuizSession
+        await db_session.execute(
+            update(QuizSession)
+            .where(QuizSession.session_id == first.session_id)
+            .values(expires_at=__import__("datetime").datetime.utcnow() - __import__("datetime").timedelta(seconds=1))
+        )
+        await db_session.commit()
+
+        # Re-POST — must create a NEW session and mark the old one EXPIRED.
+        with patch(
+            QUESTION_CLIENT, return_value=mock_question_client(sample_handler(docs))
+        ):
+            second = await QuizSessionService.create_session(db_session, test.id, 42)
+
+        assert second.session_id != first.session_id
+        # Old session must be EXPIRED, not left as ACTIVE.
+        old = await db_session.get(QuizSession, first.session_id)
+        assert old.status == QuizSessionStatus.EXPIRED

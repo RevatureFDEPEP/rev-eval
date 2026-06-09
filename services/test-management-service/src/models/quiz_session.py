@@ -1,10 +1,14 @@
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.types import JSON
 
 from src.db.session import Base
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class QuizSessionStatus(enum.StrEnum):
@@ -45,8 +49,8 @@ class QuizSession(Base):
     )
 
     # Server-authoritative timing (naive UTC, matching repo convention)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    started_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    started_at = Column(DateTime, default=_utcnow)
     expires_at = Column(DateTime, nullable=False)
     submitted_at = Column(DateTime, nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

@@ -84,3 +84,16 @@ async def get_current_participant(
             detail="This endpoint requires participant role",
         )
     return current_user
+
+
+async def get_current_participant_id(
+    current_user: dict = Depends(get_current_participant),
+) -> int:
+    """Enforce PARTICIPANT role and return the integer user id."""
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="user-service response missing 'id' field",
+        )
+    return int(user_id)

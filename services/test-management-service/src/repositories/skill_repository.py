@@ -12,6 +12,13 @@ class SkillRepository:
         return result.scalar_one_or_none()  # More explicit than .first()
 
     @staticmethod
+    async def get_by_ids(db: AsyncSession, skill_ids: list[int]) -> list[Skill]:
+        if not skill_ids:
+            return []
+        result = await db.execute(select(Skill).where(Skill.id.in_(skill_ids)))
+        return list(result.scalars().all())
+
+    @staticmethod
     async def list_all(db: AsyncSession) -> list[Skill]:
         result = await db.execute(select(Skill).order_by(Skill.id))
         return list(result.scalars().all())  # Ensure it's a list
