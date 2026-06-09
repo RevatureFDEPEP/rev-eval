@@ -108,7 +108,7 @@ const multiOptionsRefine = (data: { options: { is_correct: boolean }[] }) => {
 const multiOptionsError = {
   message:
     "Multi-select questions require at least one correct option, but not all options correct",
-  path: ["options"] as const,
+  path: ["options"],
 };
 
 // Create mode, type multi: multi-select is a first-class create type with the same
