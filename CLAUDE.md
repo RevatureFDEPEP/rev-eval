@@ -16,12 +16,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `test-management-service` | 8001 | Postgres | tests, skills, submissions, dashboards |
 | `user-service` | 8002 | Postgres | auth (issues JWT), users |
 | `question-management-service` | 8003 | Mongo + MinIO | question bank, image uploads (Beanie ODM) |
-| `reporting-and-analytics-service` | — | — | **empty by design** (candidate task) |
+| `reporting-and-analytics-service` | 8004 | Postgres | scaffolded (W2-M10); endpoints land in W4-F1 |
 | `frontend` | 3000 | — | Next.js 16 / React 19 / TS, pnpm |
 | `nginx` | 80 | — | **returns 502 by design** until wired (candidate task) |
-| postgres / mongo / minio | 5432 / 27017 / 9000 (console 9001) | | MinIO creds `minioadmin`/`minioadmin` |
+| postgres / reporting-postgres / mongo / minio | 5432 / 5433 / 27017 / 9000 (console 9001) | | MinIO creds `minioadmin`/`minioadmin` |
 
 `user-service` and `test-management-service` **share one Postgres DB** (`eval_ai_dev`).
+`reporting-and-analytics-service` has its own **`reporting-postgres`** (`eval_ai_reporting`, host port 5433) — the spec's 2-Postgres topology.
 
 ### Auth / request flow (read before touching auth)
 
@@ -91,7 +92,9 @@ python services/question-management-service/seed_rag_context_questions.py
 ## Gotchas
 
 - `nginx` returning **502 is the intended start state**, not a bug.
-- `reporting-and-analytics-service` is empty by design.
+- `reporting-and-analytics-service` is scaffolded (W2-M10) on its own
+  `reporting-postgres` under Alembic (empty `0001` baseline); business endpoints
+  and the gateway `ROUTES` entry land in W4-F1.
 - `start.sh` / `test-services.sh` are stale/aspirational — ignore their service lists.
 - A checked-in `services/test-management-service/dev.db` (SQLite) exists from local experiments; deployed config uses Postgres.
 - Compose service name is `api-gateway` (not `api-gateway-service`), though its dir is `services/api-gateway-service/`.
