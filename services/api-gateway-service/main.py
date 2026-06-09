@@ -10,13 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from src.middleware.auth import add_user_context_headers, verify_jwt_token
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from src.middleware.correlation import CorrelationIdMiddleware
+from src.utils.logging_config import get_correlation_id, setup_logging
 
 # Load environment variables
 load_dotenv()
+setup_logging("api-gateway", getenv("LOG_LEVEL", "INFO"))
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="API Gateway")
 
@@ -29,6 +29,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(CorrelationIdMiddleware)
 
 # Service name to port mapping (compose-internal DNS)
 SERVICE_PORTS = {
@@ -139,6 +140,8 @@ async def public_auth_proxy(auth_path: str, request: Request):
     for h in ("host", "content-length", "x-forwarded-proto", "x-forwarded-scheme"):
         headers.pop(h, None)
 
+    headers["X-Correlation-Id"] = get_correlation_id()
+
     async with httpx.AsyncClient(follow_redirects=True) as client:
         resp = await client.request(
             request.method,
@@ -211,6 +214,7 @@ async def smart_gateway(
 
             # Add user context headers for downstream services
             headers = add_user_context_headers(headers, user_context)
+            headers["X-Correlation-Id"] = get_correlation_id()
 
             resp = await client.request(
                 method,
@@ -251,10 +255,7 @@ async def smart_gateway(
             detail=f"Cannot connect to service '{service_name}': {str(e)}",
         ) from e
     except Exception as e:
-        logger.error(f"❌ ERROR: {str(e)}")
-        import traceback
-
-        traceback.print_exc()
+        logger.error("Gateway error in smart route: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Gateway error: {str(e)}") from e
 
 
@@ -290,6 +291,7 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
             headers.pop("content-length", None)
             headers.pop("x-forwarded-proto", None)
             headers.pop("x-forwarded-scheme", None)
+            headers["X-Correlation-Id"] = get_correlation_id()
 
             resp = await client.request(
                 method,
@@ -299,8 +301,7 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
                 timeout=30.0,
             )
 
-        print(f"✅ Response: {resp.status_code}")
-        print("=" * 80)
+        logger.info("Legacy route response: %s", resp.status_code)
 
         if resp.headers.get("content-type", "").startswith("application/json"):
             return JSONResponse(content=resp.json(), status_code=resp.status_code)
@@ -314,15 +315,12 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
     except HTTPException:
         raise
     except httpx.ConnectError as e:
-        print(f"❌ Connection Error: {str(e)}")
+        logger.error("Legacy route connection error: %s", e)
         raise HTTPException(
             status_code=503, detail=f"Cannot connect to service: {str(e)}"
         ) from e
     except Exception as e:
-        print(f"❌ ERROR: {str(e)}")
-        import traceback
-
-        traceback.print_exc()
+        logger.error("Gateway error in legacy route: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Gateway error: {str(e)}") from e
 
 

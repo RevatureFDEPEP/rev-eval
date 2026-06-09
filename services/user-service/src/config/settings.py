@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     # Service Configuration
     ALLOW_ORIGINS: str = "*"
     SERVICE_NAME: str = "user-service"
+    LOG_LEVEL: str = "INFO"
     PORT: int = 8002
     SERVICE_HOSTNAME: str = "user-service"
 

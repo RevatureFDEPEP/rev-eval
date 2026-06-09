@@ -1,4 +1,5 @@
 # Dev-only dependencies — not installed in production Docker image
-ruff
+ruff==0.15.15
 pytest
 pytest-cov
+httpx  # required by fastapi.testclient.TestClient in tests/test_correlation.py

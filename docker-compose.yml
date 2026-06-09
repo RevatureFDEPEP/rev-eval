@@ -1,3 +1,9 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -86,6 +92,7 @@ services:
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_EXPIRY_MINUTES: ${JWT_EXPIRY_MINUTES:-60}
       ALLOW_ORIGINS: http://localhost:3000,http://localhost,https://localhost
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "8002:8002"
     depends_on:
@@ -97,6 +104,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+    logging: *default-logging
 
   question-management-service:
     build:
@@ -115,6 +123,7 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME:-question-images}
       ALLOW_ORIGINS: http://localhost:3000,http://localhost,https://localhost
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "8003:8003"
     depends_on:
@@ -128,6 +137,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+    logging: *default-logging
 
   test-management-service:
     build:
@@ -146,6 +156,7 @@ services:
       SERVICE_HOSTNAME: test-management-service
       USER_SERVICE_URL: http://user-service:8002
       ALLOW_ORIGINS: http://localhost:3000,http://localhost,https://localhost
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "8001:8001"
     depends_on:
@@ -159,6 +170,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+    logging: *default-logging
 
   api-gateway:
     build:
@@ -172,6 +184,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ALLOW_ORIGINS: http://localhost:3000,http://localhost,https://localhost
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "8000:8000"
     depends_on:
@@ -187,6 +200,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+    logging: *default-logging
 
   frontend:
     build:

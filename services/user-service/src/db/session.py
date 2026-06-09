@@ -1,9 +1,13 @@
+import logging
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 
 from src.config.settings import settings
 from src.db.init_db import Base
+
+logger = logging.getLogger(__name__)
 
 # Import all models to register them with Base metadata
 
@@ -39,7 +43,6 @@ def init_db():
         # Test connection
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        print("✅ DB connected successfully and tables are ready.")
+        logger.info("DB connected successfully and tables are ready.")
     except OperationalError as e:
-        print("❌ DB connection failed!")
-        print(str(e))
+        logger.error("DB connection failed: %s", e, exc_info=True)

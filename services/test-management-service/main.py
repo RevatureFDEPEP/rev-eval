@@ -7,11 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.config.settings import settings
 from src.db.session import init_db
+from src.middleware.correlation import CorrelationIdMiddleware
+from src.utils.logging_config import setup_logging
 from src.v1.routes.skill_route import router as skill_router
 from src.v1.routes.test_route import router as test_router
 from src.v1.routes.test_submission_route import router as test_submission_router
 
 load_dotenv()
+setup_logging(settings.SERVICE_NAME, settings.LOG_LEVEL)
 
 app = FastAPI(title="Test Management Service", version="1.0.0")
 
@@ -29,6 +32,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(CorrelationIdMiddleware)
 
 # ---- Routes ----
 app.include_router(test_router, prefix="/v1/api")

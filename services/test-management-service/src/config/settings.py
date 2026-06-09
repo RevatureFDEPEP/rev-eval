@@ -13,11 +13,15 @@ class Settings(BaseSettings):
     MONGODB_PASSWORD: str | None = None  # Optional - service uses PostgreSQL only
     ALLOW_ORIGINS: str
     SERVICE_NAME: str
+    LOG_LEVEL: str = "INFO"
     PORT: int
     SERVICE_HOSTNAME: str
 
     # Service-to-Service Communication
     USER_SERVICE_URL: str = "http://localhost:8003"
+    INTERVIEW_SERVICE_URL: str | None = (
+        None  # not yet implemented; None = skip interview calls
+    )
 
     @property
     def SQLALCHEMY_DATABASE_URL(self) -> str:

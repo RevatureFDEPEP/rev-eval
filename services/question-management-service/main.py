@@ -1,10 +1,16 @@
+import logging
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.config.settings import settings
 from src.db.session import close_db, init_db
+from src.middleware.correlation import CorrelationIdMiddleware
+from src.utils.logging_config import setup_logging
 from src.v1.routes.question_routes import router as question_router
+
+setup_logging(settings.SERVICE_NAME, settings.LOG_LEVEL)
 
 app = FastAPI(
     title="Question Management Service",
@@ -22,6 +28,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(CorrelationIdMiddleware)
 
 # routes
 app.include_router(question_router, prefix="/v1/api")
@@ -44,7 +51,7 @@ async def on_shutdown():
     try:
         await close_db()
     except Exception as e:
-        print(f"⚠️ MongoDB connection close failed: {e}")
+        logging.getLogger(__name__).error("MongoDB connection close failed: %s", e)
 
 
 # ---- Run server ----

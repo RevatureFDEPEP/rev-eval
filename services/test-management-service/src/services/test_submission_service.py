@@ -18,6 +18,7 @@ from src.schemas.test_submission_schema import (
     TrainerReviewResponse,
 )
 from src.services.test_service import TestService
+from src.utils.logging_config import get_correlation_id
 
 logger = logging.getLogger(__name__)
 
@@ -215,9 +216,11 @@ class TestSubmissionService:
         async with httpx.AsyncClient(timeout=30.0) as client:
             for email in request.participant_emails:
                 try:
+                    _corr = {"X-Correlation-Id": get_correlation_id()}
                     # Check if user exists (direct call to user-service)
                     user_response = await client.get(
-                        f"{user_service_url}/v1/api/users/by-email/{email}"
+                        f"{user_service_url}/v1/api/users/by-email/{email}",
+                        headers=_corr,
                     )
 
                     if user_response.status_code == 404:
@@ -225,6 +228,7 @@ class TestSubmissionService:
                         invite_response = await client.post(
                             f"{user_service_url}/v1/api/users/invite",
                             json={"email": email},
+                            headers=_corr,
                         )
 
                         if invite_response.status_code not in [200, 201]:
@@ -341,7 +345,8 @@ class TestSubmissionService:
                 # Fetch participant details
                 try:
                     user_response = await client.get(
-                        f"{user_service_url}/v1/api/users/{submission.user_id}"
+                        f"{user_service_url}/v1/api/users/{submission.user_id}",
+                        headers={"X-Correlation-Id": get_correlation_id()},
                     )
                     if user_response.status_code == 200:
                         user_data = user_response.json()
@@ -445,7 +450,8 @@ class TestSubmissionService:
                 # Fetch participant details
                 try:
                     user_response = await client.get(
-                        f"{user_service_url}/v1/api/users/{submission.user_id}"
+                        f"{user_service_url}/v1/api/users/{submission.user_id}",
+                        headers={"X-Correlation-Id": get_correlation_id()},
                     )
                     if user_response.status_code == 200:
                         user_data = user_response.json()
@@ -494,14 +500,20 @@ class TestSubmissionService:
             raise ValueError(f"Test {submission.test_id} not found")
 
         # Get interview transcript from interview service
-        interview_service_url = settings.INTERVIEW_SERVICE_URL
         transcript_data = None
 
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(
-                    f"{interview_service_url}/v1/api/interview/submissions/{submission_id}/transcript"
-                )
+        if not settings.INTERVIEW_SERVICE_URL:
+            logger.warning(
+                "INTERVIEW_SERVICE_URL not configured; skipping transcript fetch"
+            )
+        else:
+            interview_service_url = settings.INTERVIEW_SERVICE_URL
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.get(
+                        f"{interview_service_url}/v1/api/interview/submissions/{submission_id}/transcript",
+                        headers={"X-Correlation-Id": get_correlation_id()},
+                    )
 
                 if response.status_code == 200:
                     transcript_data = response.json()
@@ -509,10 +521,10 @@ class TestSubmissionService:
                     logger.warning(
                         f"⚠️ Could not fetch transcript for submission {submission_id}: {response.status_code}"
                     )
-        except Exception as e:
-            logger.error(
-                f"❌ Error fetching transcript for submission {submission_id}: {e}"
-            )
+            except Exception as e:
+                logger.error(
+                    f"❌ Error fetching transcript for submission {submission_id}: {e}"
+                )
 
         # Build response
         return {
@@ -585,7 +597,11 @@ class TestSubmissionService:
 
         # Save comprehensive trainer evaluation to MongoDB (for interviews)
         # This stores the full evaluation structure alongside AI evaluation
-        if review.trainer_evaluation and submission.test.test_type.value == "INTERVIEW":
+        if (
+            review.trainer_evaluation
+            and submission.test.test_type.value == "INTERVIEW"
+            and settings.INTERVIEW_SERVICE_URL
+        ):
             interview_service_url = settings.INTERVIEW_SERVICE_URL
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:
@@ -596,6 +612,7 @@ class TestSubmissionService:
                             "reviewed_at": now.isoformat(),
                             "reviewed_by_id": trainer_id,
                         },
+                        headers={"X-Correlation-Id": get_correlation_id()},
                     )
                     if mongo_response.status_code != 200:
                         logger.warning(

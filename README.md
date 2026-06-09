@@ -53,6 +53,30 @@ user-service that issues a HS256 JWT stored in an httpOnly cookie; the
 gateway verifies the cookie's JWT on each request and forwards
 `X-User-Id`, `X-User-Email`, `X-User-Role` to downstream services.
 
+## Observability
+
+A separate Compose file brings up Loki, Grafana Alloy, and Grafana:
+
+```bash
+docker compose -f observability/docker-compose.yml up -d
+```
+
+| URL | What |
+|-----|------|
+| http://localhost:3001 | Grafana dashboards |
+| http://localhost:12345 | Alloy UI (pipeline introspection) |
+
+**Grafana runs with anonymous access enabled** (`GF_AUTH_ANONYMOUS_ENABLED=true`,
+`GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer`) — no login is required to view dashboards.
+To enable login, remove those two env vars from `observability/docker-compose.yml`.
+
+**Container log rotation** — the main `docker-compose.yml` applies a
+`json-file` log driver capped at `max-size: 10m` / `max-file: 3` to every
+service (via the `x-logging` YAML anchor). Each container retains at most
+~30 MB of logs on disk before the oldest file is rotated out.
+
+---
+
 ## CI
 
 `.github/workflows/ci-pipeline.yml` runs build + test for the four

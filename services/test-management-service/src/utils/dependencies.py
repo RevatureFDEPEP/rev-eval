@@ -11,6 +11,8 @@ from typing import Any
 import httpx
 from fastapi import Depends, Header, HTTPException, status
 
+from src.utils.logging_config import get_correlation_id
+
 
 async def get_current_user_from_headers(
     x_user_id: str | None = Header(None, alias="X-User-Id"),
@@ -38,7 +40,9 @@ async def get_current_user_from_headers(
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(endpoint)
+            response = await client.get(
+                endpoint, headers={"X-Correlation-Id": get_correlation_id()}
+            )
     except httpx.RequestError as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
