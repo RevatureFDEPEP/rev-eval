@@ -186,6 +186,35 @@ services:
       retries: 10
       start_period: 30s
 
+  reporting-and-analytics-service:
+    build:
+      context: ./services/reporting-and-analytics-service
+      dockerfile: Dockerfile
+    container_name: rev-eval-reporting-analytics
+    restart: unless-stopped
+    environment:
+      DB_HOST: reporting-postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${REPORTING_POSTGRES_USER:-root}
+      DB_PASSWORD: ${REPORTING_POSTGRES_PASSWORD:-root}
+      DB_NAME: ${REPORTING_POSTGRES_DB:-eval_ai_reporting}
+      SERVICE_NAME: reporting-and-analytics-service
+      PORT: 8004
+      SERVICE_HOSTNAME: reporting-and-analytics-service
+      ALLOW_ORIGINS: http://localhost:3000
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8004:8004"
+    depends_on:
+      reporting-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   api-gateway:
     build:
       context: ./services/api-gateway-service
