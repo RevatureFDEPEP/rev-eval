@@ -183,3 +183,22 @@ class QuestionRepository:
             List[Question]: List of matching Question documents
         """
         return await Question.find(In(Question.tags, tags)).limit(limit).to_list()
+
+    @staticmethod
+    async def sample(size: int) -> List[Question]:
+        """
+        Return a random sample of questions via MongoDB's $sample aggregation.
+
+        $sample reads at most `size` random documents in a single pass; if the
+        collection holds fewer than `size`, it returns all of them.
+
+        Args:
+            size: Number of random questions to draw
+
+        Returns:
+            List[Question]: Randomly sampled Question documents
+        """
+        return await Question.aggregate(
+            [{"$sample": {"size": size}}],
+            projection_model=Question,
+        ).to_list()
