@@ -206,7 +206,6 @@ services:
     restart: unless-stopped
     environment:
       API_GATEWAY_URL: http://api-gateway:8000
-      NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:8000
       NODE_ENV: development
     ports:
       - "3000:3000"

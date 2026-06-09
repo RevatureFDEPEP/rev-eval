@@ -5,10 +5,14 @@ No downstream services required. These parametrize the full ROUTES regex table
 and assert the auth boundary: protected routes 401 without a token while the
 public /v1/api/auth/* pass-through skips JWT verification entirely.
 """
+import asyncio
+
+import jwt
 import main
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from src.middleware.auth import add_user_context_headers
+from src.middleware.auth import add_user_context_headers, verify_jwt_token
 
 # raise_server_exceptions=False so the public-auth pass-through (which tries to
 # reach user-service and fails in a hermetic run) surfaces as a 5xx response
@@ -97,3 +101,36 @@ def test_public_auth_paths_skip_jwt(path):
     fail to connect downstream in a hermetic run, which is a 5xx, not a 401)."""
     resp = client.post(path, json={})
     assert resp.status_code != 401
+
+
+# ---- Bearer-only auth boundary (cookie fallback removed in W2-F1 step 4) ----
+
+_TEST_SECRET = "test-secret"
+
+
+@pytest.fixture
+def jwt_secret(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET", _TEST_SECRET)
+    return _TEST_SECRET
+
+
+def test_valid_bearer_returns_user_context(jwt_secret):
+    token = jwt.encode(
+        {"sub": "7", "email": "a@b.com", "role": "TRAINER"}, jwt_secret, algorithm="HS256"
+    )
+    ctx = asyncio.run(verify_jwt_token(authorization=f"Bearer {token}"))
+    assert ctx == {"user_id": "7", "email": "a@b.com", "role": "TRAINER"}
+
+
+def test_missing_authorization_header_401(jwt_secret):
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(verify_jwt_token(authorization=None))
+    assert exc.value.status_code == 401
+    assert "Authorization header" in exc.value.detail
+
+
+@pytest.mark.parametrize("header", ["Bearer", "Token abc", "abc", "Bearer a b"])
+def test_malformed_authorization_header_401(jwt_secret, header):
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(verify_jwt_token(authorization=header))
+    assert exc.value.status_code == 401

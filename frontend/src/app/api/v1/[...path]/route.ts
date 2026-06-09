@@ -46,9 +46,17 @@ async function handleRequest(
   });
 
   const text = await response.text();
+
+  // 204/205 (and any empty body) must NOT carry a payload — NextResponse.json
+  // would emit "null", and a body on a no-content status throws. Pass the
+  // bodyless status straight through (e.g. successful DELETE -> 204).
+  if (!text || response.status === 204 || response.status === 205) {
+    return new NextResponse(null, { status: response.status });
+  }
+
   let payload: unknown;
   try {
-    payload = text ? JSON.parse(text) : null;
+    payload = JSON.parse(text);
   } catch {
     payload = text;
   }
