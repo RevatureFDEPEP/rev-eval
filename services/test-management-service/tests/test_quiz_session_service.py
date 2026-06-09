@@ -251,10 +251,14 @@ class TestCreateSessionExpiredResume:
         from sqlalchemy import update
 
         from src.models.quiz_session import QuizSession
+
         await db_session.execute(
             update(QuizSession)
             .where(QuizSession.session_id == first.session_id)
-            .values(expires_at=__import__("datetime").datetime.utcnow() - __import__("datetime").timedelta(seconds=1))
+            .values(
+                expires_at=__import__("datetime").datetime.utcnow()
+                - __import__("datetime").timedelta(seconds=1)
+            )
         )
         await db_session.commit()
 

@@ -46,7 +46,9 @@ class SessionBaseResponse(BaseModel):
 
 
 class SessionCreateResponse(SessionBaseResponse):
-    session_token: str  # TODO(W3-F2): validated as a bearer credential on answer-submit endpoints
+    session_token: (
+        str  # TODO(W3-F2): validated as a bearer credential on answer-submit endpoints
+    )
 
 
 class SessionStateResponse(SessionBaseResponse):
