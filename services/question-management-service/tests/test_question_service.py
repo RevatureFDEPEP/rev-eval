@@ -6,7 +6,6 @@ without a live MongoDB instance. These tests cover pure Pydantic schema
 validation which requires no external services.
 """
 import os
-import sys
 import pytest
 from pydantic import ValidationError
 

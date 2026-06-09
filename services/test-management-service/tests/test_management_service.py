@@ -24,10 +24,10 @@ from main import app
 # engine is already pointing at SQLite because DATABASE_URL was set above
 from src.db.session import get_db, engine, Base
 # Import all models so Base.metadata knows about every table before create_all
-from src.models.test import Test
-from src.models.skill import Skill
-from src.models.test_skill import TestSkill
-from src.models.test_submission import TestSubmission
+from src.models.test import Test  # noqa: F401
+from src.models.skill import Skill  # noqa: F401
+from src.models.test_skill import TestSkill  # noqa: F401
+from src.models.test_submission import TestSubmission  # noqa: F401
 from src.utils.dependencies import get_current_user_from_headers
 
 # Bind test sessions to the same SQLite engine

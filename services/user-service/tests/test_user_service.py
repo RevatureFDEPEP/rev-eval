@@ -8,7 +8,7 @@ from sqlalchemy.pool import StaticPool
 from main import app
 from src.db.session import get_db
 from src.db.init_db import Base
-from src.models.user import User  # registers User table with Base so create_all knows about it
+from src.models.user import User  # noqa: F401 — registers User table with Base so create_all knows about it
 
 # Route handlers use sync Session (db.query/db.add/db.commit), so we must keep a sync
 # engine here. sqlite+aiosqlite requires AsyncSession which is incompatible with those

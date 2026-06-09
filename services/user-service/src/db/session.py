@@ -6,7 +6,7 @@ from src.db.init_db import Base
 from src.config.settings import settings
 
 # Import all models to register them with Base metadata
-from src.models.user import User
+from src.models.user import User  # noqa: F401
 
 # Use settings for database URL
 DATABASE_URL = settings.SQLALCHEMY_DATABASE_URL
@@ -31,7 +31,7 @@ def init_db():
     """
     try:
         # Import all models here so they are registered with Base
-        from src.models.user import User
+        from src.models.user import User  # noqa: F401
 
         # Create tables
         Base.metadata.create_all(bind=engine)
