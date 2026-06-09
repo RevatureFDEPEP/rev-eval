@@ -17,6 +17,24 @@ services:
       timeout: 5s
       retries: 10
 
+  reporting-postgres:
+    image: postgres:15-alpine
+    container_name: rev-eval-reporting-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${REPORTING_POSTGRES_USER:-root}
+      POSTGRES_PASSWORD: ${REPORTING_POSTGRES_PASSWORD:-root}
+      POSTGRES_DB: ${REPORTING_POSTGRES_DB:-eval_ai_reporting}
+    ports:
+      - "5433:5432"
+    volumes:
+      - reporting_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${REPORTING_POSTGRES_USER:-root} -d ${REPORTING_POSTGRES_DB:-eval_ai_reporting}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   mongo:
     image: mongo:7
     container_name: rev-eval-mongo
@@ -218,5 +236,6 @@ services:
 
 volumes:
   postgres_data:
+  reporting_postgres_data:
   mongo_data:
   minio_data:
