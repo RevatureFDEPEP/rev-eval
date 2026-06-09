@@ -1,4 +1,4 @@
-from beanie import Document, Indexed
+from beanie import Document
 from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 from typing import List, Optional, Union

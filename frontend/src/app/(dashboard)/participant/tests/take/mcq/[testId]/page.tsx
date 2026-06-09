@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, use, useMemo } from 'react';
+import { useEffect, useState, useCallback, use, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -83,17 +83,8 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
     };
   }, [state]);
 
-  // Auto-submit handler
-  const handleTimeExpired = useCallback(async () => {
-    toast.error('Time expired! Auto-submitting your quiz...');
-
-    if (currentPart === 'A' && sessionId) {
-      await handleSubmitPartA();
-    } else if (currentPart === 'B' && sessionId) {
-      await handleFinalSubmit();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPart, sessionId, answers]);
+  // Ref breaks circular dep: useTimer needs onTimeExpired, handlers need timer.pause/resume
+  const handleTimeExpiredRef = useRef<() => Promise<void>>(async () => {});
 
   const derivedTotalQuestions =
     typeof test?.number_of_questions === 'number' && test.number_of_questions > 0
@@ -129,7 +120,7 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
     durationSeconds: totalDuration || 0,
     // Guard against NaN before hooks were validated — safe string fallback
     testId: isNaN(testId) ? '0' : testId.toString(),
-    onTimeExpired: handleTimeExpired,
+    onTimeExpired: () => handleTimeExpiredRef.current(),
     autoStart: false,
   });
 
@@ -144,6 +135,107 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
       pauseTimer();
     }
   }, [state, pauseTimer, resumeTimer]);
+
+  // Submit Part A handler
+  const handleSubmitPartA = useCallback(async () => {
+    if (!sessionId) return;
+
+    try {
+      setState('transitioning');
+      pauseTimer();
+
+      const answersArray: QuizAnswer[] = Array.from(answers.entries()).map(([qId, answer]) => ({
+        question_id: qId,
+        selected_answers: Array.isArray(answer)
+          ? answer
+          : typeof answer === 'boolean'
+            ? [answer ? 1 : 0]
+            : [answer],
+      }));
+
+      await submitPartA({
+        session_id: sessionId,
+        answers: answersArray,
+      });
+
+      const partBData = await getPartBQuestions(sessionId);
+      setPartBQuestions(partBData.questions);
+      setQuestions(partBData.questions);
+      setCurrentPart('B');
+      setCurrentQuestionIndex(0);
+      setSubmittedPartAQuestionIds(new Set(partAQuestions.map((question) => question.question_id)));
+      setAnswers(new Map());
+
+      localStorage.setItem(`quiz-part-${testId}`, 'B');
+      localStorage.removeItem(`quiz-answers-${testId}`);
+
+      setState('part-b');
+      resumeTimer();
+      toast.success('Part A submitted! Starting Part B...');
+    } catch (err) {
+      console.error('Part A submission error:', err);
+      toast.error('Failed to submit Part A. Please try again.');
+      setState('part-a');
+      resumeTimer();
+    }
+  }, [sessionId, answers, pauseTimer, resumeTimer, partAQuestions, testId]);
+
+  // Final submit handler
+  const handleFinalSubmit = useCallback(async () => {
+    if (!sessionId) return;
+
+    try {
+      setState('submitting');
+      pauseTimer();
+
+      const answersArray: QuizAnswer[] = Array.from(answers.entries()).map(([qId, answer]) => ({
+        question_id: qId,
+        selected_answers: Array.isArray(answer)
+          ? answer
+          : typeof answer === 'boolean'
+            ? [answer ? 1 : 0]
+            : [answer],
+      }));
+
+      await submitPartB({
+        session_id: sessionId,
+        answers: answersArray,
+      });
+
+      localStorage.removeItem(`quiz-session-${testId}`);
+      localStorage.removeItem(`quiz-part-${testId}`);
+      localStorage.removeItem(`quiz-answers-${testId}`);
+      localStorage.removeItem(`quiz-timer-${testId}`);
+
+      setState('completed');
+      toast.success('Quiz submitted successfully! Redirecting to your tests...');
+
+      setTimeout(() => {
+        router.push('/participant/tests');
+      }, 2000);
+    } catch (err) {
+      console.error('Final submission error:', err);
+      toast.error('Failed to submit quiz. Please try again.');
+      setState('part-b');
+      resumeTimer();
+    }
+  }, [sessionId, answers, pauseTimer, resumeTimer, testId, router]);
+
+  // Auto-submit handler — declared after its dependencies
+  const handleTimeExpired = useCallback(async () => {
+    toast.error('Time expired! Auto-submitting your quiz...');
+
+    if (currentPart === 'A' && sessionId) {
+      await handleSubmitPartA();
+    } else if (currentPart === 'B' && sessionId) {
+      await handleFinalSubmit();
+    }
+  }, [currentPart, sessionId, handleSubmitPartA, handleFinalSubmit]);
+
+  // Keep ref in sync so useTimer always calls the latest handleTimeExpired
+  useEffect(() => {
+    handleTimeExpiredRef.current = handleTimeExpired;
+  }, [handleTimeExpired]);
 
   // Load test data and create session
   useEffect(() => {
@@ -323,91 +415,6 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   const handleNext = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
-    }
-  };
-
-  // Submit Part A handler
-  const handleSubmitPartA = async () => {
-    if (!sessionId) return;
-
-    try {
-      setState('transitioning');
-      pauseTimer();
-
-      const answersArray: QuizAnswer[] = Array.from(answers.entries()).map(([qId, answer]) => ({
-        question_id: qId,
-        selected_answers: Array.isArray(answer)
-          ? answer
-          : typeof answer === 'boolean'
-            ? [answer ? 1 : 0]
-            : [answer],
-      }));
-
-      await submitPartA({
-        session_id: sessionId,
-        answers: answersArray,
-      });
-
-      const partBData = await getPartBQuestions(sessionId);
-      setPartBQuestions(partBData.questions);
-      setQuestions(partBData.questions);
-      setCurrentPart('B');
-      setCurrentQuestionIndex(0);
-      setSubmittedPartAQuestionIds(new Set(partAQuestions.map((question) => question.question_id)));
-      setAnswers(new Map());
-
-      localStorage.setItem(`quiz-part-${testId}`, 'B');
-      localStorage.removeItem(`quiz-answers-${testId}`);
-
-      setState('part-b');
-      resumeTimer();
-      toast.success('Part A submitted! Starting Part B...');
-    } catch (err) {
-      console.error('Part A submission error:', err);
-      toast.error('Failed to submit Part A. Please try again.');
-      setState('part-a');
-      resumeTimer();
-    }
-  };
-
-  // Final submit handler
-  const handleFinalSubmit = async () => {
-    if (!sessionId) return;
-
-    try {
-      setState('submitting');
-      pauseTimer();
-
-      const answersArray: QuizAnswer[] = Array.from(answers.entries()).map(([qId, answer]) => ({
-        question_id: qId,
-        selected_answers: Array.isArray(answer)
-          ? answer
-          : typeof answer === 'boolean'
-            ? [answer ? 1 : 0]
-            : [answer],
-      }));
-
-      await submitPartB({
-        session_id: sessionId,
-        answers: answersArray,
-      });
-
-      localStorage.removeItem(`quiz-session-${testId}`);
-      localStorage.removeItem(`quiz-part-${testId}`);
-      localStorage.removeItem(`quiz-answers-${testId}`);
-      localStorage.removeItem(`quiz-timer-${testId}`);
-
-      setState('completed');
-      toast.success('Quiz submitted successfully! Redirecting to your tests...');
-
-      setTimeout(() => {
-        router.push('/participant/tests');
-      }, 2000);
-    } catch (err) {
-      console.error('Final submission error:', err);
-      toast.error('Failed to submit quiz. Please try again.');
-      setState('part-b');
-      resumeTimer();
     }
   };
 

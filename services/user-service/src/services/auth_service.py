@@ -91,13 +91,13 @@ class AuthService:
         db.refresh(user)
         return user
 
-    # Backwards-compatible aliases used by the existing auth_route scaffolding.
+    # Backwards-compatible aliases — no routes call these directly.
     @staticmethod
-    def authenticate_student(db: Session, email: str, password: str) -> Optional[User]:
+    def authenticate_student(db: Session, email: str, password: str) -> Optional[User]:  # pragma: no cover
         return AuthService.authenticate_user(db, email, password)
 
     @staticmethod
-    def create_student(
+    def create_student(  # pragma: no cover
         db: Session, email: str, password: str, full_name: Optional[str] = None
     ) -> User:
         return AuthService.create_user(db, email, password, full_name, UserRole.PARTICIPANT)

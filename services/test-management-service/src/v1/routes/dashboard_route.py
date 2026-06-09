@@ -3,20 +3,8 @@ Dashboard Statistics Endpoints
 
 Provides aggregated statistics for trainer and participant dashboards.
 """
-from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
-from src.db.session import get_db
-from src.models.test import Test, TestType
-from src.models.test_submission import TestSubmission, SubmissionStatus
-from src.models.user import User, UserRole
-from src.schemas.test_schema import (
-    TrainerDashboardStats,
-    ParticipantDashboardStats,
-    AssignedTestInfo
-)
-from typing import Optional, List
-from datetime import datetime, timedelta
+from fastapi import APIRouter, Header, HTTPException
+from typing import Optional
 import logging
 
 # Set up logging

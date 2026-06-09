@@ -33,7 +33,8 @@ interface InterviewTranscript {
   lambda_evaluation?: InterviewTranscriptEvaluation;
 }
 
-async function getInterviewTranscript(_submissionId: number): Promise<InterviewTranscript> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function getInterviewTranscript(_: number): Promise<InterviewTranscript> {
   throw new Error('Interview transcripts not available — candidate-built on W3 D13.');
 }
 import { formatTableDate } from '@/lib/utils/date';

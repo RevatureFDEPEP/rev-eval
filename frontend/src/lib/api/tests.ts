@@ -11,7 +11,6 @@ import {
   TestUpdate,
   TestSubmission,
   BulkTestAssignmentCreate,
-  TestAssignment,
 } from './types';
 
 /**

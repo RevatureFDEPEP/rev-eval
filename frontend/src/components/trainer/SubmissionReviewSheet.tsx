@@ -12,10 +12,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getSubmissionReviewDetails, submitTrainerReview } from '@/lib/api';
-import type { TestSubmission } from '@/lib/api/types';
-import { CheckCircle2, Star, Play, Pause, RotateCcw, Loader2, Copy, Lightbulb } from 'lucide-react';
+import type { TestSubmission, SubmissionReviewDetails } from '@/lib/api/types';
+import { CheckCircle2, Play, Pause, RotateCcw, Loader2, Copy, Lightbulb } from 'lucide-react';
 import { useAudioPlayer } from '@/lib/hooks/useAudioPlayer';
-import { formatTableDate } from '@/lib/utils/date';
 
 interface SubmissionReviewSheetProps {
   submission: TestSubmission | null;
@@ -25,87 +24,6 @@ interface SubmissionReviewSheetProps {
   readOnly?: boolean; // If true, show existing review in read-only mode (for GRADED submissions)
 }
 
-interface ReviewDetails {
-  submission: TestSubmission;
-  test: {
-    id: number;
-    name: string;
-    test_type: string;
-    role?: string;
-    curriculum?: string;
-    duration_seconds?: number;
-    skills: Array<{ id: number; name: string; description?: string }>;
-  };
-  transcript: {
-    session_id: string;
-    submission_id: number;
-    test_name: string;
-    test_role?: string;
-    messages: Array<{
-      speaker: string;
-      text: string;
-      timestamp: string;
-    }>;
-    audio_urls?: Array<{
-      message_index: number;
-      audio_url: string;
-      uploaded_at: string;
-    }>;
-    message_count: number;
-    duration_seconds?: number;
-    status: string;
-    created_at: string;
-    ended_at?: string;
-    lambda_evaluation?: {
-      overall_score: number;
-      score_breakdown: {
-        technical_knowledge?: number;
-        problem_solving?: number;
-        communication?: number;
-        code_quality?: number;
-        engagement?: number;
-      };
-      skill_breakdown: Record<
-        string,
-        {
-          score: number;
-          feedback: string;
-          proficiency_level: string;
-        }
-      >;
-      feedback: string;
-      strengths: string[];
-      improvements: string[];
-      key_highlights: string[];
-      red_flags: string[];
-      recommendation: string;
-      reasoning: string;
-      evaluated_at?: string;
-      evaluated_by?: string;
-    };
-    trainer_evaluation?: {
-      overall_score: number;
-      score_breakdown?: {
-        technical_knowledge?: number;
-        problem_solving?: number;
-        communication?: number;
-        code_quality?: number;
-        engagement?: number;
-      };
-      skill_breakdown?: Record<
-        string,
-        {
-          score: number;
-          feedback: string;
-          proficiency_level: string;
-        }
-      >;
-      feedback?: string;
-      strengths?: string[];
-      improvements?: string[];
-    };
-  };
-}
 
 export function SubmissionReviewSheet({
   submission,
@@ -114,7 +32,7 @@ export function SubmissionReviewSheet({
   onReviewSuccess,
   readOnly = false,
 }: SubmissionReviewSheetProps) {
-  const [details, setDetails] = useState<ReviewDetails | null>(null);
+  const [details, setDetails] = useState<SubmissionReviewDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -203,10 +121,6 @@ export function SubmissionReviewSheet({
       setPlayingAudioIndex(null);
     });
     await audioPlayer.play(audioUrl);
-  };
-
-  const handlePauseAudio = () => {
-    audioPlayer.pause();
   };
 
   const handleRestartAudio = () => {
@@ -491,7 +405,7 @@ export function SubmissionReviewSheet({
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => setTrainerScore(details.transcript.lambda_evaluation!.overall_score.toString())}
+                              onClick={() => setTrainerScore(details.transcript!.lambda_evaluation!.overall_score.toString())}
                             >
                               <Lightbulb className="mr-2 h-4 w-4" />
                               Use AI: {details.transcript.lambda_evaluation.overall_score}
@@ -524,18 +438,18 @@ export function SubmissionReviewSheet({
                                 max="100"
                                 value={state}
                                 onChange={(e) => setState(e.target.value)}
-                                placeholder={details.transcript?.lambda_evaluation?.score_breakdown[aiKey as keyof typeof details.transcript.lambda_evaluation.score_breakdown] ? `AI: ${details.transcript.lambda_evaluation.score_breakdown[aiKey as keyof typeof details.transcript.lambda_evaluation.score_breakdown]}` : "Score"}
+                                placeholder={(details.transcript?.lambda_evaluation?.score_breakdown as Record<string, number | undefined>)?.[aiKey] != null ? `AI: ${(details.transcript?.lambda_evaluation?.score_breakdown as Record<string, number | undefined>)?.[aiKey]}` : "Score"}
                                 className="placeholder:text-slate-400"
                                 disabled={readOnly}
                               />
-                              {!readOnly && details.transcript?.lambda_evaluation?.score_breakdown[aiKey as keyof typeof details.transcript.lambda_evaluation.score_breakdown] && (
+                              {!readOnly && (details.transcript?.lambda_evaluation?.score_breakdown as Record<string, number | undefined>)?.[aiKey] != null && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => setState(details.transcript.lambda_evaluation!.score_breakdown[aiKey as keyof typeof details.transcript.lambda_evaluation.score_breakdown]!.toString())}
+                                  onClick={() => setState(String((details.transcript?.lambda_evaluation?.score_breakdown as Record<string, number | undefined>)?.[aiKey] ?? ''))}
                                 >
                                   <Copy className="mr-1 h-3 w-3" />
-                                  AI: {details.transcript.lambda_evaluation.score_breakdown[aiKey as keyof typeof details.transcript.lambda_evaluation.score_breakdown]}
+                                  AI: {(details.transcript?.lambda_evaluation?.score_breakdown as Record<string, number | undefined>)?.[aiKey]}
                                 </Button>
                               )}
                             </div>
@@ -652,7 +566,7 @@ export function SubmissionReviewSheet({
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleUseAIValue(setOverallFeedback, details.transcript.lambda_evaluation?.feedback)}
+                              onClick={() => handleUseAIValue(setOverallFeedback, details.transcript!.lambda_evaluation?.feedback)}
                             >
                               <Lightbulb className="mr-2 h-4 w-4" />
                               Use AI Feedback
@@ -684,7 +598,7 @@ export function SubmissionReviewSheet({
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleUseAIValue(setStrengths, details.transcript.lambda_evaluation?.strengths)}
+                              onClick={() => handleUseAIValue(setStrengths, details.transcript!.lambda_evaluation?.strengths)}
                             >
                               <Lightbulb className="mr-2 h-4 w-4" />
                               Use AI Strengths
@@ -716,7 +630,7 @@ export function SubmissionReviewSheet({
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleUseAIValue(setImprovements, details.transcript.lambda_evaluation?.improvements)}
+                              onClick={() => handleUseAIValue(setImprovements, details.transcript!.lambda_evaluation?.improvements)}
                             >
                               <Lightbulb className="mr-2 h-4 w-4" />
                               Use AI Suggestions
@@ -935,14 +849,14 @@ export function SubmissionReviewSheet({
                           <div
                             key={idx}
                             className={`rounded-lg border p-4 ${
-                              message.speaker === 'user'
+                              message.role === 'user'
                                 ? 'border-blue-200 bg-blue-50/50'
                                 : 'border-slate-200 bg-slate-50/50'
                             }`}
                           >
                             <div className="mb-2 flex items-center justify-between">
-                              <Badge variant={message.speaker === 'user' ? 'default' : 'secondary'}>
-                                {message.speaker === 'user' ? 'Participant' : 'AI Interviewer'}
+                              <Badge variant={message.role === 'user' ? 'default' : 'secondary'}>
+                                {message.role === 'user' ? 'Participant' : 'AI Interviewer'}
                               </Badge>
                               {getAudioUrlForMessage(idx) && (
                                 <div className="flex items-center gap-2">
@@ -1011,7 +925,7 @@ export function SubmissionReviewSheet({
                               )}
                             </div>
                             <p className="text-sm text-slate-700 whitespace-pre-wrap">
-                              {message.text}
+                              {message.content}
                             </p>
                             <p className="mt-2 text-xs text-slate-400">
                               {new Date(message.timestamp).toLocaleString()}

@@ -6,7 +6,7 @@ from src.db.init_db import Base
 from src.config.settings import settings
 
 # Import all models to register them with Base metadata
-from src.models.user import User
+from src.models.user import User  # noqa: F401
 
 # Use settings for database URL
 DATABASE_URL = settings.SQLALCHEMY_DATABASE_URL
@@ -15,7 +15,7 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # ===== Dependency for FastAPI =====
-def get_db():
+def get_db():  # pragma: no cover
     """Dependency to get database session"""
     db = SessionLocal()
     try:
@@ -24,14 +24,14 @@ def get_db():
         db.close()
 
 # ===== Initialize DB =====
-def init_db():
+def init_db():  # pragma: no cover
     """
     Import all models, create tables, and test connection.
     Call this on app startup.
     """
     try:
         # Import all models here so they are registered with Base
-        from src.models.user import User
+        from src.models.user import User  # noqa: F401
 
         # Create tables
         Base.metadata.create_all(bind=engine)

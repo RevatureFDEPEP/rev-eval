@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# Import JWT middleware
-from src.middleware.auth import verify_jwt_token, add_user_context_headers
+# Import JWT middleware — after load_dotenv() so env vars are available at import time
+from src.middleware.auth import verify_jwt_token, add_user_context_headers  # noqa: E402
 
 app = FastAPI(title="API Gateway")
 
@@ -89,7 +89,7 @@ def on_startup():
     service_name = getenv('SERVICE_NAME', 'api-gateway')
     service_port = int(getenv('PORT', '8000'))
     logger.info(f"✅ {service_name} starting on port {service_port}")
-    logger.info(f"📍 Service discovery: compose-internal DNS")
+    logger.info("📍 Service discovery: compose-internal DNS")
 
 @app.on_event("shutdown")
 def on_shutdown():
@@ -215,10 +215,10 @@ async def smart_gateway(
         
         # Log errors
         if resp.status_code >= 400:
-            logger.error(f"❌ Error Response:")
+            logger.error("❌ Error Response:")
             try:
                 logger.error(f"   {resp.json()}")
-            except:
+            except Exception:
                 logger.error(f"   {resp.text[:200]}")
         
         logger.info("=" * 80)
@@ -311,7 +311,7 @@ async def legacy_gateway(
     except httpx.ConnectError as e:
         logger.error(f"❌ Connection Error: {str(e)}")
         raise HTTPException(status_code=503, detail=f"Cannot connect to service: {str(e)}")
-    except Exception as e:
+    except Exception:
         logger.exception("Unhandled legacy gateway error")
         raise HTTPException(status_code=500, detail="Internal server error")
 

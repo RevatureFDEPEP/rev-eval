@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getSubmissionReviewDetails } from '@/lib/api';
-import type { TestSubmission } from '@/lib/api/types';
+import type { TestSubmission, SubmissionReviewDetails } from '@/lib/api/types';
 import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
 import { useAudioPlayer } from '@/lib/hooks/useAudioPlayer';
 import { formatTableDate } from '@/lib/utils/date';
@@ -19,73 +19,12 @@ interface GradedSubmissionSheetProps {
   onOpenChange: (open: boolean) => void;
 }
 
-interface ReviewDetails {
-  submission: TestSubmission;
-  test: {
-    id: number;
-    name: string;
-    test_type: string;
-    role?: string;
-    curriculum?: string;
-    duration_seconds?: number;
-    skills: Array<{ id: number; name: string; description?: string }>;
-  };
-  transcript: {
-    session_id: string;
-    submission_id: number;
-    test_name: string;
-    test_role?: string;
-    messages: Array<{
-      role: string;
-      content: string;
-      timestamp: string;
-    }>;
-    audio_urls?: Array<{
-      message_index: number;
-      audio_url: string;
-      uploaded_at: string;
-    }>;
-    message_count: number;
-    duration_seconds?: number;
-    status: string;
-    created_at: string;
-    ended_at?: string;
-    lambda_evaluation?: {
-      overall_score: number;
-      score_breakdown: {
-        technical_knowledge?: number;
-        problem_solving?: number;
-        communication?: number;
-        code_quality?: number;
-        engagement?: number;
-      };
-      skill_breakdown: Record<
-        string,
-        {
-          score: number;
-          feedback: string;
-          proficiency_level: string;
-        }
-      >;
-      feedback: string;
-      strengths: string[];
-      improvements: string[];
-      key_highlights: string[];
-      red_flags: string[];
-      recommendation: string;
-      reasoning: string;
-      evaluated_at?: string;
-      evaluated_by?: string;
-    };
-  };
-}
-
 export function GradedSubmissionSheet({
   submission,
   open,
   onOpenChange,
 }: GradedSubmissionSheetProps) {
-  const [details, setDetails] = useState<ReviewDetails | null>(null);
+  const [details, setDetails] = useState<SubmissionReviewDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [playingAudioIndex, setPlayingAudioIndex] = useState<number | null>(null);
@@ -133,10 +72,6 @@ export function GradedSubmissionSheet({
     await audioPlayer.play(audioUrl);
   };
 
-  const handlePauseAudio = () => {
-    audioPlayer.pause();
-  };
-
   const handleRestartAudio = () => {
     audioPlayer.restart();
   };
@@ -154,6 +89,7 @@ export function GradedSubmissionSheet({
       audioPlayer.stop();
       setPlayingAudioIndex(null);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   if (!submission) return null;

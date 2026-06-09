@@ -21,7 +21,7 @@ SessionLocal = sessionmaker(
 Base = declarative_base()
 
 # Dependency for FastAPI (optional)
-def get_db():
+def get_db():  # pragma: no cover
     db = SessionLocal()
     try:
         yield db

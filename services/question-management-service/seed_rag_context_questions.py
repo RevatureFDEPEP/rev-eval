@@ -517,7 +517,7 @@ async def seed_questions():
             result = await create_question(question)
             created_count += 1
             print(f"✅ Created question ID: {result.get('_id', 'unknown')}\n")
-        except Exception as e:
+        except Exception:
             failed_count += 1
             print(f"❌ Failed to create question {i}\n")
             continue

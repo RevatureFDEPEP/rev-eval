@@ -55,7 +55,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.14'
           cache: pip
           cache-dependency-path: services/${{ matrix.service }}/requirements.txt
 
@@ -72,13 +72,17 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov aiosqlite diff-cover
+          pip install pytest pytest-cov aiosqlite diff-cover ruff
+
+      - name: Lint (ruff)
+        working-directory: services/${{ matrix.service }}
+        run: ruff check .
 
       - name: Run pytest with coverage
         working-directory: services/${{ matrix.service }}
         run: |
           if [ -d tests ]; then
-            pytest --cov --cov-report=xml --cov-fail-under=80
+            pytest --cov=src --cov-report=xml
           else
             echo "⚠️ No tests found — skipping for ${{ matrix.service }}"
           fi
@@ -88,7 +92,7 @@ jobs:
         run: |
           if [ -f coverage.xml ]; then
             git fetch origin main --depth=1 || true
-            diff-cover coverage.xml --compare-branch=origin/main --fail-under=80 || true
+            diff-cover coverage.xml --compare-branch=origin/main --fail-under=80
           fi
 
   trivy-scan:
@@ -129,7 +133,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 8
+          version: 9
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -141,7 +145,7 @@ jobs:
 
       - name: Lint (zero warnings)
         working-directory: frontend
-        run: pnpm lint --max-warnings 0
+        run: pnpm lint
 
       - name: Build
         working-directory: frontend

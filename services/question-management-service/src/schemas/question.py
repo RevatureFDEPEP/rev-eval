@@ -1,7 +1,7 @@
 from pydantic import BaseModel, field_validator, model_validator, Field
 from typing import List, Optional, Union
 from datetime import datetime
-from src.models.question import Option, OptionCreate, QuestionType
+from src.models.question import OptionCreate, QuestionType
 
 
 class QuestionCreate(BaseModel):
@@ -276,7 +276,7 @@ class QuestionUpdate(BaseModel):
 # Use this when you need strict type-level separation between MCQ and MULTI
 # without runtime model_validator branching.
 # ---------------------------------------------------------------------------
-from typing import Annotated, Literal
+from typing import Annotated, Literal  # noqa: E402
 
 class SingleSelectPayload(BaseModel):
     """MCQ — exactly one correct answer by option position (1-indexed)."""

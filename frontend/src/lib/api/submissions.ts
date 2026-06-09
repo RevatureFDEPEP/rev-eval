@@ -10,6 +10,7 @@ import {
   TestSubmissionCreate,
   TestSubmissionUpdate,
   BulkTestSubmissionCreate,
+  SubmissionReviewDetails,
 } from './types';
 
 /**
@@ -109,23 +110,13 @@ export async function getAllSubmissionsForTrainer(): Promise<TestSubmission[]> {
 }
 
 /**
- * Get full review details for a submission
- * Includes submission, test info, transcript, and AI evaluation
+ * Get full review details for a submission.
+ * Includes submission, test info, and (for INTERVIEW type) the transcript with AI evaluation.
  */
-export async function getSubmissionReviewDetails(submissionId: number): Promise<{
-  submission: TestSubmission;
-  test: {
-    id: number;
-    name: string;
-    test_type: string;
-    role?: string;
-    curriculum?: string;
-    duration_seconds?: number;
-    skills: Array<{ id: number; name: string; description?: string }>;
-  };
-  transcript: Record<string, unknown>; // Full transcript from interview service
-}> {
-  return api.get(`/v1/api/submissions/${submissionId}/review-details`);
+export async function getSubmissionReviewDetails(
+  submissionId: number,
+): Promise<SubmissionReviewDetails> {
+  return api.get<SubmissionReviewDetails>(`/v1/api/submissions/${submissionId}/review-details`);
 }
 
 /**
