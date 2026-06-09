@@ -12,7 +12,9 @@ This file stays at summary level only.
 > start, advance, or finish a feature, update its detail file (check off steps,
 > add evidence) **and** its status row here, in the same PR as the code change.
 
-**Last assessed:** 2026-06-05 (branch `richardh-feat-alembic`)
+**Last assessed:** 2026-06-09 (W2-F1 step 4 completed — BFF-Bearer wiring,
+gateway now Bearer-only; prior sweep reconciled to
+`pr-reviews/students/richardh/progress.md`)
 
 ## Status values
 
@@ -29,13 +31,13 @@ Spec: `days_6_10_features.md`.
 | # | Feature | Spec priority | Status | Detail |
 |---|---|---|---|---|
 | W2-F1 | Nginx path-based routing & local TLS | REQUIRED | ✅ Completed | [w2-f1-nginx-routing-tls.md](features/w2-f1-nginx-routing-tls.md) |
-| W2-F2 | Unit test scaffolding (frontend + backend) | — | ✅ Completed | [w2-f2-unit-test-scaffolding.md](features/w2-f2-unit-test-scaffolding.md) |
+| W2-F2 | Unit test scaffolding (frontend + backend) | — | 🟡 In Progress | [w2-f2-unit-test-scaffolding.md](features/w2-f2-unit-test-scaffolding.md) |
 | W2-F3 | Centralized log aggregation (Loki/Grafana) | — | ✅ Completed | [w2-f3-log-aggregation.md](features/w2-f3-log-aggregation.md) |
 | W2-F4 | CI quality gates (Ruff / ESLint / Trivy / coverage) | REQUIRED | ✅ Completed | [w2-f4-ci-quality-gates.md](features/w2-f4-ci-quality-gates.md) |
 | W2-F5 | Direct-to-MinIO diagram uploads (pre-signed URLs) | — | ✅ Completed | [w2-f5-minio-presigned-uploads.md](features/w2-f5-minio-presigned-uploads.md) |
-| W2-F6 | Structured question authoring interface | — | ✅ Completed | [w2-f6-question-authoring-ui.md](features/w2-f6-question-authoring-ui.md) |
+| W2-F6 | Structured question authoring interface | — | 🟡 In Progress | [w2-f6-question-authoring-ui.md](features/w2-f6-question-authoring-ui.md) |
 | W2-F7 | Alembic migrations & Category domain | — | ✅ Completed | [w2-f7-alembic-category-domain.md](features/w2-f7-alembic-category-domain.md) |
-| W2-F8 | Pre-existing defect cleanup (found during W2-F7) | — | 🟡 In Progress | [w2-f8-pre-existing-defects.md](features/w2-f8-pre-existing-defects.md) |
+| W2-F8 | Pre-existing defect cleanup (found during W2-F7) | — | ✅ Completed | [w2-f8-pre-existing-defects.md](features/w2-f8-pre-existing-defects.md) |
 | W2-M10 | Day 10 milestone: reporting service scaffold | milestone | ❌ Not Started | [w2-m10-reporting-service-scaffold.md](features/w2-m10-reporting-service-scaffold.md) |
 
 ## Days 11–15 (Week 3 — quiz-taking vertical slice)
@@ -73,7 +75,7 @@ Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 3. ~~**W2-F7 Alembic + Category**~~ — done (branch `richardh-feat-alembic`).
 4. ~~**W2-F2 deepen**~~ — done (branch `richardh-feat-W2-F2`): multi-stage Dockerfiles + model/repo test depth + hermetic test DBs.
 5. **W2-M10 reporting scaffold** — pairs naturally with W2-F7's Alembic work.
-6. **W2-F8 defect cleanup** — small fixes, good filler tasks between features (gateway 204 item already done in W2-F7).
+6. ~~**W2-F8 defect cleanup**~~ — done (PR #63: skills-500, user-service dual-engine, Pydantic-v2 sweep; gateway 204 was in W2-F7).
 7. **W3-F1 sessions backend** — strict prerequisite for the whole Week 3 slice; lands as Alembic `0004` on W2-F7's chain.
 8. **W3-F2 → W3-F3 → W3-F4** — the quiz-taking slice in dependency order; W3-F2 backend before the W3-F3/W3-F4 frontend that consumes it.
 9. **W3-F5 + W3-F6** — verification layer; do last, once the endpoints + UI exist to test.
