@@ -18,6 +18,10 @@ from sqlalchemy.orm import sessionmaker
 from src.db.session import Base
 
 # Import all models to register table metadata
+from src.models.test import Test  # noqa: F401
+from src.models.skill import Skill  # noqa: F401
+from src.models.test_skill import TestSkill  # noqa: F401
+from src.models.test_submission import TestSubmission  # noqa: F401
 
 
 @pytest_asyncio.fixture(scope="function")
