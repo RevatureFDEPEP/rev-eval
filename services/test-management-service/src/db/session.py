@@ -51,6 +51,7 @@ async def init_db():
         from src.models.skill import Skill  # noqa: F401
         from src.models.test_skill import TestSkill  # noqa: F401
         from src.models.test_submission import TestSubmission  # noqa: F401
+        from src.models.quiz_session import QuizSession  # noqa: F401
 
         # Create tables in async context
         async with engine.begin() as conn:
