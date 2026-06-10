@@ -74,6 +74,10 @@ class SessionOut(BaseModel):
     current_index: int
     total_questions: int
     question: Optional[SanitizedQuestion] = None
+    # Present only when an existing ACTIVE session is reused (W3-F7 item 3):
+    # the autosaved in-progress answers so the client can restore them.
+    # None on a fresh mint — the response shape stays backward-compatible.
+    draft_answers: Optional[Dict[str, List[int]]] = None
 
     model_config = ConfigDict(from_attributes=True)
 

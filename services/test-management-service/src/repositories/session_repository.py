@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from src.models.session import Session
+from src.models.session import Session, SessionStatus
 from src.models.test import Test
 
 
@@ -25,6 +25,25 @@ class SessionRepository:
         await db.commit()
         await db.refresh(session)
         return session
+
+    @staticmethod
+    async def get_active_for_user_test(
+        db: AsyncSession, user_id: int, test_id: int
+    ) -> Optional[Session]:
+        """Newest ACTIVE session for (user, test) — the reuse lookup (W3-F7
+        item 3). At most one row exists once the partial unique index
+        (Alembic 0007) is in place; newest-first ordering keeps the lookup
+        deterministic on pre-index data."""
+        result = await db.execute(
+            select(Session)
+            .where(
+                Session.user_id == user_id,
+                Session.test_id == test_id,
+                Session.status == SessionStatus.ACTIVE,
+            )
+            .order_by(Session.created_at.desc())
+        )
+        return result.scalars().first()
 
     @staticmethod
     async def get_by_id(db: AsyncSession, session_id: UUID) -> Optional[Session]:

@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import ValidationError
 from src.models.question import Question
 from src.schemas.question import (
@@ -11,6 +11,7 @@ from src.schemas.question import (
 )
 from src.services.question_service import QuestionService
 from src.services.upload_service import UploadService
+from src.utils.authz import require_answer_key_role
 from src.utils.s3_client import generate_presigned_get_url
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
@@ -127,6 +128,7 @@ async def get_presigned_upload_url(
 @router.get(
     "/sample",
     response_model=List[QuestionResponse],
+    dependencies=[Depends(require_answer_key_role)],
     summary="Randomly sample questions",
     description="""
     Return a random sample of questions via MongoDB's `$sample` aggregation.
@@ -134,6 +136,10 @@ async def get_presigned_upload_url(
     Used by test-management-service when minting a quiz session: it draws the
     fixed question set for the session in a single pass. Returns up to `size`
     questions (fewer if the bank holds fewer).
+
+    **Authorization (W3-F7 item 4):** responses include answer fields
+    (`correct_answers`/`sample_answer`), so gateway traffic requires a
+    TRAINER/ADMIN `X-User-Role`; header-less internal service calls pass.
     """
 )
 async def sample_questions(

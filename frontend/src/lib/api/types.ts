@@ -417,6 +417,9 @@ export interface SessionOut {
   current_index: number;
   total_questions: number;
   question?: SanitizedQuestion | null; // the current (first) question
+  // Autosaved in-progress answers, present only when an existing ACTIVE
+  // session was reused (W3-F7 item 3) — restore these on resume.
+  draft_answers?: Record<string, number[]> | null;
 }
 
 /** Display identity surfaced through AuthContext — never carries the raw cookie/token. */

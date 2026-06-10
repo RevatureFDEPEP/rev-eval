@@ -60,6 +60,7 @@ function renderQuestion(
   selected: number[],
   onChange: (ids: number[]) => void,
   disabled: boolean,
+  labelledBy: string,
 ) {
   switch (question.type) {
     case 'multi':
@@ -69,6 +70,7 @@ function renderQuestion(
           selected={selected}
           onChange={onChange}
           disabled={disabled}
+          labelledBy={labelledBy}
         />
       );
     default:
@@ -79,6 +81,7 @@ function renderQuestion(
           selected={selected}
           onChange={onChange}
           disabled={disabled}
+          labelledBy={labelledBy}
         />
       );
   }
@@ -99,7 +102,10 @@ export function TestRunner({
 
   const [questions, setQuestions] = useState<SanitizedQuestion[]>(seed);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Map<string, number[]>>(new Map());
+  // Resumed sessions (W3-F7 item 3) restore the autosaved draft selections.
+  const [answers, setAnswers] = useState<Map<string, number[]>>(
+    () => new Map(Object.entries(session.draft_answers ?? {})),
+  );
   const [exam, dispatch] = useReducer(examReducer, initialExamState);
   const submittingRef = useRef(false);
 
@@ -107,12 +113,12 @@ export function TestRunner({
   const goNext = () =>
     setCurrentIndex((i) => Math.min(questions.length - 1, i + 1));
 
-  const handleSubmit = async () => {
-    if (submittingRef.current || exam.isLocked) return;
+  // Shared submit body — entered via handleSubmit (active) or handleRetry
+  // (error/transient); the caller dispatches its own entry action first.
+  const performSubmit = async () => {
     if (questions.length === 0) return;
     const q = questions[questions.length - 1]; // the live (frontier) question
     submittingRef.current = true;
-    dispatch({ type: 'SUBMIT_START' });
     try {
       const result = await submitAnswerFn(
         session.session_id,
@@ -143,6 +149,22 @@ export function TestRunner({
     }
   };
 
+  const handleSubmit = async () => {
+    if (submittingRef.current || exam.isLocked) return;
+    dispatch({ type: 'SUBMIT_START' });
+    await performSubmit();
+  };
+
+  // Recovery from a transient-exhausted submit (W3-F7 item 2): re-enter
+  // `submitting` (still locked) and re-send. Semantic errors never get here —
+  // the reducer ignores SUBMIT_RETRY for them and no button is rendered.
+  const handleRetry = async () => {
+    if (submittingRef.current) return;
+    if (exam.status !== 'error' || exam.error?.kind !== 'transient') return;
+    dispatch({ type: 'SUBMIT_RETRY' });
+    await performSubmit();
+  };
+
   // Server-anchored countdown; stops once the exam is no longer active.
   const timer = useServerTimer(
     session.server_now,
@@ -171,7 +193,9 @@ export function TestRunner({
   const frontier = questions.length - 1;
   const isReviewing = currentIndex < frontier;
   const inputsDisabled = exam.isLocked || isReviewing;
-  const isLastQuestion = frontier >= session.total_questions - 1;
+  // Server index at mint (>0 on a resumed session) offsets the local list.
+  const baseIndex = session.current_index;
+  const isLastQuestion = baseIndex + frontier >= session.total_questions - 1;
 
   const question = questions[currentIndex];
   const selected = answers.get(question.id) ?? [];
@@ -204,7 +228,7 @@ export function TestRunner({
     <div className="mx-auto max-w-2xl space-y-4 p-6">
       <div className="flex items-center justify-between gap-4">
         <span className="text-sm text-slate-500">
-          Question {currentIndex + 1} of {session.total_questions}
+          Question {baseIndex + currentIndex + 1} of {session.total_questions}
         </span>
         <div className="w-40">
           <Timer
@@ -228,17 +252,38 @@ export function TestRunner({
             ? 'Network problem submitting your answer. Please check your connection.'
             : 'Your submission was rejected by the server.'}{' '}
           {exam.error.message}
+          {exam.error.kind === 'transient' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-3"
+              onClick={handleRetry}
+              data-testid="retry-button"
+            >
+              Retry submission
+            </Button>
+          )}
         </div>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg leading-relaxed">
+          {/* id ties the question text to its option group (W3-F7 item 7). */}
+          <CardTitle
+            id={`question-${question.id}-label`}
+            className="text-lg leading-relaxed"
+          >
             {question.question_text}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {renderQuestion(question, selected, setSelected, inputsDisabled)}
+          {renderQuestion(
+            question,
+            selected,
+            setSelected,
+            inputsDisabled,
+            `question-${question.id}-label`,
+          )}
         </CardContent>
       </Card>
 

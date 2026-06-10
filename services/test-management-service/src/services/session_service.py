@@ -1,8 +1,10 @@
 import logging
 import secrets
 from datetime import datetime, timedelta
+from typing import Optional
 from uuid import UUID, uuid4
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from src import scoring
 from src.models.answer import Answer
@@ -71,14 +73,73 @@ def _sanitize(q: dict) -> SanitizedQuestion:
 class SessionService:
 
     @staticmethod
+    async def _resume_session(db: AsyncSession, session: Session) -> Optional[SessionOut]:
+        """Rebuild a SessionOut from an existing ACTIVE row (W3-F7 item 3).
+
+        Returns None — after flipping the row to EXPIRED — when its
+        ``expires_at`` has already passed (same side-effect convention as
+        ``submit_answer``), so the caller proceeds to mint a fresh session.
+
+        The response anchors ``server_now`` at *now* against the **original**
+        ``expires_at``, so the client countdown shows true remaining time;
+        ``current_index`` and the autosaved ``draft_answers`` ride along for
+        refresh-recovery.
+        """
+        now = datetime.utcnow()
+        if session.expires_at is not None and session.expires_at < now:
+            session.status = SessionStatus.EXPIRED
+            await SessionRepository.flush(db, session)
+            await db.commit()
+            return None
+
+        question_ids = list(session.question_ids or [])
+        question = None
+        if session.current_index < len(question_ids):
+            q = await question_client.get_question(
+                question_ids[session.current_index]
+            )
+            question = _sanitize(q)
+
+        logger.info(
+            "session reused: session_id=%s test_id=%s user_id=%s index=%d",
+            session.session_id, session.test_id, session.user_id,
+            session.current_index,
+        )
+        return SessionOut(
+            session_id=session.session_id,
+            session_token=session.session_token,
+            server_now=now,
+            expires_at=session.expires_at,
+            current_index=session.current_index,
+            total_questions=len(question_ids),
+            question=question,
+            draft_answers=session.draft_answers,
+        )
+
+    @staticmethod
     async def create_session(db: AsyncSession, test_id: int, user_id: int) -> SessionOut:
         """Mint a quiz session: server-authoritative timing, a fixed sampled
         question set, and the first (sanitized) question. Persists the row
         before responding.
+
+        Reuse semantic (W3-F7 item 3): at most one ACTIVE session per
+        (user, test). An existing live session is returned as-is (question set,
+        clock, draft answers intact) instead of minting a duplicate — a page
+        refresh must not re-sample questions or reset the countdown. The
+        partial unique index (Alembic 0007) backstops the lookup race; the
+        loser of a concurrent double-POST serves the winner's row, not a 500.
         """
         test = await SessionRepository.get_test(db, test_id)
         if test is None:
             raise ValueError("Test not found")
+
+        existing = await SessionRepository.get_active_for_user_test(
+            db, user_id, test_id
+        )
+        if existing is not None:
+            resumed = await SessionService._resume_session(db, existing)
+            if resumed is not None:
+                return resumed
 
         # Server-authoritative timing (tz-naive UTC, matching repo convention).
         server_now = datetime.utcnow()
@@ -90,6 +151,24 @@ class SessionService:
         if not questions:
             raise EmptyQuestionBankError(
                 "No questions available to start a session"
+            )
+
+        # Mongo $sample may emit duplicate documents — dedupe (order-preserving)
+        # so a candidate is never asked the same question twice (W3-F7 item 8).
+        seen: set[str] = set()
+        unique_questions = []
+        for q in questions:
+            qid = _question_id(q)
+            if qid not in seen:
+                seen.add(qid)
+                unique_questions.append(q)
+        questions = unique_questions
+
+        if len(questions) < size:
+            # Short fill (small bank and/or duplicates dropped) — visible, not silent.
+            logger.warning(
+                "session short-filled: test_id=%s requested=%d got=%d",
+                test_id, size, len(questions),
             )
 
         question_ids = [_question_id(q) for q in questions]
@@ -106,7 +185,20 @@ class SessionService:
             current_index=0,
             question_ids=question_ids,
         )
-        await SessionRepository.create(db, session)
+        try:
+            await SessionRepository.create(db, session)
+        except IntegrityError:
+            # Lost the uq_sessions_active_user_test race — another request
+            # created the ACTIVE session between our lookup and insert.
+            await db.rollback()
+            winner = await SessionRepository.get_active_for_user_test(
+                db, user_id, test_id
+            )
+            if winner is not None:
+                resumed = await SessionService._resume_session(db, winner)
+                if resumed is not None:
+                    return resumed
+            raise
         logger.info(
             "session created: session_id=%s test_id=%s user_id=%s questions=%d",
             session.session_id, test_id, user_id, len(question_ids),
@@ -178,6 +270,11 @@ class SessionService:
             raise SessionTerminalError("No further questions to answer")
 
         qid = question_ids[idx]
+        # NOTE (W3-F7 item 9b): this fetch runs while holding the FOR UPDATE
+        # row lock. Blast radius is this session only (concurrent retries for
+        # the same session queue here by design); worst-case hold time is the
+        # client's bounded budget — 10s timeout × ≤3 attempts per fetch
+        # (question_client._TIMEOUT / _MAX_RETRIES).
         question = await question_client.get_question(qid)
         result = scoring.score(
             question.get("type"),

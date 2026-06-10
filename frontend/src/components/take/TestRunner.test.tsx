@@ -153,6 +153,101 @@ describe("TestRunner (W3-F4 exam client)", () => {
     expect(screen.getByRole("radio", { name: "Python" })).toBeDisabled();
   });
 
+  // W3-F7 item 7 — the question text is the option group's accessible label.
+  it("associates the question text with its option group (a11y)", async () => {
+    const submitFn = vi.fn().mockResolvedValue(advanceResult);
+    renderRunner(submitFn);
+
+    // mcq → radiogroup labelled by the rendered question text element.
+    const radioGroup = screen.getByRole("radiogroup");
+    expect(radioGroup).toHaveAttribute("aria-labelledby", "question-q1-label");
+    expect(document.getElementById("question-q1-label")).toHaveTextContent(
+      "Q1: pick one",
+    );
+
+    // multi → fieldset (role group) labelled by the question text.
+    fireEvent.click(screen.getByLabelText("Python"));
+    fireEvent.click(screen.getByTestId("submit-button"));
+    await waitFor(() => screen.getByText("Q2: pick many"));
+    expect(
+      screen.getByRole("group", { name: "Q2: pick many" }),
+    ).toHaveAttribute("aria-labelledby", "question-q2-label");
+  });
+
+  // W3-F7 item 7 — the W3-F4 spec names aria-disabled; assert it, not just
+  // the DOM disabled state.
+  it("marks the option group aria-disabled while locked", async () => {
+    const submitFn = vi.fn(() => new Promise<AnswerResult>(() => {}));
+    renderRunner(submitFn);
+
+    expect(screen.getByRole("radiogroup")).toHaveAttribute(
+      "aria-disabled",
+      "false",
+    );
+    fireEvent.click(screen.getByLabelText("Python"));
+    fireEvent.click(screen.getByTestId("submit-button"));
+    await waitFor(() =>
+      expect(screen.getByRole("radiogroup")).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      ),
+    );
+  });
+
+  // W3-F7 item 3 — a reused session restores autosaved drafts + true position.
+  it("restores draft answers and offsets the question counter on a resumed session", () => {
+    render(
+      <AuthProvider initialUser={identity}>
+        <TestRunner
+          session={{
+            ...session,
+            question: q1,
+            current_index: 1,
+            total_questions: 3,
+            draft_answers: { q1: [1] },
+          }}
+          submitAnswerFn={vi.fn()}
+          saveDraftFn={noopSave}
+        />
+      </AuthProvider>,
+    );
+    expect(screen.getByText("Question 2 of 3")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Python" })).toBeChecked();
+  });
+
+  // W3-F7 item 2 — a transient outage must not brick the attempt.
+  it("offers Retry submission after a transient failure and recovers on success", async () => {
+    const submitFn = vi
+      .fn()
+      .mockRejectedValueOnce(new ExamError("transient", 503, "gateway down"))
+      .mockResolvedValueOnce(advanceResult);
+    renderRunner(submitFn);
+
+    fireEvent.click(screen.getByLabelText("Python"));
+    fireEvent.click(screen.getByTestId("submit-button"));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    const retry = screen.getByTestId("retry-button");
+    expect(retry).toHaveTextContent("Retry submission");
+
+    fireEvent.click(retry);
+    await waitFor(() => expect(screen.getByText("Q2: pick many")).toBeInTheDocument());
+    expect(submitFn).toHaveBeenCalledTimes(2);
+    // Recovered: inputs unlocked on the next live question.
+    expect(screen.getByRole("checkbox", { name: "Node.js" })).not.toBeDisabled();
+  });
+
+  it("renders no retry affordance for a semantic rejection", async () => {
+    const submitFn = vi.fn().mockRejectedValue(new ExamError("semantic", 409, "locked"));
+    renderRunner(submitFn);
+
+    fireEvent.click(screen.getByLabelText("Python"));
+    fireEvent.click(screen.getByTestId("submit-button"));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(screen.queryByTestId("retry-button")).not.toBeInTheDocument();
+  });
+
   it("reviews an answered question read-only and preserves its selection", async () => {
     const submitFn = vi.fn().mockResolvedValue(advanceResult);
     renderRunner(submitFn);

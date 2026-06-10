@@ -12,3 +12,5 @@ pytest-asyncio>=0.23,<0.25
 # so pin the floor explicitly to stop the resolver picking an older one.
 mongomock>=4.3.0
 mongomock-motor>=0.0.36
+# Route-level tests drive the FastAPI app over ASGI (no server, no Mongo).
+httpx>=0.27,<1

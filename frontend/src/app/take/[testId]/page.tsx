@@ -7,9 +7,9 @@
  * Because the session (and its first question) is fetched on the server, the
  * first question is present in the initial HTML — no client loading spinner.
  */
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
-import { getIdentityServer, mintSessionServer } from '@/lib/api/server';
+import { getIdentityServer, mintSessionServer, ServerApiError } from '@/lib/api/server';
 import { AuthProvider } from '@/lib/auth/AuthContext';
 import { TestRunner } from '@/components/take/TestRunner';
 
@@ -33,10 +33,20 @@ export default async function TakePage({ params }: TakePageProps) {
 
   // Server-side mint + identity: the first question lands in the initial HTML
   // and only the derived identity (not the cookie) crosses to the client.
-  const [quizSession, identity] = await Promise.all([
-    mintSessionServer(testIdNum),
-    getIdentityServer(),
-  ]);
+  // Failures route to the boundaries (W3-F7 item 5): unknown testId → 404
+  // page; anything else (422 empty bank, 502 service down) → error.tsx.
+  let quizSession, identity;
+  try {
+    [quizSession, identity] = await Promise.all([
+      mintSessionServer(testIdNum),
+      getIdentityServer(),
+    ]);
+  } catch (err) {
+    if (err instanceof ServerApiError && err.status === 404) {
+      notFound();
+    }
+    throw err;
+  }
 
   return (
     <AuthProvider initialUser={identity}>

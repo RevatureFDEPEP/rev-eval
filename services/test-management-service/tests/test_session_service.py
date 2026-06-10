@@ -46,10 +46,14 @@ def _question(qid="q1", qtype="mcq"):
     }
 
 
-def _run(test=None, questions=None):
-    """Drive create_session with get_test/create/sample_questions patched.
+def _run(test=None, questions=None, existing=None, create_side_effect=None,
+         current_question=None):
+    """Drive create_session with the repositories + question client patched.
 
-    Returns (SessionOut, captured_session_model)."""
+    ``existing`` feeds get_active_for_user_test (a list becomes a side_effect
+    sequence for the IntegrityError-race test). Returns
+    (SessionOut, captured_session_model) — the captured model is None when no
+    new row was created (reuse path)."""
     captured = {}
 
     async def _capture_create(db, session):
@@ -57,11 +61,21 @@ def _run(test=None, questions=None):
         return session
 
     with patch(f"{SVC}.SessionRepository.get_test", new_callable=AsyncMock) as get_test, \
-         patch(f"{SVC}.SessionRepository.create", side_effect=_capture_create), \
-         patch(f"{SVC}.question_client.sample_questions", new_callable=AsyncMock) as sample:
+         patch(f"{SVC}.SessionRepository.get_active_for_user_test",
+               new_callable=AsyncMock) as get_active, \
+         patch(f"{SVC}.SessionRepository.flush", new_callable=AsyncMock), \
+         patch(f"{SVC}.SessionRepository.create",
+               side_effect=create_side_effect or _capture_create), \
+         patch(f"{SVC}.question_client.sample_questions", new_callable=AsyncMock) as sample, \
+         patch(f"{SVC}.question_client.get_question", new_callable=AsyncMock) as get_q:
         get_test.return_value = test
+        if isinstance(existing, list):
+            get_active.side_effect = existing
+        else:
+            get_active.return_value = existing
         sample.return_value = questions
-        out = asyncio.run(SessionService.create_session(None, 1, 42))
+        get_q.return_value = current_question or _question("q-current")
+        out = asyncio.run(SessionService.create_session(AsyncMock(), 1, 42))
     return out, captured.get("session")
 
 
@@ -122,6 +136,93 @@ def test_missing_test_raises_value_error():
 def test_empty_question_bank_raises():
     with pytest.raises(EmptyQuestionBankError):
         _run(_test_row(), [])
+
+
+def test_sampled_duplicates_are_deduped_order_preserving():
+    """Mongo $sample may emit duplicate documents (W3-F7 item 8)."""
+    _, session = _run(
+        _test_row(number_of_questions=4),
+        [_question("a"), _question("b"), _question("a"), _question("c")],
+    )
+    assert session.question_ids == ["a", "b", "c"]
+
+
+def test_short_fill_logs_a_warning(caplog):
+    with caplog.at_level("WARNING", logger="src.services.session_service"):
+        _, session = _run(
+            _test_row(number_of_questions=5),
+            [_question("a"), _question("b"), _question("a")],  # dedupes to 2
+        )
+    assert session.question_ids == ["a", "b"]
+    assert any("short-filled" in r.message for r in caplog.records)
+
+
+def test_full_sample_logs_no_short_fill_warning(caplog):
+    with caplog.at_level("WARNING", logger="src.services.session_service"):
+        _run(_test_row(number_of_questions=2), [_question("a"), _question("b")])
+    assert not any("short-filled" in r.message for r in caplog.records)
+
+
+# ---- active-session reuse (W3-F7 item 3) ------------------------------------
+
+def _active_row(current_index=1, expires_in=1800, draft_answers=None,
+                question_ids=("a", "b", "c")):
+    return SimpleNamespace(
+        session_id=uuid4(),
+        test_id=1,
+        user_id=42,
+        session_token="ab" * 32,
+        server_now=datetime.utcnow() - timedelta(seconds=60),
+        expires_at=datetime.utcnow() + timedelta(seconds=expires_in),
+        status=SessionStatus.ACTIVE,
+        current_index=current_index,
+        question_ids=list(question_ids),
+        draft_answers=draft_answers,
+    )
+
+
+def test_reuse_returns_existing_active_session_without_resampling():
+    row = _active_row(current_index=1, draft_answers={"a": [1]})
+    out, created = _run(_test_row(), [_question("fresh")], existing=row,
+                        current_question=_question("b"))
+    assert created is None                       # no duplicate row minted
+    assert out.session_id == row.session_id
+    assert out.session_token == row.session_token
+    assert out.current_index == 1                # progress intact
+    assert out.total_questions == 3
+    assert out.question.id == "b"                # the question AT current_index
+    assert out.draft_answers == {"a": [1]}       # autosave restored
+    assert out.expires_at == row.expires_at      # original clock, not reset
+
+
+def test_reuse_expired_active_is_flipped_and_fresh_session_minted():
+    row = _active_row(expires_in=-10)
+    out, created = _run(_test_row(), [_question("q1")], existing=row)
+    assert row.status == SessionStatus.EXPIRED   # side-effect transition
+    assert created is not None                   # fresh mint proceeded
+    assert out.session_id == created.session_id
+    assert out.session_id != row.session_id
+    assert out.draft_answers is None
+
+
+def test_lost_insert_race_serves_the_winner_row():
+    """Losing the uq_sessions_active_user_test race must return the winner's
+    session, not bubble a 500 (W3-F7 item 3, unlike cohort #73)."""
+    from sqlalchemy.exc import IntegrityError
+
+    winner = _active_row(current_index=0, question_ids=("a", "b", "c"))
+
+    async def _duplicate_insert(db, session):
+        raise IntegrityError(
+            "INSERT INTO sessions", {}, Exception("uq_sessions_active_user_test")
+        )
+
+    out, _ = _run(_test_row(), [_question("q1")],
+                  existing=[None, winner],       # lookup misses, then sees winner
+                  create_side_effect=_duplicate_insert,
+                  current_question=_question("a"))
+    assert out.session_id == winner.session_id
+    assert out.question.id == "a"
 
 
 # ---- save_draft (W3-F4 autosave) -------------------------------------------

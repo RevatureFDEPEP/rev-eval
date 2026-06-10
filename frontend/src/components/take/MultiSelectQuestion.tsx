@@ -15,6 +15,8 @@ interface MultiSelectQuestionProps {
   onChange: (optionIds: number[]) => void;
   /** Disable selection (W3-F4): exam locked/submitting, or reviewing an answered question. */
   disabled?: boolean;
+  /** id of the rendered question text — ties the group to its label (W3-F7 item 7). */
+  labelledBy?: string;
 }
 
 export function MultiSelectQuestion({
@@ -22,6 +24,7 @@ export function MultiSelectQuestion({
   selected,
   onChange,
   disabled = false,
+  labelledBy,
 }: MultiSelectQuestionProps) {
   if (!question.options || question.options.length === 0) {
     return <div className="text-sm text-red-600">Error: No options available</div>;
@@ -36,7 +39,9 @@ export function MultiSelectQuestion({
   };
 
   return (
-    <div className="space-y-3">
+    // fieldset labelled by the rendered question text: the group of checkbox
+    // inputs carries the question as its accessible name (W3-F7 item 7).
+    <fieldset className="space-y-3" aria-labelledby={labelledBy}>
       {question.options.map((option) => {
         const isChecked = selected.includes(option.option_id);
 
@@ -65,6 +70,6 @@ export function MultiSelectQuestion({
           </div>
         );
       })}
-    </div>
+    </fieldset>
   );
 }

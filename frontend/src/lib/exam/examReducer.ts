@@ -10,6 +10,12 @@
  *   active ──SUBMIT_START──▶ submitting ──SUBMIT_CONFIRMED(finalized)──▶ submitted (locked)
  *                                        └─SUBMIT_CONFIRMED(!finalized)─▶ active (unlocked, next q)
  *                                        └─SUBMIT_FAILED────────────────▶ error (locked)
+ *   error(transient) ──SUBMIT_RETRY──▶ submitting (stays locked until the retry acks)
+ *
+ * Only a TRANSIENT failure (network blip, 502/503/504 after backoff exhaustion)
+ * may be retried — a brief outage must not brick the attempt (W3-F7 item 2).
+ * Semantic rejections (409/410/422) keep the terminal lock: the server has
+ * made a definitive decision.
  */
 import type { ExamErrorKind } from '@/lib/api/types';
 
@@ -32,7 +38,8 @@ export const initialExamState: ExamState = {
 export type ExamAction =
   | { type: 'SUBMIT_START' }
   | { type: 'SUBMIT_CONFIRMED'; finalized: boolean; submittedAt?: string | null }
-  | { type: 'SUBMIT_FAILED'; kind: ExamErrorKind; message: string };
+  | { type: 'SUBMIT_FAILED'; kind: ExamErrorKind; message: string }
+  | { type: 'SUBMIT_RETRY' };
 
 export function examReducer(state: ExamState, action: ExamAction): ExamState {
   switch (action.type) {
@@ -62,6 +69,13 @@ export function examReducer(state: ExamState, action: ExamAction): ExamState {
         isLocked: true,
         error: { kind: action.kind, message: action.message },
       };
+
+    case 'SUBMIT_RETRY':
+      // Exit `error` only for transient failures; semantic stays terminal.
+      if (state.status !== 'error' || state.error?.kind !== 'transient') {
+        return state;
+      }
+      return { ...state, status: 'submitting', isLocked: true, error: null };
 
     default:
       return state;

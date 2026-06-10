@@ -8,7 +8,15 @@ import { api } from './client';
 import { fetchWithRetry } from '@/lib/exam/errors';
 import type { AnswerResult, DraftSaveResult } from './types';
 
-/** A stable per-submission idempotency key (reused across this submit's retries). */
+/**
+ * A stable per-submission idempotency key (reused across this submit's retries).
+ *
+ * CONTRACT (W3-F7 item 9a): a key is bound to ONE payload. The server does not
+ * fingerprint the request body — replaying a key with a *different* body
+ * silently returns the response stored for the first request. Always mint a
+ * fresh key per logical submission (as the default parameter does) and reuse
+ * it only for byte-identical retries of that same submission.
+ */
 function newIdempotencyKey(): string {
   return crypto.randomUUID();
 }
