@@ -32,6 +32,10 @@ class QuestionServiceError(Exception):
     after bounded retries (or returns a non-retryable error)."""
 
 
+class QuestionNotFoundError(QuestionServiceError):
+    """Raised when question-management-service returns 404 for a question id."""
+
+
 def get_client() -> httpx.AsyncClient:
     global _client
     if _client is None:
@@ -91,6 +95,53 @@ async def sample_questions(size: int) -> List[dict]:
             )
             logger.warning(
                 "question-service sample 5xx (attempt %d/%d): %s",
+                attempt + 1, _MAX_RETRIES + 1, resp.status_code,
+            )
+
+        if attempt < _MAX_RETRIES:
+            await asyncio.sleep(_BACKOFF_BASE * (2 ** attempt))
+
+    raise QuestionServiceError(
+        f"question-service unavailable after {_MAX_RETRIES + 1} attempts"
+    ) from last_exc
+
+
+async def get_question(qid: str) -> dict:
+    """Fetch a single full question body (incl. ``correct_answers``) by id.
+
+    Used by the answer endpoint (W3-F2) to score against the authoritative
+    answer key, which is never sent to the candidate. Same transient-retry /
+    correlation-id behaviour as :func:`sample_questions`; a 404 raises
+    :class:`QuestionNotFoundError` (not retried), other 4xx raise
+    :class:`QuestionServiceError`.
+    """
+    client = get_client()
+    headers = {"X-Correlation-Id": get_correlation_id()}
+    last_exc: Optional[Exception] = None
+
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            resp = await client.get(f"/v1/api/questions/{qid}", headers=headers)
+        except httpx.TransportError as e:
+            last_exc = e
+            logger.warning(
+                "question-service get_question transport error (attempt %d/%d): %s",
+                attempt + 1, _MAX_RETRIES + 1, e,
+            )
+        else:
+            if resp.status_code < 400:
+                return resp.json()
+            if resp.status_code == 404:
+                raise QuestionNotFoundError(f"question {qid} not found")
+            if resp.status_code < 500:
+                raise QuestionServiceError(
+                    f"question-service returned {resp.status_code}: {resp.text}"
+                )
+            last_exc = QuestionServiceError(
+                f"question-service returned {resp.status_code}"
+            )
+            logger.warning(
+                "question-service get_question 5xx (attempt %d/%d): %s",
                 attempt + 1, _MAX_RETRIES + 1, resp.status_code,
             )
 
