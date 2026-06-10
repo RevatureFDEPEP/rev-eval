@@ -70,6 +70,48 @@ async def get_all_questions():
 
 
 @router.get(
+    "/sample",
+    response_model=list[QuestionResponse],
+    summary="Randomly sample questions by skill",
+    description="""
+    Randomly sample up to `count` questions matching any of the given skills,
+    using MongoDB's `$sample` aggregation.
+
+    **Usage:**
+    - Provide skills as repeatable query parameters: `?skills=Python&skills=SQL`
+    - Returns questions matching ANY of the skills (OR logic)
+    - Returns AT MOST `count` questions; fewer if the matching pool is smaller
+
+    Declared before `/{id}` so it is not captured by the single-segment id route.
+    """,
+)
+async def sample_questions(
+    skills: list[str] = Query(
+        ..., description="Skills to match (OR). Repeatable: ?skills=A&skills=B"
+    ),
+    count: int = Query(..., ge=1, le=200, description="Number of questions to sample"),
+    type: str | None = Query(None, description="Optional question type filter"),
+    difficulty: str | None = Query(None, description="Optional difficulty filter"),
+):
+    """Randomly sample questions matching the given skills."""
+    try:
+        questions = await QuestionService.sample_by_skills(
+            skills=skills, count=count, question_type=type, difficulty=difficulty
+        )
+        return [
+            QuestionResponse(**q.model_dump(by_alias=True, mode="json"))
+            for q in questions
+        ]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred: {str(e)}",
+        ) from e
+
+
+@router.get(
     "/{id}",
     response_model=QuestionResponse,
     summary="Get question by ID",

@@ -4,7 +4,7 @@ FROM python:3.11-slim AS base
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     gcc \
     postgresql-client \
     curl \
@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
 # Keep base-image Python tooling current: the bundled pip/setuptools/wheel
 # lag upstream, so the Trivy gate (CRITICAL/HIGH, ignore-unfixed) can trip on
 # fixable tooling CVEs whenever the base image drifts.
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel "jaraco.context>=6.1.0"
 
 
 # ---- test stage ----
@@ -38,6 +38,8 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 COPY --from=test /app/src ./src
 COPY --from=test /app/main.py .
 COPY --from=test /app/start.sh .
+COPY --from=test /app/alembic.ini .
+COPY --from=test /app/migrations ./migrations
 
 RUN chmod +x start.sh
 

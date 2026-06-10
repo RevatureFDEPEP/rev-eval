@@ -418,6 +418,54 @@ class QuestionService:
         return await QuestionRepository.find_by_tags(cleaned_tags, limit)
 
     @staticmethod
+    async def sample_by_skills(
+        skills: list[str],
+        count: int,
+        question_type: str | None = None,
+        difficulty: str | None = None,
+    ) -> list[Question]:
+        """
+        Randomly sample up to `count` questions matching any of `skills`.
+
+        Args:
+            skills: Skills to match (OR logic)
+            count: Number of questions to sample
+            question_type: Optional type filter (mcq, multi, true_false, text)
+            difficulty: Optional difficulty filter (easy, medium, hard)
+
+        Returns:
+            List[Question]: Randomly sampled matching questions (at most `count`)
+
+        Raises:
+            HTTPException: If no valid skill is provided or a filter is invalid
+        """
+        cleaned_skills = [s.strip() for s in skills if s and s.strip()]
+        if not cleaned_skills:
+            raise HTTPException(
+                status_code=400, detail="At least one skill must be provided"
+            )
+
+        if question_type is not None:
+            valid_types = [qt.value for qt in QuestionType]
+            if question_type not in valid_types:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid question type. Must be one of: {', '.join(valid_types)}",
+                )
+
+        if difficulty is not None:
+            valid_difficulties = ["easy", "medium", "hard"]
+            if difficulty not in valid_difficulties:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid difficulty. Must be one of: {', '.join(valid_difficulties)}",
+                )
+
+        return await QuestionRepository.sample_by_skills(
+            cleaned_skills, count, question_type, difficulty
+        )
+
+    @staticmethod
     async def filter_questions(
         question_type: str | None = None,
         skill: str | None = None,

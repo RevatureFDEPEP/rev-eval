@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     INTERVIEW_SERVICE_URL: str | None = (
         None  # not yet implemented; None = skip interview calls
     )
+    QUESTION_MANAGEMENT_SERVICE_URL: str = "http://localhost:8003"
+
+    # Quiz sessions
+    DEFAULT_QUIZ_DURATION_MINUTES: int = 30  # fallback when a test has no duration
 
     @property
     def SQLALCHEMY_DATABASE_URL(self) -> str:
