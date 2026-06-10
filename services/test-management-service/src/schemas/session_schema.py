@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -19,6 +19,31 @@ class AnswerSubmit(BaseModel):
     key is never sent to the client.
     """
     submitted_answers: List[Any] = Field(default_factory=list)
+
+
+class DraftSave(BaseModel):
+    """Request body for PATCH /sessions/{id}/draft (W3-F4 autosave).
+
+    ``answers`` is the candidate's full in-progress selection map keyed by
+    question id (``{ question_id: [option_id, ...] }``). It is a last-write-wins
+    crash-recovery snapshot: the server persists it verbatim but never scores it,
+    and saving it does not advance ``current_index`` or change ``status``.
+    """
+    answers: Dict[str, List[int]] = Field(default_factory=dict)
+
+
+class DraftSaveResult(BaseModel):
+    """Response contract for PATCH /sessions/{id}/draft.
+
+    Echoes the *unchanged* ``current_index``/``status`` so the client can confirm
+    the autosave did not advance the session, plus the server save timestamp.
+    """
+    session_id: UUID
+    status: str
+    current_index: int
+    saved_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SanitizedQuestion(BaseModel):
