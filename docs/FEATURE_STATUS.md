@@ -12,10 +12,11 @@ This file stays at summary level only.
 > start, advance, or finish a feature, update its detail file (check off steps,
 > add evidence) **and** its status row here, in the same PR as the code change.
 
-**Last assessed:** 2026-06-09 (W3-F1 completed — `POST /sessions` in
-test-management-service: sessions table via Alembic 0004, opaque token +
-server-authoritative timing, first cross-service httpx call to a new QMS
-`$sample` endpoint with bounded retries + correlation-id propagation)
+**Last assessed:** 2026-06-09 (W3-F2 completed — `POST /sessions/{id}/answer`
+in test-management-service: pure exact-match + Jaccard partial-credit scoring,
+pessimistic `SELECT FOR UPDATE` lock, required `Idempotency-Key` dedup/replay,
+and a session state machine that finalizes to `SUBMITTED` on the last question.
+New `answers` + `idempotency_keys` tables via Alembic 0005; 89 tests, 78% cov)
 
 ## Status values
 
@@ -49,7 +50,7 @@ in dependency order (W3-F1 first, W3-F6 last).
 | # | Feature | Day | Status | Detail |
 |---|---|---|---|---|
 | W3-F1 | Quiz session creation backend (`POST /sessions`, httpx integration) | 11 | ✅ Completed | [w3-f1-quiz-session-backend.md](features/w3-f1-quiz-session-backend.md) |
-| W3-F2 | Scoring engine + attempt locking (idempotency, state machine) | 12 | ❌ Not Started | [w3-f2-scoring-engine-locking.md](features/w3-f2-scoring-engine-locking.md) |
+| W3-F2 | Scoring engine + attempt locking (idempotency, state machine) | 12 | ✅ Completed | [w3-f2-scoring-engine-locking.md](features/w3-f2-scoring-engine-locking.md) |
 | W3-F3 | Test-taking frontend skeleton (`/take/[testId]`, AuthContext) | 13 | ❌ Not Started | [w3-f3-test-taking-frontend-skeleton.md](features/w3-f3-test-taking-frontend-skeleton.md) |
 | W3-F4 | Auto-saving exam client (server timer, autosave, submit-lock) | 14 | ❌ Not Started | [w3-f4-autosave-exam-client.md](features/w3-f4-autosave-exam-client.md) |
 | W3-F5 | Integration tests vs. real Postgres/Mongo | 15 | ❌ Not Started | [w3-f5-integration-tests-real-db.md](features/w3-f5-integration-tests-real-db.md) |

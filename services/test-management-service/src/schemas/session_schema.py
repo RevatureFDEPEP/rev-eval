@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -8,6 +8,17 @@ from pydantic import BaseModel, ConfigDict, Field
 class SessionCreate(BaseModel):
     """Request body for POST /sessions."""
     test_id: int = Field(..., description="ID of the quiz/test to start a session for")
+
+
+class AnswerSubmit(BaseModel):
+    """Request body for POST /sessions/{id}/answer.
+
+    ``submitted_answers`` is the candidate's selection(s) for the *current*
+    question: a list of option_ids for mcq/multi, or a single-element list for
+    true_false. The server scores against the authoritative answer key; the
+    key is never sent to the client.
+    """
+    submitted_answers: List[Any] = Field(default_factory=list)
 
 
 class SanitizedQuestion(BaseModel):
@@ -38,5 +49,24 @@ class SessionOut(BaseModel):
     current_index: int
     total_questions: int
     question: Optional[SanitizedQuestion] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AnswerResult(BaseModel):
+    """Response contract for POST /sessions/{id}/answer.
+
+    Deliberately score-free: per-question ``score`` / ``is_correct`` are
+    persisted server-side but never returned, so a candidate cannot probe the
+    answer key mid-exam (W3-F2 locked decision 1). Results are surfaced later
+    from the answers table (W4-F1). The body carries only advance state.
+    """
+    session_id: UUID
+    question_id: str
+    current_index: int          # advanced past the question just answered
+    total_questions: int
+    status: str                 # "ACTIVE" or "SUBMITTED"
+    submitted_at: Optional[datetime] = None
+    next_question: Optional[SanitizedQuestion] = None
 
     model_config = ConfigDict(from_attributes=True)

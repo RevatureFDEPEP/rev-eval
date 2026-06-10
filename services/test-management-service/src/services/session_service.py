@@ -1,12 +1,17 @@
 import logging
 import secrets
 from datetime import datetime, timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from src import scoring
+from src.models.answer import Answer
+from src.models.idempotency_key import IdempotencyKey
 from src.models.session import Session, SessionStatus
+from src.repositories.answer_repository import AnswerRepository
+from src.repositories.idempotency_repository import IdempotencyRepository
 from src.repositories.session_repository import SessionRepository
-from src.schemas.session_schema import SanitizedQuestion, SessionOut
+from src.schemas.session_schema import AnswerResult, SanitizedQuestion, SessionOut
 from src.utils import question_client
 
 logger = logging.getLogger(__name__)
@@ -18,6 +23,25 @@ _DEFAULT_QUESTION_COUNT = 20
 
 class EmptyQuestionBankError(Exception):
     """Raised when the question bank returns no questions to sample."""
+
+
+class SessionNotFoundError(Exception):
+    """Raised when no session exists for the given id (→ 404)."""
+
+
+class SessionForbiddenError(Exception):
+    """Raised when a session belongs to a different user (→ 403)."""
+
+
+class SessionTerminalError(Exception):
+    """Raised when answering a session that is already submitted/expired,
+    or otherwise past its last question (→ 409). Terminal states are
+    immutable."""
+
+
+class SessionExpiredError(Exception):
+    """Raised when a session's expires_at has passed (→ 409). The session is
+    transitioned to EXPIRED as a side effect."""
 
 
 def _question_id(q: dict) -> str:
@@ -92,3 +116,118 @@ class SessionService:
             total_questions=len(question_ids),
             question=first_question,
         )
+
+    @staticmethod
+    async def submit_answer(
+        db: AsyncSession,
+        session_id: UUID,
+        user_id: int,
+        submitted_answers: list,
+        idempotency_key: str,
+    ) -> AnswerResult:
+        """Score the current question, advance the state machine, finalize on
+        the last question. Runs as a single transaction with a pessimistic lock
+        on the session row.
+
+        Concurrency model:
+          * ``SELECT FOR UPDATE`` serializes concurrent submissions for the same
+            session, so retries queue rather than double-score / double-advance.
+          * the ``Idempotency-Key`` is checked *inside* the lock — a retry that
+            arrives after the first commit sees the stored response and replays
+            it without re-scoring.
+
+        The per-question score/is_correct are persisted to ``answers`` but never
+        returned (locked decision: no answer-key leakage mid-exam).
+        """
+        # 1. Acquire the pessimistic lock before reading current_index.
+        session = await SessionRepository.get_for_update(db, session_id)
+        if session is None:
+            raise SessionNotFoundError("Session not found")
+        if session.user_id != user_id:
+            raise SessionForbiddenError("Session belongs to another user")
+
+        # 2. Idempotency replay — return the stored response without re-scoring.
+        existing = await IdempotencyRepository.get(db, session_id, idempotency_key)
+        if existing is not None:
+            logger.info(
+                "answer idempotent replay: session_id=%s key=%s",
+                session_id, idempotency_key,
+            )
+            return AnswerResult.model_validate(existing.response_body)
+
+        # 3. State gate — terminal states are immutable.
+        now = datetime.utcnow()
+        if session.status != SessionStatus.ACTIVE:
+            raise SessionTerminalError(f"Session is {session.status.value}")
+        if session.expires_at is not None and session.expires_at < now:
+            session.status = SessionStatus.EXPIRED
+            await SessionRepository.flush(db, session)
+            await db.commit()
+            raise SessionExpiredError("Session has expired")
+
+        # 4. Resolve the current question and score it server-side.
+        question_ids = list(session.question_ids or [])
+        idx = session.current_index
+        if idx >= len(question_ids):
+            # Past the last slot while still ACTIVE — defensive; treat as terminal.
+            raise SessionTerminalError("No further questions to answer")
+
+        qid = question_ids[idx]
+        question = await question_client.get_question(qid)
+        result = scoring.score(
+            question.get("type"),
+            question.get("correct_answers"),
+            submitted_answers,
+        )
+
+        await AnswerRepository.create(
+            db,
+            Answer(
+                session_id=session_id,
+                question_id=qid,
+                question_index=idx,
+                submitted_answers=submitted_answers,
+                score=result.score,
+                is_correct=result.is_correct,
+            ),
+        )
+
+        # 5. Advance the state machine; finalize on the last question.
+        session.current_index = idx + 1
+        next_question = None
+        if session.current_index >= len(question_ids):
+            session.status = SessionStatus.SUBMITTED
+            session.submitted_at = now
+        else:
+            nq = await question_client.get_question(
+                question_ids[session.current_index]
+            )
+            next_question = _sanitize(nq)
+        await SessionRepository.flush(db, session)
+
+        out = AnswerResult(
+            session_id=session_id,
+            question_id=qid,
+            current_index=session.current_index,
+            total_questions=len(question_ids),
+            status=session.status.value,
+            submitted_at=session.submitted_at,
+            next_question=next_question,
+        )
+
+        # 6. Store the dedup record (replayable) and commit the whole txn once.
+        await IdempotencyRepository.create(
+            db,
+            IdempotencyKey(
+                idempotency_key=idempotency_key,
+                session_id=session_id,
+                status_code=200,
+                response_body=out.model_dump(mode="json"),
+            ),
+        )
+        await db.commit()
+        logger.info(
+            "answer scored: session_id=%s q_index=%d status=%s",
+            session_id, idx, session.status.value,
+        )
+        return out
