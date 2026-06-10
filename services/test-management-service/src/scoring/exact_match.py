@@ -12,7 +12,7 @@ def score_question(
 ) -> "ScoreResult":
     from src.scoring import ScoreResult
 
-    if not correct_answers or not submitted_answers:
+    if correct_answers is None:
         return ScoreResult(is_correct=False, points_earned=0.0)
 
     hit = set(map(str, submitted_answers)) == set(map(str, correct_answers))

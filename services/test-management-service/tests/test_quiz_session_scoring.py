@@ -16,7 +16,7 @@ from src.schemas.session_answer_schema import AnswerSubmitRequest
 from src.services.quiz_session_scoring_service import QuizSessionScoringService
 from src.services.quiz_session_service import QuizSessionError
 
-SCORING_CLIENT = "src.services.quiz_session_scoring_service.get_question_client"
+SCORING_CLIENT = "src.services.quiz_session_service.get_question_client"
 
 
 # ---------------------------------------------------------------------------

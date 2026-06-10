@@ -9,7 +9,6 @@ double-scoring on retried requests.
 import logging
 from datetime import UTC, datetime
 
-import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.quiz_session import QuizSessionStatus
@@ -18,34 +17,13 @@ from src.repositories.session_answer_repository import SessionAnswerRepository
 from src.schemas.quiz_session_schema import ParticipantQuestion
 from src.schemas.session_answer_schema import AnswerResult, AnswerSubmitRequest
 from src.scoring import score
-from src.services.quiz_session_service import QuizSessionError, _participant_question
-from src.utils.logging_config import get_correlation_id
-from src.utils.question_client import get_question_client
+from src.services.quiz_session_service import (
+    QuizSessionError,
+    QuizSessionService,
+    _participant_question,
+)
 
 logger = logging.getLogger(__name__)
-
-
-async def _fetch_question(question_id: str) -> dict:
-    """Fetch a single full question payload from question-management-service."""
-    from src.config.settings import settings
-
-    url = f"{settings.QUESTION_MANAGEMENT_SERVICE_URL}/v1/api/questions/{question_id}"
-    client = get_question_client()
-    try:
-        response = await client.get(
-            url, headers={"X-Correlation-Id": get_correlation_id()}
-        )
-    except httpx.RequestError as e:
-        logger.error("Failed to reach question-management-service: %s", e)
-        raise QuizSessionError(
-            "Cannot reach question-management-service", status_code=503
-        ) from e
-    if response.status_code != 200:
-        raise QuizSessionError(
-            "Could not load question from question-management-service",
-            status_code=502,
-        )
-    return response.json()
 
 
 def _build_result_from_answer(
@@ -100,7 +78,13 @@ class QuizSessionScoringService:
 
         total = len(session.question_ids)
 
-        # 4. Idempotency: return cached result if key already seen.
+        # 4. Guard against corrupted current_index.
+        if session.current_index >= total:
+            raise QuizSessionError(
+                "Session question index is out of range", status_code=409
+            )
+
+        # 5. Idempotency: return cached result if key already seen.
         if idempotency_key:
             cached = await SessionAnswerRepository.find_by_idempotency_key(
                 db, session_id, idempotency_key
@@ -108,7 +92,7 @@ class QuizSessionScoringService:
             if cached is not None:
                 next_q: ParticipantQuestion | None = None
                 if session.current_index < total:
-                    raw = await _fetch_question(
+                    raw = await QuizSessionService._fetch_question(
                         session.question_ids[session.current_index]
                     )
                     next_q = _participant_question(raw, session.current_index)
@@ -121,7 +105,7 @@ class QuizSessionScoringService:
                     session.submitted_at,
                 )
 
-        # 5. Validate question_id matches the frozen question at current_index.
+        # 6. Validate question_id matches the frozen question at current_index.
         expected_id = session.question_ids[session.current_index]
         if request.question_id != expected_id:
             raise QuizSessionError(
@@ -130,10 +114,10 @@ class QuizSessionScoringService:
                 status_code=422,
             )
 
-        # 6. Fetch full question from QMS to get correct_answers.
-        raw = await _fetch_question(request.question_id)
+        # 7. Fetch full question from QMS to get correct_answers.
+        raw = await QuizSessionService._fetch_question(request.question_id)
 
-        # 7. Score.
+        # 8. Score.
         result = score(
             raw.get("type", ""),
             raw.get("correct_answers"),
@@ -141,8 +125,9 @@ class QuizSessionScoringService:
         )
 
         answered_index = session.current_index
+        new_index = answered_index + 1
 
-        # 8. Persist the scored answer.
+        # 9. Persist the scored answer.
         stored = await SessionAnswerRepository.create(
             db,
             session_id=session_id,
@@ -156,9 +141,7 @@ class QuizSessionScoringService:
             idempotency_key=idempotency_key,
         )
 
-        new_index = answered_index + 1
-
-        # 9. Finalize or advance.
+        # 10. Finalize or advance.
         if new_index >= total:
             session = await QuizSessionRepository.set_status(
                 db, session, QuizSessionStatus.SUBMITTED
@@ -175,9 +158,14 @@ class QuizSessionScoringService:
                 session.submitted_at,
             )
 
-        session = await QuizSessionRepository.advance_index(db, session, new_index)
-        next_raw = await _fetch_question(session.question_ids[new_index])
+        # Fetch the next question BEFORE committing the index advance so that a
+        # QMS failure does not leave current_index advanced without a response.
+        next_raw = await QuizSessionService._fetch_question(
+            session.question_ids[new_index]
+        )
         next_q = _participant_question(next_raw, new_index)
+
+        session = await QuizSessionRepository.advance_index(db, session, new_index)
 
         logger.info(
             "answer scored: session_id=%s index=%d is_correct=%s points=%.4f",
