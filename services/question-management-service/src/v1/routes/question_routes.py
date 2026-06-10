@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import ValidationError
 from src.models.question import Question
 from src.schemas.question import (
@@ -14,6 +14,33 @@ from src.services.upload_service import UploadService
 from src.utils.s3_client import generate_presigned_get_url
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
+
+# Roles allowed to read endpoints that return full documents including the
+# answer key (correct_answers / sample_answer).
+_ANSWER_KEY_ROLES = {"TRAINER", "ADMIN"}
+
+
+async def require_answer_key_role(
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+) -> None:
+    """Role gate for bulk answer-key reads (W3-F7 item 4).
+
+    The gateway overwrites ``X-User-Role`` from the verified JWT on every
+    authenticated request, so browser traffic always carries the caller's
+    real role — a participant cannot spoof it through the gateway. An ABSENT
+    header means an internal service-to-service call inside the compose
+    network (test-management-service's session sampler sends only
+    ``X-Correlation-Id``), which is allowed per the platform's
+    trust-the-gateway model.
+
+    NOTE: ``GET /questions`` and ``GET /questions/{id}`` share this leak
+    class; the full API-layer RBAC sweep is deferred to W4-F3.
+    """
+    if x_user_role is not None and x_user_role not in _ANSWER_KEY_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient role to sample the question bank",
+        )
 
 
 def _to_response(question: Question) -> QuestionResponse:
@@ -127,6 +154,7 @@ async def get_presigned_upload_url(
 @router.get(
     "/sample",
     response_model=List[QuestionResponse],
+    dependencies=[Depends(require_answer_key_role)],
     summary="Randomly sample questions",
     description="""
     Return a random sample of questions via MongoDB's `$sample` aggregation.
@@ -134,6 +162,10 @@ async def get_presigned_upload_url(
     Used by test-management-service when minting a quiz session: it draws the
     fixed question set for the session in a single pass. Returns up to `size`
     questions (fewer if the bank holds fewer).
+
+    **Authorization (W3-F7 item 4):** responses include answer fields
+    (`correct_answers`/`sample_answer`), so gateway traffic requires a
+    TRAINER/ADMIN `X-User-Role`; header-less internal service calls pass.
     """
 )
 async def sample_questions(
