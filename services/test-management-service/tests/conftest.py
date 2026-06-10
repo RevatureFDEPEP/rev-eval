@@ -18,6 +18,7 @@ from src.db.session import Base  # noqa: E402
 
 # Import all models so they register on Base.metadata before create_all
 from src.models.quiz_session import QuizSession  # noqa: E402, F401
+from src.models.session_answer import SessionAnswer  # noqa: E402, F401
 from src.models.skill import Skill  # noqa: E402, F401
 from src.models.test import Test  # noqa: E402, F401
 from src.models.test_skill import TestSkill  # noqa: E402, F401

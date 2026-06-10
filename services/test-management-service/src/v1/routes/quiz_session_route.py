@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.session import get_db
@@ -7,6 +7,8 @@ from src.schemas.quiz_session_schema import (
     SessionCreateResponse,
     SessionStateResponse,
 )
+from src.schemas.session_answer_schema import AnswerResult, AnswerSubmitRequest
+from src.services.quiz_session_scoring_service import QuizSessionScoringService
 from src.services.quiz_session_service import QuizSessionError, QuizSessionService
 from src.utils.dependencies import get_current_participant_id
 
@@ -30,6 +32,26 @@ async def create_session(
     """
     try:
         return await QuizSessionService.create_session(db, request.test_id, user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except QuizSessionError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail) from e
+
+
+@router.post("/{session_id}/answer", response_model=AnswerResult)
+async def submit_answer(
+    session_id: str,
+    request: AnswerSubmitRequest,
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    user_id: int = Depends(get_current_participant_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Submit an answer for the current question, advance the session, and
+    return the next question (or completion state when all questions answered)."""
+    try:
+        return await QuizSessionScoringService.submit_answer(
+            db, session_id, user_id, request, idempotency_key
+        )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except QuizSessionError as e:
