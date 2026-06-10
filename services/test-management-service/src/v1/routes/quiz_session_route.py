@@ -10,6 +10,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from src.config.settings import settings
 from src.db.session import get_db
@@ -258,6 +259,7 @@ async def submit_part_a(
     part_a["total_questions"] = total
     part_a["completed_at"] = datetime.utcnow().isoformat()
     session.part_a = part_a
+    flag_modified(session, "part_a")
     session.status = SessionStatus.PART_A_COMPLETED
     await db.commit()
 
@@ -361,6 +363,7 @@ async def submit_part_b(
     part_b["score"] = part_b_score
     part_b["completed_at"] = datetime.utcnow().isoformat()
     session.part_b = part_b
+    flag_modified(session, "part_b")
     session.total_score = total_score
     session.percentage_score = percentage_score
     session.status = SessionStatus.COMPLETED
