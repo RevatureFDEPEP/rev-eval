@@ -12,8 +12,11 @@ FROM python:3.11-slim AS base
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies.
+# apt-get upgrade patches OS-package CVEs (e.g. libssl3t64 CVE-2026-45447, HIGH)
+# that land in Debian before the python:3.11-slim base image rebuilds; the Trivy
+# CI gate (CRITICAL/HIGH, ignore-unfixed) rejects them otherwise.
+RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     gcc \
     postgresql-client \
     curl \
