@@ -1,32 +1,53 @@
 # Question Management Service Dockerfile
 
-FROM python:3.11-slim
+# ─── Stage 1: base ────────────────────────────────────────────────────────────
+# OS packages and production Python dependencies shared by all later stages.
+FROM python:3.11-slim AS base
 
 WORKDIR /app
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+
+# ─── Stage 2: test ────────────────────────────────────────────────────────────
+# Installs dev dependencies and runs the full test suite.
+# A non-zero pytest exit code aborts the build here, before the production
+# image is assembled.
+FROM base AS test
+
+COPY dev-requirements.txt .
+RUN pip install --no-cache-dir -r dev-requirements.txt \
+    && pip install --no-cache-dir pytest pytest-cov
+
 COPY . .
 
-# Create a non-root user
+RUN pytest -q --tb=short \
+    && touch /tmp/.tests-passed
+
+
+# ─── Stage 3: production ──────────────────────────────────────────────────────
+# Lean production image built on the clean base layer.
+# The COPY --from=test forces BuildKit to complete the test stage first;
+# the sentinel file is removed so it does not persist in the final image.
+FROM base AS production
+
+COPY --from=test /tmp/.tests-passed /tmp/.tests-passed
+RUN rm /tmp/.tests-passed
+
+COPY . .
+
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Expose port
 EXPOSE 8003
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8003/health || exit 1
 
-# Run the application
 CMD ["python", "main.py"]
