@@ -15,7 +15,7 @@ os.environ.setdefault("SERVICE_HOSTNAME", "test-management-service")
 
 import asyncio
 import pytest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
