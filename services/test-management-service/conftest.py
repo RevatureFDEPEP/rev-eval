@@ -17,10 +17,39 @@ os.environ.setdefault("SERVICE_NAME", "test-management-service")
 os.environ.setdefault("PORT", "8001")
 os.environ.setdefault("SERVICE_HOSTNAME", "localhost")
 
+import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--integration",
+        action="store_true",
+        default=False,
+        help="run tests/integration/ against real Postgres/Mongo containers "
+        "(docker compose up -d --wait postgres mongo question-management-service)",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Mark everything under tests/integration/ and gate it on --integration.
+
+    Plain ``pytest`` runs (unit CI step, the Dockerfile ``test`` stage — no
+    databases available there) skip the integration suite untouched.
+    """
+    run_integration = config.getoption("--integration")
+    skip = pytest.mark.skip(
+        reason="needs real containers — pass --integration "
+        "(see tests/integration/conftest.py for the compose command)"
+    )
+    for item in items:
+        if "tests/integration/" in str(item.fspath).replace(os.sep, "/"):
+            item.add_marker(pytest.mark.integration)
+        if "integration" in item.keywords and not run_integration:
+            item.add_marker(skip)
 
 
 @pytest_asyncio.fixture

@@ -120,6 +120,32 @@ jobs:
           path: services/${{ matrix.service }}/coverage.xml
           if-no-files-found: ignore
 
+      # W3-F5: integration tests against real Postgres + Mongo, ahead of the
+      # Docker build so a lock/idempotency regression fails the pipeline before
+      # any image is produced. The compose file is the source of truth for the
+      # containers (images, env, healthchecks); --wait blocks until every
+      # started service is healthy. question-management-service rides along
+      # because session creation exercises the real $sample cross-service call.
+      # Only test-management-service has an integration suite today.
+      - name: Start integration containers (Postgres, Mongo, question-service)
+        if: matrix.service == 'test-management-service'
+        run: |
+          cp .env.example .env
+          docker compose up -d --wait postgres mongo question-management-service
+
+      - name: Run integration tests
+        if: matrix.service == 'test-management-service'
+        working-directory: services/test-management-service
+        run: pytest --integration -m integration -v
+
+      - name: Dump integration container logs
+        if: failure() && matrix.service == 'test-management-service'
+        run: docker compose logs --no-color
+
+      - name: Stop integration containers
+        if: always() && matrix.service == 'test-management-service'
+        run: docker compose down -v --remove-orphans
+
       # Run the Dockerfile `test` stage: installs requirements-dev.txt and runs
       # `pytest -q` inside the container, so the build fails if container-level
       # tests fail. This gates on the same suite as the runner step above, but
