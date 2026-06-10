@@ -25,6 +25,22 @@ EXPOSE 3000
 CMD ["pnpm", "dev"]
 
 
+# Test stage: run unit tests before production build
+FROM node:20-alpine AS test
+
+WORKDIR /app
+
+RUN npm install -g pnpm
+
+COPY package.json pnpm-lock.yaml* ./
+
+RUN pnpm install
+
+COPY . .
+
+RUN pnpm test
+
+
 # Production build stage
 FROM node:20-alpine AS builder
 

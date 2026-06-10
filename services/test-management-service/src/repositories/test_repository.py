@@ -16,7 +16,7 @@ class TestRepository:
         test = result.scalars().first()
         if test and test.duration:
             test.duration_seconds = int(test.duration.total_seconds())
-        else:
+        elif test:
             test.duration_seconds = None
         return test
     @staticmethod
