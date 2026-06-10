@@ -1,3 +1,10 @@
+# User Service Dockerfile
+#
+# Multi-stage: base (system deps) -> deps (prod deps) -> test (dev deps + pytest gate) -> production.
+# Default target is `production`. Run the in-image test gate with:
+#   docker build --target test .
+# Tests are hermetic (in-memory SQLite) — no Postgres needed.
+
 FROM python:3.11-slim AS base
 
 WORKDIR /app
@@ -8,24 +15,21 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install production dependencies
+# ===== deps: production dependencies only =====
 FROM base AS deps
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Test stage: run unit tests before building production image
-FROM deps AS test
+# ===== test: dev deps + run the unit tests (build fails if a test fails) =====
+FROM base AS test
 
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
 COPY . .
-ENV DB_HOST=test \
-    DB_PORT=5432 \
-    DB_USERNAME=test \
-    DB_PASSWORD=test \
-    DB_NAME=testdb
-RUN pytest tests/ -v --cov=src --cov-report=term-missing
+RUN pytest -q
 
-# Production stage
+# ===== production (default target) =====
 FROM deps AS production
 
 COPY . .

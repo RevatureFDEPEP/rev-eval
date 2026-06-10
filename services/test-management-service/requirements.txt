@@ -13,6 +13,3 @@ python-jose[cryptography]
 python-multipart
 asyncpg
 httpx
-pytest
-pytest-cov
-pytest-asyncio

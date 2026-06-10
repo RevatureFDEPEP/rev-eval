@@ -34,13 +34,15 @@ export const mcqSchema = z
 
 export const trueFalseSchema = z.object({
   ...baseFields,
-  correct_answer: z.boolean(),
+  true_false_answer: z.boolean(),
 })
 
 export const textSchema = z.object({
   ...baseFields,
+  sample_answer: z.string().min(10, 'Sample answer must be at least 10 characters'),
 })
 
 export type McqFormValues = z.infer<typeof mcqSchema>
 export type TrueFalseFormValues = z.infer<typeof trueFalseSchema>
 export type TextFormValues = z.infer<typeof textSchema>
+export type QuestionFormValues = McqFormValues | TrueFalseFormValues | TextFormValues

@@ -52,32 +52,41 @@ describe('mcqSchema', () => {
 })
 
 describe('trueFalseSchema', () => {
-  it('accepts correct_answer=true', () => {
-    expect(trueFalseSchema.safeParse({ ...baseValid, correct_answer: true }).success).toBe(true)
+  it('accepts true_false_answer=true', () => {
+    expect(trueFalseSchema.safeParse({ ...baseValid, true_false_answer: true }).success).toBe(true)
   })
 
-  it('accepts correct_answer=false', () => {
-    expect(trueFalseSchema.safeParse({ ...baseValid, correct_answer: false }).success).toBe(true)
+  it('accepts true_false_answer=false', () => {
+    expect(trueFalseSchema.safeParse({ ...baseValid, true_false_answer: false }).success).toBe(true)
   })
 
   it('rejects question_text shorter than 10 chars', () => {
     expect(
-      trueFalseSchema.safeParse({ question_text: 'Hi?', skills: ['x'], correct_answer: true }).success
+      trueFalseSchema.safeParse({ question_text: 'Hi?', skills: ['x'], true_false_answer: true }).success
     ).toBe(false)
   })
 })
 
+const validText = {
+  ...baseValid,
+  sample_answer: 'This is a valid sample answer',
+}
+
 describe('textSchema', () => {
   it('accepts valid text question', () => {
-    expect(textSchema.safeParse(baseValid).success).toBe(true)
+    expect(textSchema.safeParse(validText).success).toBe(true)
   })
 
   it('rejects empty skills', () => {
-    expect(textSchema.safeParse({ ...baseValid, skills: [] }).success).toBe(false)
+    expect(textSchema.safeParse({ ...validText, skills: [] }).success).toBe(false)
+  })
+
+  it('rejects sample_answer shorter than 10 chars', () => {
+    expect(textSchema.safeParse({ ...validText, sample_answer: 'Too short' }).success).toBe(false)
   })
 
   it('transforms comma-separated tags to array', () => {
-    const result = textSchema.safeParse({ ...baseValid, tags: 'java, oop, patterns' })
+    const result = textSchema.safeParse({ ...validText, tags: 'java, oop, patterns' })
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.tags).toEqual(['java', 'oop', 'patterns'])
@@ -85,7 +94,7 @@ describe('textSchema', () => {
   })
 
   it('returns empty array when tags omitted', () => {
-    const result = textSchema.safeParse(baseValid)
+    const result = textSchema.safeParse(validText)
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.tags).toEqual([])

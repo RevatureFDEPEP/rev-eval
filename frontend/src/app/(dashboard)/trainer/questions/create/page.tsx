@@ -4,7 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import {
+  mcqSchema,
+  trueFalseSchema,
+  textSchema,
+  type McqFormValues,
+  type TrueFalseFormValues,
+  type TextFormValues,
+  type QuestionFormValues,
+} from "@/lib/schemas/question-form.schema";
 import { ArrowLeft, Check, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,66 +51,6 @@ import {
   SkillInfo,
 } from "@/lib/api";
 import { toast } from "sonner";
-
-// Base fields common to all question types
-const baseSchema = {
-  question_text: z
-    .string()
-    .min(10, "Question must be at least 10 characters"),
-  difficulty: z.enum(["easy", "medium", "hard"]).optional(),
-  skills: z
-    .array(z.string())
-    .min(1, "Select at least one skill")
-    .max(20, "Maximum 20 skills allowed"),
-  tags: z
-    .string()
-    .optional()
-    .transform((val) => (val ? val.split(",").map((t) => t.trim()) : [])),
-  answer_explanation: z.string().optional(),
-};
-
-// MCQ-specific schema
-const mcqSchema = z
-  .object({
-    ...baseSchema,
-    options: z.array(
-      z.object({
-        text: z.string().min(1, "Option text is required"),
-        is_correct: z.boolean(),
-      })
-    ),
-  })
-  .refine(
-    (data) => {
-      if (data.options.length < 2 || data.options.length > 5) {
-        return false;
-      }
-      return data.options.some((opt) => opt.is_correct);
-    },
-    {
-      message: "MCQ questions require 2-5 options with at least one marked correct",
-      path: ["options"],
-    }
-  );
-
-// True/False schema
-const trueFalseSchema = z.object({
-  ...baseSchema,
-  true_false_answer: z.boolean(),
-});
-
-// Text schema
-const textSchema = z.object({
-  ...baseSchema,
-  sample_answer: z
-    .string()
-    .min(10, "Sample answer must be at least 10 characters"),
-});
-
-type McqFormValues = z.infer<typeof mcqSchema>;
-type TrueFalseFormValues = z.infer<typeof trueFalseSchema>;
-type TextFormValues = z.infer<typeof textSchema>;
-type QuestionFormValues = McqFormValues | TrueFalseFormValues | TextFormValues;
 
 export default function CreateQuestionPage() {
   const router = useRouter();
