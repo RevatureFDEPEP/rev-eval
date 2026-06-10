@@ -153,6 +153,39 @@ describe("TestRunner (W3-F4 exam client)", () => {
     expect(screen.getByRole("radio", { name: "Python" })).toBeDisabled();
   });
 
+  // W3-F7 item 2 — a transient outage must not brick the attempt.
+  it("offers Retry submission after a transient failure and recovers on success", async () => {
+    const submitFn = vi
+      .fn()
+      .mockRejectedValueOnce(new ExamError("transient", 503, "gateway down"))
+      .mockResolvedValueOnce(advanceResult);
+    renderRunner(submitFn);
+
+    fireEvent.click(screen.getByLabelText("Python"));
+    fireEvent.click(screen.getByTestId("submit-button"));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    const retry = screen.getByTestId("retry-button");
+    expect(retry).toHaveTextContent("Retry submission");
+
+    fireEvent.click(retry);
+    await waitFor(() => expect(screen.getByText("Q2: pick many")).toBeInTheDocument());
+    expect(submitFn).toHaveBeenCalledTimes(2);
+    // Recovered: inputs unlocked on the next live question.
+    expect(screen.getByRole("checkbox", { name: "Node.js" })).not.toBeDisabled();
+  });
+
+  it("renders no retry affordance for a semantic rejection", async () => {
+    const submitFn = vi.fn().mockRejectedValue(new ExamError("semantic", 409, "locked"));
+    renderRunner(submitFn);
+
+    fireEvent.click(screen.getByLabelText("Python"));
+    fireEvent.click(screen.getByTestId("submit-button"));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(screen.queryByTestId("retry-button")).not.toBeInTheDocument();
+  });
+
   it("reviews an answered question read-only and preserves its selection", async () => {
     const submitFn = vi.fn().mockResolvedValue(advanceResult);
     renderRunner(submitFn);

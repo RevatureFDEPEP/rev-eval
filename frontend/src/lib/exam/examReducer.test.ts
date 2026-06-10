@@ -44,4 +44,35 @@ describe("examReducer", () => {
     expect(s.isLocked).toBe(true);
     expect(s.error).toEqual({ kind: "semantic", message: "rejected" });
   });
+
+  // W3-F7 item 2 — recovery from a transient-exhausted submit.
+  it("SUBMIT_RETRY exits a transient error → submitting, still locked", () => {
+    const mid = examReducer(initialExamState, { type: "SUBMIT_START" });
+    const failed = examReducer(mid, {
+      type: "SUBMIT_FAILED",
+      kind: "transient",
+      message: "network blip",
+    });
+    const s = examReducer(failed, { type: "SUBMIT_RETRY" });
+    expect(s.status).toBe("submitting");
+    expect(s.isLocked).toBe(true);
+    expect(s.error).toBeNull();
+  });
+
+  it("SUBMIT_RETRY is a no-op for a semantic error (terminal lock)", () => {
+    const mid = examReducer(initialExamState, { type: "SUBMIT_START" });
+    const failed = examReducer(mid, {
+      type: "SUBMIT_FAILED",
+      kind: "semantic",
+      message: "rejected",
+    });
+    const s = examReducer(failed, { type: "SUBMIT_RETRY" });
+    expect(s).toBe(failed); // unchanged reference — no transition
+  });
+
+  it("SUBMIT_RETRY is a no-op outside the error state", () => {
+    expect(examReducer(initialExamState, { type: "SUBMIT_RETRY" })).toBe(
+      initialExamState,
+    );
+  });
 });

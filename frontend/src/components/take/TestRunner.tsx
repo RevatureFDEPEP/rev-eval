@@ -107,12 +107,12 @@ export function TestRunner({
   const goNext = () =>
     setCurrentIndex((i) => Math.min(questions.length - 1, i + 1));
 
-  const handleSubmit = async () => {
-    if (submittingRef.current || exam.isLocked) return;
+  // Shared submit body — entered via handleSubmit (active) or handleRetry
+  // (error/transient); the caller dispatches its own entry action first.
+  const performSubmit = async () => {
     if (questions.length === 0) return;
     const q = questions[questions.length - 1]; // the live (frontier) question
     submittingRef.current = true;
-    dispatch({ type: 'SUBMIT_START' });
     try {
       const result = await submitAnswerFn(
         session.session_id,
@@ -141,6 +141,22 @@ export function TestRunner({
     } finally {
       submittingRef.current = false;
     }
+  };
+
+  const handleSubmit = async () => {
+    if (submittingRef.current || exam.isLocked) return;
+    dispatch({ type: 'SUBMIT_START' });
+    await performSubmit();
+  };
+
+  // Recovery from a transient-exhausted submit (W3-F7 item 2): re-enter
+  // `submitting` (still locked) and re-send. Semantic errors never get here —
+  // the reducer ignores SUBMIT_RETRY for them and no button is rendered.
+  const handleRetry = async () => {
+    if (submittingRef.current) return;
+    if (exam.status !== 'error' || exam.error?.kind !== 'transient') return;
+    dispatch({ type: 'SUBMIT_RETRY' });
+    await performSubmit();
   };
 
   // Server-anchored countdown; stops once the exam is no longer active.
@@ -228,6 +244,17 @@ export function TestRunner({
             ? 'Network problem submitting your answer. Please check your connection.'
             : 'Your submission was rejected by the server.'}{' '}
           {exam.error.message}
+          {exam.error.kind === 'transient' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-3"
+              onClick={handleRetry}
+              data-testid="retry-button"
+            >
+              Retry submission
+            </Button>
+          )}
         </div>
       )}
 
