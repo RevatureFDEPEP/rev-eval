@@ -285,6 +285,26 @@ class QuestionService:
         return await QuestionRepository.find_by_type(question_type, limit)
 
     @staticmethod
+    async def sample_questions(size: int) -> List[Question]:
+        """
+        Return a random sample of questions for quiz session creation.
+
+        Args:
+            size: Number of random questions to draw (clamped to 1..100)
+
+        Returns:
+            List[Question]: Randomly sampled questions (may be fewer than
+            `size` if the bank holds fewer documents)
+
+        Raises:
+            HTTPException: If size is not a positive integer
+        """
+        if size < 1:
+            raise HTTPException(status_code=400, detail="size must be >= 1")
+        size = min(size, 100)
+        return await QuestionRepository.sample(size)
+
+    @staticmethod
     async def find_by_skill(skill: str, limit: int = 100) -> List[Question]:
         """
         Find questions by skill.

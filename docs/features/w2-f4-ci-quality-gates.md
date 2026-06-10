@@ -28,10 +28,12 @@ comment ("Trivy + Ruff scans added in W2 D7 by candidates").
       per-service artifact with `if: always()` (PR #40, `1dbbc37`, `0d550e2`).
 - [x] **4. Coverage threshold** — per-service `.coveragerc` (source/omit +
       `fail_under`) as a measured-baseline ratchet instead of the spec's
-      aspirational 70 (smoke tests only; cohort decision):
-      api-gateway 47%→45, user 60%→58, question-mgmt 50%→48,
+      aspirational 70 (smoke tests only; cohort decision). At PR #40 (smoke
+      tests only): api-gateway 47%→45, user 60%→58, question-mgmt 50%→48,
       test-mgmt 45%→43. `coverage.xml` uploaded as per-service artifact
-      (PR #40, `7251a55`). Raise thresholds as test depth grows (W2-F2).
+      (PR #40, `7251a55`). **Subsequently raised by [W2-F2](w2-f2-unit-test-scaffolding.md)**
+      as repo/model test depth grew — current `.coveragerc` `fail_under`:
+      api-gateway **50**, question-mgmt **63**, user **66**, test-mgmt **75**.
 
 ## Evidence
 
