@@ -153,6 +153,24 @@ class SessionService:
                 "No questions available to start a session"
             )
 
+        # Mongo $sample may emit duplicate documents — dedupe (order-preserving)
+        # so a candidate is never asked the same question twice (W3-F7 item 8).
+        seen: set[str] = set()
+        unique_questions = []
+        for q in questions:
+            qid = _question_id(q)
+            if qid not in seen:
+                seen.add(qid)
+                unique_questions.append(q)
+        questions = unique_questions
+
+        if len(questions) < size:
+            # Short fill (small bank and/or duplicates dropped) — visible, not silent.
+            logger.warning(
+                "session short-filled: test_id=%s requested=%d got=%d",
+                test_id, size, len(questions),
+            )
+
         question_ids = [_question_id(q) for q in questions]
         first_question = _sanitize(questions[0])
 
@@ -252,6 +270,11 @@ class SessionService:
             raise SessionTerminalError("No further questions to answer")
 
         qid = question_ids[idx]
+        # NOTE (W3-F7 item 9b): this fetch runs while holding the FOR UPDATE
+        # row lock. Blast radius is this session only (concurrent retries for
+        # the same session queue here by design); worst-case hold time is the
+        # client's bounded budget — 10s timeout × ≤3 attempts per fetch
+        # (question_client._TIMEOUT / _MAX_RETRIES).
         question = await question_client.get_question(qid)
         result = scoring.score(
             question.get("type"),

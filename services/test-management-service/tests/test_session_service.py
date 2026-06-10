@@ -138,6 +138,31 @@ def test_empty_question_bank_raises():
         _run(_test_row(), [])
 
 
+def test_sampled_duplicates_are_deduped_order_preserving():
+    """Mongo $sample may emit duplicate documents (W3-F7 item 8)."""
+    _, session = _run(
+        _test_row(number_of_questions=4),
+        [_question("a"), _question("b"), _question("a"), _question("c")],
+    )
+    assert session.question_ids == ["a", "b", "c"]
+
+
+def test_short_fill_logs_a_warning(caplog):
+    with caplog.at_level("WARNING", logger="src.services.session_service"):
+        _, session = _run(
+            _test_row(number_of_questions=5),
+            [_question("a"), _question("b"), _question("a")],  # dedupes to 2
+        )
+    assert session.question_ids == ["a", "b"]
+    assert any("short-filled" in r.message for r in caplog.records)
+
+
+def test_full_sample_logs_no_short_fill_warning(caplog):
+    with caplog.at_level("WARNING", logger="src.services.session_service"):
+        _run(_test_row(number_of_questions=2), [_question("a"), _question("b")])
+    assert not any("short-filled" in r.message for r in caplog.records)
+
+
 # ---- active-session reuse (W3-F7 item 3) ------------------------------------
 
 def _active_row(current_index=1, expires_in=1800, draft_answers=None,
