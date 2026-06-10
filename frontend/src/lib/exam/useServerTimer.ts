@@ -4,12 +4,17 @@
  * The remaining seconds are computed from the session's `server_now`/`expires_at`
  * (the W3-F1 contract), never the client clock, to absorb client clock skew:
  *
- *   baseline   = expires_at − server_now            (captured once at mount)
- *   remaining  = baseline − (Date.now() − mountWall) (elapsed wall time since mount)
+ *   baseline   = expires_at − server_now                  (captured once at mount)
+ *   deadline   = Date.now() + baseline*1000               (anchored ONCE, first enable)
+ *   remaining  = (deadline − Date.now()) / 1000           (re-derived every tick)
  *
- * A 1s interval re-derives `remaining` from elapsed wall-clock (not by decrementing
- * a counter, so a throttled/background tab can't drift). At zero it fires `onExpire`
- * exactly once (auto-submit) and clamps at 0.
+ * The deadline is stored in a ref on the FIRST enabled run and never moves —
+ * `enabled` toggles (every submit cycles active → submitting → active) must not
+ * re-anchor the countdown against the original full baseline (W3-F7 item 1).
+ *
+ * A 1s interval re-derives `remaining` from the absolute deadline (not by
+ * decrementing a counter, so a throttled/background tab can't drift). At zero it
+ * fires `onExpire` exactly once (auto-submit) and clamps at 0.
  */
 'use client';
 
@@ -47,20 +52,24 @@ export function useServerTimer(
     onExpireRef.current = onExpire;
   });
 
+  // Absolute deadline (client clock), anchored once; survives enabled toggles.
+  const deadlineRef = useRef<number | null>(null);
+  // onExpire single-fire across re-enables, not per effect run.
+  const firedRef = useRef(false);
+
   useEffect(() => {
     if (!enabled) return;
 
-    // Anchor wall-clock at mount/enable; remaining is re-derived from elapsed
-    // wall time so a throttled/background tab cannot drift.
-    const mountWall = Date.now();
-    let fired = false;
+    if (deadlineRef.current === null) {
+      deadlineRef.current = Date.now() + baseline * 1000;
+    }
+    const deadline = deadlineRef.current;
 
     const tick = () => {
-      const elapsed = Math.floor((Date.now() - mountWall) / 1000);
-      const remaining = Math.max(0, baseline - elapsed);
+      const remaining = Math.max(0, Math.floor((deadline - Date.now()) / 1000));
       setTimeRemaining(remaining);
-      if (remaining === 0 && !fired) {
-        fired = true;
+      if (remaining === 0 && !firedRef.current) {
+        firedRef.current = true;
         onExpireRef.current();
       }
     };
