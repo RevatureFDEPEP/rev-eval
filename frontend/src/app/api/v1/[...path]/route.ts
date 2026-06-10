@@ -32,16 +32,24 @@ async function handleRequest(
     }
   }
 
+  const forwarded: Record<string, string> = {
+    Authorization: `Bearer ${session.token}`,
+    'Content-Type': 'application/json',
+    // Start (or continue) the distributed trace at the browser-origin hop;
+    // the BFF path bypasses nginx, so the id must be set here.
+    'X-Correlation-Id':
+      request.headers.get('x-correlation-id') ?? crypto.randomUUID(),
+  };
+  // Pass through the client's idempotency key so retry-safe writes (e.g. the
+  // W3-F4 exam answer submit) stay idempotent across the BFF hop.
+  const idempotencyKey = request.headers.get('idempotency-key');
+  if (idempotencyKey) {
+    forwarded['Idempotency-Key'] = idempotencyKey;
+  }
+
   const response = await fetch(url.toString(), {
     method: request.method,
-    headers: {
-      Authorization: `Bearer ${session.token}`,
-      'Content-Type': 'application/json',
-      // Start (or continue) the distributed trace at the browser-origin hop;
-      // the BFF path bypasses nginx, so the id must be set here.
-      'X-Correlation-Id':
-        request.headers.get('x-correlation-id') ?? crypto.randomUUID(),
-    },
+    headers: forwarded,
     body,
   });
 
