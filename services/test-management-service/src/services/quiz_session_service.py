@@ -13,6 +13,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import httpx
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.settings import settings
@@ -175,16 +176,42 @@ class QuizSessionService:
         )
         expires_at = now + timedelta(seconds=duration_seconds)
 
-        session = await QuizSessionRepository.create(
-            db,
-            session_id=str(uuid.uuid4()),
-            test_id=test_id,
-            user_id=user_id,
-            session_token=secrets.token_urlsafe(32),
-            question_ids=question_ids,
-            started_at=now,
-            expires_at=expires_at,
-        )
+        try:
+            session = await QuizSessionRepository.create(
+                db,
+                session_id=str(uuid.uuid4()),
+                test_id=test_id,
+                user_id=user_id,
+                session_token=secrets.token_urlsafe(32),
+                question_ids=question_ids,
+                started_at=now,
+                expires_at=expires_at,
+            )
+        except IntegrityError:
+            # A concurrent POST raced past the idempotency check and won the
+            # insert first. Roll back and return the session that row already owns.
+            await db.rollback()
+            race_winner = await QuizSessionRepository.get_active_by_test_and_user(
+                db, test_id, user_id
+            )
+            if not race_winner:
+                raise QuizSessionError(
+                    "Session conflict; please retry", status_code=409
+                )
+            raw = await QuizSessionService._fetch_question(
+                race_winner.question_ids[race_winner.current_index]
+            )
+            question = _participant_question(raw, race_winner.current_index)
+            return SessionCreateResponse(
+                session_id=race_winner.session_id,
+                session_token=race_winner.session_token,
+                status=race_winner.status,
+                server_now=now,
+                expires_at=race_winner.expires_at,
+                total_questions=len(race_winner.question_ids),
+                current_index=race_winner.current_index,
+                question=question,
+            )
 
         question = _participant_question(sample[0], 0)
         return SessionCreateResponse(

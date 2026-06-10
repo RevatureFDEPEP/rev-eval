@@ -7,12 +7,15 @@ singleton client patched at the service-module boundary.
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from src.models.quiz_session import QuizSession, QuizSessionStatus
 from src.models.skill import Skill
 from src.models.test import Test, TestType
 from src.models.test_skill import TestSkill
+from src.repositories.quiz_session_repository import QuizSessionRepository
 from src.services.quiz_session_service import QuizSessionError, QuizSessionService
 
 QUESTION_CLIENT = "src.services.quiz_session_service.get_question_client"
@@ -158,6 +161,63 @@ class TestCreateSession:
         with pytest.raises(QuizSessionError) as exc:
             await QuizSessionService.create_session(db_session, test.id, 42)
         assert exc.value.status_code == 422
+
+    async def test_question_service_unreachable_raises_503(self, db_session):
+        test = await make_quiz(db_session, number_of_questions=1)
+        client = MagicMock()
+        client.get = AsyncMock(side_effect=httpx.ConnectError("connection refused"))
+        with patch(QUESTION_CLIENT, return_value=client):
+            with pytest.raises(QuizSessionError) as exc:
+                await QuizSessionService.create_session(db_session, test.id, 42)
+        assert exc.value.status_code == 503
+
+    async def test_question_service_non_200_raises_502(self, db_session):
+        test = await make_quiz(db_session, number_of_questions=1)
+        client = MagicMock()
+        client.get = AsyncMock(return_value=make_response(500, None))
+        with patch(QUESTION_CLIENT, return_value=client):
+            with pytest.raises(QuizSessionError) as exc:
+                await QuizSessionService.create_session(db_session, test.id, 42)
+        assert exc.value.status_code == 502
+
+    async def test_concurrent_create_race_returns_existing_session(self, db_session):
+        test = await make_quiz(db_session, number_of_questions=2)
+        docs = [question_doc(1), question_doc(2)]
+
+        now = datetime.utcnow()
+        race_winner = QuizSession(
+            session_id="race-winner",
+            test_id=test.id,
+            user_id=42,
+            session_token="winner-token",
+            question_ids=["q1", "q2"],
+            current_index=0,
+            status=QuizSessionStatus.ACTIVE,
+            created_at=now,
+            started_at=now,
+            expires_at=now + timedelta(minutes=10),
+        )
+
+        with patch(QUESTION_CLIENT, return_value=mock_question_client(sample_handler(docs))):
+            with patch.object(
+                QuizSessionRepository,
+                "get_active_by_test_and_user",
+                new_callable=AsyncMock,
+                side_effect=[None, race_winner],
+            ):
+                with patch.object(
+                    QuizSessionRepository,
+                    "create",
+                    new_callable=AsyncMock,
+                    side_effect=IntegrityError(None, None, Exception("uq")),
+                ):
+                    result = await QuizSessionService.create_session(
+                        db_session, test.id, 42
+                    )
+
+        assert result.session_id == "race-winner"
+        assert result.session_token == "winner-token"
+        assert result.total_questions == 2
 
     async def test_tokens_are_unique(self, db_session):
         t1 = await make_quiz(db_session, number_of_questions=1)

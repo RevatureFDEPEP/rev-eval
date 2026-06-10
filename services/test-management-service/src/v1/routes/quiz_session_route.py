@@ -14,7 +14,7 @@ router = APIRouter(prefix="/sessions", tags=["Quiz Sessions"])
 
 
 @router.post(
-    "/", response_model=SessionCreateResponse, status_code=status.HTTP_201_CREATED
+    "", response_model=SessionCreateResponse, status_code=status.HTTP_201_CREATED
 )
 async def create_session(
     request: SessionCreateRequest,
