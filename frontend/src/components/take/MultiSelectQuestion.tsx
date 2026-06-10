@@ -13,12 +13,15 @@ interface MultiSelectQuestionProps {
   question: SanitizedQuestion;
   selected: number[];
   onChange: (optionIds: number[]) => void;
+  /** Disable selection (W3-F4): exam locked/submitting, or reviewing an answered question. */
+  disabled?: boolean;
 }
 
 export function MultiSelectQuestion({
   question,
   selected,
   onChange,
+  disabled = false,
 }: MultiSelectQuestionProps) {
   if (!question.options || question.options.length === 0) {
     return <div className="text-sm text-red-600">Error: No options available</div>;
@@ -48,6 +51,8 @@ export function MultiSelectQuestion({
             <Checkbox
               id={`${question.id}-option-${option.option_id}`}
               checked={isChecked}
+              disabled={disabled}
+              aria-disabled={disabled}
               onCheckedChange={() => toggleOption(option.option_id)}
               className="size-5 border-2"
             />

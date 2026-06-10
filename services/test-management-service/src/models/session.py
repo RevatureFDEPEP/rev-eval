@@ -45,5 +45,10 @@ class Session(Base):
     # Ordered list of sampled question ids (Mongo _id strings).
     question_ids = Column(JSON, nullable=False, default=list)
 
+    # In-progress, un-scored answer selections autosaved by the client (W3-F4).
+    # Map of question_id -> list[option_id]. Advisory crash-recovery snapshot;
+    # never scored, and writing it does not advance current_index or status.
+    draft_answers = Column(JSON, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

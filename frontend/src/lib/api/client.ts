@@ -106,12 +106,29 @@ export const api = {
   },
 
   /**
-   * POST request
+   * POST request. `headers` allows per-call headers (e.g. an `Idempotency-Key`).
    */
-  async post<T>(endpoint: string, data?: unknown): Promise<T> {
+  async post<T>(
+    endpoint: string,
+    data?: unknown,
+    headers?: HeadersInit,
+  ): Promise<T> {
     const response = await fetchApi(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
+      ...(headers ? { headers } : {}),
+    });
+
+    return response.json();
+  },
+
+  /**
+   * PATCH request
+   */
+  async patch<T>(endpoint: string, data: unknown): Promise<T> {
+    const response = await fetchApi(endpoint, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     });
 
     return response.json();

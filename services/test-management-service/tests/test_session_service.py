@@ -5,14 +5,22 @@ client are patched with AsyncMocks. Service methods are async; driven with
 asyncio.run() to match the repo's existing test style.
 """
 import asyncio
-from datetime import timedelta
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
-from src.schemas.session_schema import SanitizedQuestion, SessionOut
-from src.services.session_service import EmptyQuestionBankError, SessionService
+from src.models.session import SessionStatus
+from src.schemas.session_schema import DraftSaveResult, SanitizedQuestion, SessionOut
+from src.services.session_service import (
+    EmptyQuestionBankError,
+    SessionExpiredError,
+    SessionForbiddenError,
+    SessionNotFoundError,
+    SessionService,
+    SessionTerminalError,
+)
 
 SVC = "src.services.session_service"
 
@@ -114,3 +122,63 @@ def test_missing_test_raises_value_error():
 def test_empty_question_bank_raises():
     with pytest.raises(EmptyQuestionBankError):
         _run(_test_row(), [])
+
+
+# ---- save_draft (W3-F4 autosave) -------------------------------------------
+
+def _session_row(user_id=42, status=SessionStatus.ACTIVE, expires_in=1800,
+                 current_index=2):
+    return SimpleNamespace(
+        session_id=uuid4(),
+        user_id=user_id,
+        status=status,
+        expires_at=datetime.utcnow() + timedelta(seconds=expires_in),
+        current_index=current_index,
+        draft_answers=None,
+    )
+
+
+def _run_draft(session, answers, user_id=42):
+    """Drive save_draft with get_by_id/flush patched and an AsyncMock db."""
+    db = AsyncMock()
+    with patch(f"{SVC}.SessionRepository.get_by_id", new_callable=AsyncMock) as get_by_id, \
+         patch(f"{SVC}.SessionRepository.flush", new_callable=AsyncMock):
+        get_by_id.return_value = session
+        return asyncio.run(
+            SessionService.save_draft(db, session.session_id if session else uuid4(),
+                                      user_id, answers)
+        )
+
+
+def test_save_draft_persists_without_advancing():
+    session = _session_row(current_index=2)
+    answers = {"q1": [1], "q2": [3, 4]}
+    out = _run_draft(session, answers)
+    assert isinstance(out, DraftSaveResult)
+    assert session.draft_answers == answers       # persisted verbatim
+    assert out.current_index == 2                 # unchanged
+    assert out.status == "ACTIVE"                 # unchanged
+
+
+def test_save_draft_missing_session_raises_not_found():
+    with pytest.raises(SessionNotFoundError):
+        _run_draft(None, {"q1": [1]})
+
+
+def test_save_draft_wrong_user_raises_forbidden():
+    session = _session_row(user_id=99)
+    with pytest.raises(SessionForbiddenError):
+        _run_draft(session, {"q1": [1]}, user_id=42)
+
+
+def test_save_draft_terminal_session_raises_409():
+    session = _session_row(status=SessionStatus.SUBMITTED)
+    with pytest.raises(SessionTerminalError):
+        _run_draft(session, {"q1": [1]})
+
+
+def test_save_draft_expired_session_raises_and_marks_expired():
+    session = _session_row(expires_in=-10)  # already past expires_at
+    with pytest.raises(SessionExpiredError):
+        _run_draft(session, {"q1": [1]})
+    assert session.status == SessionStatus.EXPIRED

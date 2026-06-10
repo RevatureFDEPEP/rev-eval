@@ -11,7 +11,12 @@ from src.models.session import Session, SessionStatus
 from src.repositories.answer_repository import AnswerRepository
 from src.repositories.idempotency_repository import IdempotencyRepository
 from src.repositories.session_repository import SessionRepository
-from src.schemas.session_schema import AnswerResult, SanitizedQuestion, SessionOut
+from src.schemas.session_schema import (
+    AnswerResult,
+    DraftSaveResult,
+    SanitizedQuestion,
+    SessionOut,
+)
 from src.utils import question_client
 
 logger = logging.getLogger(__name__)
@@ -231,3 +236,52 @@ class SessionService:
             session_id, idx, session.status.value,
         )
         return out
+
+    @staticmethod
+    async def save_draft(
+        db: AsyncSession,
+        session_id: UUID,
+        user_id: int,
+        answers: dict,
+    ) -> DraftSaveResult:
+        """Persist an advisory autosave snapshot of in-progress answers (W3-F4).
+
+        Last-write-wins: ``answers`` is stored verbatim on ``draft_answers`` and
+        never scored. The session is **not** advanced — ``current_index`` and
+        ``status`` are returned unchanged so the client can confirm autosave was
+        non-mutating.
+
+        State gate (semantic — the client must surface and halt, never retry):
+          * 404 if the session is missing,
+          * 403 if it belongs to another user,
+          * 409 if the session is terminal (SUBMITTED/EXPIRED) or its
+            ``expires_at`` has passed — you cannot autosave a finished exam.
+        """
+        session = await SessionRepository.get_by_id(db, session_id)
+        if session is None:
+            raise SessionNotFoundError("Session not found")
+        if session.user_id != user_id:
+            raise SessionForbiddenError("Session belongs to another user")
+
+        now = datetime.utcnow()
+        if session.status != SessionStatus.ACTIVE:
+            raise SessionTerminalError(f"Session is {session.status.value}")
+        if session.expires_at is not None and session.expires_at < now:
+            session.status = SessionStatus.EXPIRED
+            await SessionRepository.flush(db, session)
+            await db.commit()
+            raise SessionExpiredError("Session has expired")
+
+        session.draft_answers = answers
+        await SessionRepository.flush(db, session)
+        await db.commit()
+        logger.info(
+            "draft saved: session_id=%s keys=%d index=%d (unchanged)",
+            session_id, len(answers or {}), session.current_index,
+        )
+        return DraftSaveResult(
+            session_id=session_id,
+            status=session.status.value,
+            current_index=session.current_index,
+            saved_at=now,
+        )

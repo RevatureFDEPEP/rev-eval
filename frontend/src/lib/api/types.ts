@@ -426,6 +426,44 @@ export interface AuthIdentity {
   role: string;
 }
 
+// ===== W3-F4 ANSWER SUBMISSION + AUTOSAVE (W3-F2 / W3-F4 backend contract) =====
+
+/** Request body for POST /v1/api/sessions/{id}/answer. */
+export interface AnswerSubmit {
+  submitted_answers: number[];
+}
+
+/** Response contract for POST /v1/api/sessions/{id}/answer (score-free by design). */
+export interface AnswerResult {
+  session_id: string;
+  question_id: string;
+  current_index: number; // advanced past the question just answered
+  total_questions: number;
+  status: 'ACTIVE' | 'SUBMITTED';
+  submitted_at?: string | null;
+  next_question?: SanitizedQuestion | null;
+}
+
+/** Request body for PATCH /v1/api/sessions/{id}/draft — full in-progress answer map. */
+export interface DraftSave {
+  answers: Record<string, number[]>;
+}
+
+/** Response contract for PATCH /v1/api/sessions/{id}/draft (index/status unchanged). */
+export interface DraftSaveResult {
+  session_id: string;
+  status: string;
+  current_index: number;
+  saved_at: string;
+}
+
+/**
+ * How an exam-client fetch failure is classified (W3-F4 spec step 3):
+ *   - `transient`: network error / 502 / 503 / 504 → auto-retry with backoff.
+ *   - `semantic`: 409 / 410 / 422 → surface to the user and halt (no retry storm).
+ */
+export type ExamErrorKind = 'transient' | 'semantic';
+
 // ===== TYPE ALIASES (for backwards compatibility) =====
 
 /** @deprecated Use SubmissionStatus instead */

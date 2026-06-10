@@ -12,13 +12,18 @@ This file stays at summary level only.
 > start, advance, or finish a feature, update its detail file (check off steps,
 > add evidence) **and** its status row here, in the same PR as the code change.
 
-**Last assessed:** 2026-06-10 (W3-F3 completed — `/take/[testId]` Next.js
-server-component page mints a W3-F1 session server-side so the first question is
-in the initial HTML; `TestRunner` client component owns `currentIndex` +
-`answers` `Map<string, number[]>` with clamped React-state Prev/Next
-(no router nav, no re-fetch) and polymorphic single/multi-select leaf rendering;
-server-seeded `AuthContext` exposes identity without leaking the httpOnly cookie.
-Frontend: 92 tests pass, lint clean, build green)
+**Last assessed:** 2026-06-10 (W3-F4 completed — auto-saving exam client layered
+on the W3-F3 `TestRunner`: a server-anchored countdown (`useServerTimer`, derived
+from `server_now`/`expires_at`, auto-submits at zero), debounced 30s autosave to
+a new `PATCH /sessions/{id}/draft` (advisory `sessions.draft_answers` column,
+Alembic `0006`), transient-vs-semantic error classification with backoff retry
+(`lib/exam/errors.ts` — no retry storm on 422), and submit-and-lock via
+`useReducer` (`examReducer`: optimistic input/timer lock, confirmed result,
+surface-and-halt on rejection). Forward motion is the `POST /answer` loop
+appending `next_question`. Backend: 94 tests pass (5 new `save_draft`),
+single Alembic head `0006`. Frontend: 116 tests pass, lint clean, build green.
+W3-F3 prior: `/take/[testId]` server-component page minting the session +
+server-seeded `AuthContext`.)
 
 ## Status values
 
@@ -54,7 +59,7 @@ in dependency order (W3-F1 first, W3-F6 last).
 | W3-F1 | Quiz session creation backend (`POST /sessions`, httpx integration) | 11 | ✅ Completed | [w3-f1-quiz-session-backend.md](features/w3-f1-quiz-session-backend.md) |
 | W3-F2 | Scoring engine + attempt locking (idempotency, state machine) | 12 | ✅ Completed | [w3-f2-scoring-engine-locking.md](features/w3-f2-scoring-engine-locking.md) |
 | W3-F3 | Test-taking frontend skeleton (`/take/[testId]`, AuthContext) | 13 | ✅ Completed | [w3-f3-test-taking-frontend-skeleton.md](features/w3-f3-test-taking-frontend-skeleton.md) |
-| W3-F4 | Auto-saving exam client (server timer, autosave, submit-lock) | 14 | ❌ Not Started | [w3-f4-autosave-exam-client.md](features/w3-f4-autosave-exam-client.md) |
+| W3-F4 | Auto-saving exam client (server timer, autosave, submit-lock) | 14 | ✅ Completed | [w3-f4-autosave-exam-client.md](features/w3-f4-autosave-exam-client.md) |
 | W3-F5 | Integration tests vs. real Postgres/Mongo | 15 | ❌ Not Started | [w3-f5-integration-tests-real-db.md](features/w3-f5-integration-tests-real-db.md) |
 | W3-F6 | Playwright E2E happy path + smoke script | 15 | ❌ Not Started | [w3-f6-playwright-e2e-smoke.md](features/w3-f6-playwright-e2e-smoke.md) |
 
