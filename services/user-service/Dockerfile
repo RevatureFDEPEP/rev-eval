@@ -24,7 +24,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # ===== test: dev deps + run the unit tests (build fails if a test fails) =====
 FROM base AS test
 
-COPY requirements-dev.txt .
+COPY requirements.txt requirements-dev.txt ./
 RUN pip install --no-cache-dir -r requirements-dev.txt
 COPY . .
 RUN pytest -q
