@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 # autogenerate diffs the metadata against the live DB. Keep this list in
 # sync with src/db/session.py.
 from src.db.session import Base
+from src.models.answer import Answer  # noqa: F401
 from src.models.category import Category  # noqa: F401
+from src.models.idempotency_key import IdempotencyKey  # noqa: F401
 from src.models.session import Session  # noqa: F401
 from src.models.skill import Skill  # noqa: F401
 from src.models.test import Test  # noqa: F401

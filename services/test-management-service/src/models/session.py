@@ -39,6 +39,9 @@ class Session(Base):
     status = Column(Enum(SessionStatus), nullable=False, default=SessionStatus.ACTIVE)
     current_index = Column(Integer, nullable=False, default=0)
 
+    # Set when status transitions to SUBMITTED (final question answered). W3-F2.
+    submitted_at = Column(DateTime, nullable=True)
+
     # Ordered list of sampled question ids (Mongo _id strings).
     question_ids = Column(JSON, nullable=False, default=list)
 
