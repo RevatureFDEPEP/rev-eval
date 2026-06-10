@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import type { AuthIdentity, SanitizedQuestion, SessionOut } from "@/lib/api/types";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import type { AnswerResult, AuthIdentity, SanitizedQuestion, SessionOut } from "@/lib/api/types";
 import { AuthProvider } from "@/lib/auth/AuthContext";
+import { ExamError } from "@/lib/exam/errors";
 import { TestRunner } from "./TestRunner";
 
 const identity: AuthIdentity = {
@@ -10,116 +11,165 @@ const identity: AuthIdentity = {
   role: "PARTICIPANT",
 };
 
+// Far-future window so the live countdown never expires during a test.
 const session: SessionOut = {
   session_id: "s1",
   session_token: "tok",
   server_now: "2026-01-01T00:00:00Z",
   expires_at: "2026-01-01T01:00:00Z",
   current_index: 0,
-  total_questions: 3,
+  total_questions: 2,
   question: null,
 };
 
-const questions: SanitizedQuestion[] = [
-  {
-    id: "q1",
-    type: "mcq",
-    question_text: "Q1: pick one",
-    options: [
-      { option_id: 1, text: "Python" },
-      { option_id: 2, text: "JavaScript" },
-    ],
-  },
-  {
-    id: "q2",
-    type: "multi",
-    question_text: "Q2: pick many",
-    options: [
-      { option_id: 1, text: "Node.js" },
-      { option_id: 2, text: "Deno" },
-    ],
-  },
-  {
-    id: "q3",
-    type: "mcq",
-    question_text: "Q3: pick one",
-    options: [
-      { option_id: 1, text: "Yes" },
-      { option_id: 2, text: "No" },
-    ],
-  },
-];
+const q1: SanitizedQuestion = {
+  id: "q1",
+  type: "mcq",
+  question_text: "Q1: pick one",
+  options: [
+    { option_id: 1, text: "Python" },
+    { option_id: 2, text: "JavaScript" },
+  ],
+};
 
-function renderRunner(initial: SanitizedQuestion[] = questions) {
+const q2: SanitizedQuestion = {
+  id: "q2",
+  type: "multi",
+  question_text: "Q2: pick many",
+  options: [
+    { option_id: 1, text: "Node.js" },
+    { option_id: 2, text: "Deno" },
+  ],
+};
+
+const noopSave = vi.fn().mockResolvedValue({});
+
+function renderRunner(
+  submitAnswerFn: (id: string, a: number[]) => Promise<AnswerResult>,
+) {
   return render(
     <AuthProvider initialUser={identity}>
-      <TestRunner session={session} initialQuestions={initial} />
-    </AuthProvider>
+      <TestRunner
+        session={{ ...session, question: q1 }}
+        initialQuestions={[q1]}
+        submitAnswerFn={submitAnswerFn}
+        saveDraftFn={noopSave}
+      />
+    </AuthProvider>,
   );
 }
 
-describe("TestRunner", () => {
-  it("seeds from session.question when no list is supplied", () => {
+const advanceResult: AnswerResult = {
+  session_id: "s1",
+  question_id: "q1",
+  current_index: 1,
+  total_questions: 2,
+  status: "ACTIVE",
+  next_question: q2,
+};
+
+const finalResult: AnswerResult = {
+  session_id: "s1",
+  question_id: "q2",
+  current_index: 2,
+  total_questions: 2,
+  status: "SUBMITTED",
+  submitted_at: "2026-01-01T00:05:00Z",
+};
+
+describe("TestRunner (W3-F4 exam client)", () => {
+  it("seeds from session.question and shows identity + timer", () => {
     render(
       <AuthProvider initialUser={identity}>
-        <TestRunner session={{ ...session, question: questions[0], total_questions: 1 }} />
-      </AuthProvider>
+        <TestRunner
+          session={{ ...session, question: q1, total_questions: 1 }}
+          submitAnswerFn={vi.fn()}
+          saveDraftFn={noopSave}
+        />
+      </AuthProvider>,
     );
     expect(screen.getByText("Q1: pick one")).toBeInTheDocument();
-  });
-
-  it("shows identity from AuthContext and the progress header", () => {
-    renderRunner();
     expect(screen.getByTestId("auth-identity")).toHaveTextContent(
-      "candidate@example.com (PARTICIPANT)"
+      "candidate@example.com (PARTICIPANT)",
     );
-    expect(screen.getByText("Question 1 of 3")).toBeInTheDocument();
+    // Timer rendered from server timing (1h window → "60:00").
+    expect(screen.getByText("60:00")).toBeInTheDocument();
   });
 
-  it("dispatches to the right leaf component by question.type", () => {
-    renderRunner();
-    // Q1 is single-select (radio).
-    expect(screen.getByRole("radio", { name: "Python" })).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Next"));
-    // Q2 is multi-select (checkbox).
-    expect(screen.getByRole("checkbox", { name: "Node.js" })).toBeInTheDocument();
+  it("submits the current answer, appends next_question, and advances", async () => {
+    const submitFn = vi.fn().mockResolvedValue(advanceResult);
+    renderRunner(submitFn);
+
+    fireEvent.click(screen.getByLabelText("Python")); // q1 → [1]
+    fireEvent.click(screen.getByTestId("submit-button"));
+
+    await waitFor(() => expect(screen.getByText("Q2: pick many")).toBeInTheDocument());
+    expect(submitFn).toHaveBeenCalledWith("s1", [1]);
+    expect(screen.getByText("Question 2 of 2")).toBeInTheDocument();
   });
 
-  it("clamps Prev at the first question and Next at the last", () => {
-    renderRunner();
-    expect(screen.getByText("Previous")).toBeDisabled();
-    expect(screen.getByText("Next")).not.toBeDisabled();
-    fireEvent.click(screen.getByText("Next"));
-    fireEvent.click(screen.getByText("Next"));
-    expect(screen.getByText("Question 3 of 3")).toBeInTheDocument();
-    expect(screen.getByText("Next")).toBeDisabled();
-    expect(screen.getByText("Previous")).not.toBeDisabled();
+  it("finalizes on the last question and renders a locked confirmation", async () => {
+    const submitFn = vi
+      .fn()
+      .mockResolvedValueOnce(advanceResult)
+      .mockResolvedValueOnce(finalResult);
+    renderRunner(submitFn);
+
+    fireEvent.click(screen.getByLabelText("Python"));
+    fireEvent.click(screen.getByTestId("submit-button"));
+    await waitFor(() => screen.getByText("Q2: pick many"));
+
+    expect(screen.getByTestId("submit-button")).toHaveTextContent("Submit Exam");
+    fireEvent.click(screen.getByLabelText("Node.js"));
+    fireEvent.click(screen.getByTestId("submit-button"));
+
+    await waitFor(() => expect(screen.getByTestId("exam-confirmation")).toBeInTheDocument());
+    expect(screen.getByText("Exam submitted")).toBeInTheDocument();
   });
 
-  it("preserves answers in the Map across Next/Prev navigation", () => {
-    renderRunner();
-    // Answer Q1.
-    fireEvent.click(screen.getByLabelText("JavaScript"));
-    expect(screen.getByRole("radio", { name: "JavaScript" })).toBeChecked();
-    // Navigate forward then back — selection must survive (no re-fetch, state only).
+  it("optimistically locks inputs + submit while a submission is in flight", async () => {
+    // A never-resolving submit keeps the runner in the 'submitting' state.
+    const submitFn = vi.fn(() => new Promise<AnswerResult>(() => {}));
+    renderRunner(submitFn);
+
+    fireEvent.click(screen.getByLabelText("Python"));
+    fireEvent.click(screen.getByTestId("submit-button"));
+
+    await waitFor(() =>
+      expect(screen.getByRole("radio", { name: "Python" })).toBeDisabled(),
+    );
+    expect(screen.getByTestId("submit-button")).toBeDisabled();
+    expect(screen.getByTestId("submit-button")).toHaveTextContent("Submitting…");
+  });
+
+  it("surfaces a semantic error and keeps inputs locked (halts)", async () => {
+    const submitFn = vi.fn().mockRejectedValue(new ExamError("semantic", 422, "bad payload"));
+    renderRunner(submitFn);
+
+    fireEvent.click(screen.getByLabelText("Python"));
+    fireEvent.click(screen.getByTestId("submit-button"));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(screen.getByRole("radio", { name: "Python" })).toBeDisabled();
+  });
+
+  it("reviews an answered question read-only and preserves its selection", async () => {
+    const submitFn = vi.fn().mockResolvedValue(advanceResult);
+    renderRunner(submitFn);
+
+    fireEvent.click(screen.getByLabelText("Python")); // answer q1
+    fireEvent.click(screen.getByTestId("submit-button"));
+    await waitFor(() => screen.getByText("Q2: pick many"));
+
+    // Go back to the answered q1 — read-only, selection preserved.
+    fireEvent.click(screen.getByText("Previous"));
+    expect(screen.getByText("Q1: pick one")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Python" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Python" })).toBeDisabled();
+
+    // Next returns forward to the live question (local nav, no resubmit).
     fireEvent.click(screen.getByText("Next"));
     expect(screen.getByText("Q2: pick many")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Previous"));
-    expect(screen.getByText("Q1: pick one")).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "JavaScript" })).toBeChecked();
-  });
-
-  it("keeps per-question answers independent across questions", () => {
-    renderRunner();
-    fireEvent.click(screen.getByLabelText("JavaScript")); // Q1 = [2]
-    fireEvent.click(screen.getByText("Next"));
-    fireEvent.click(screen.getByLabelText("Node.js")); // Q2 = [1]
-    fireEvent.click(screen.getByLabelText("Deno")); // Q2 = [1, 2]
-    expect(screen.getByRole("checkbox", { name: "Node.js" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "Deno" })).toBeChecked();
-    fireEvent.click(screen.getByText("Previous"));
-    // Q1 still only JavaScript.
-    expect(screen.getByRole("radio", { name: "JavaScript" })).toBeChecked();
-    expect(screen.getByRole("radio", { name: "Python" })).not.toBeChecked();
+    expect(submitFn).toHaveBeenCalledTimes(1); // review navigation does not re-submit
   });
 });
