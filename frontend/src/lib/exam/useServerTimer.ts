@@ -31,32 +31,36 @@ export function useServerTimer(
   onExpire: () => void,
   enabled = true,
 ): ServerTimerState {
-  // Captured once at mount — recomputing would defeat the skew-absorbing anchor.
-  const mountWallRef = useRef<number>(Date.now());
-  const baselineRef = useRef<number>(
-    Math.max(
-      0,
-      Math.floor(
-        (new Date(expiresAt).getTime() - new Date(serverNow).getTime()) / 1000,
-      ),
+  // Pure: parse the server timestamps to a starting remaining-seconds value
+  // (no Date.now here — the wall-clock anchor is captured in the effect below).
+  const baseline = Math.max(
+    0,
+    Math.floor(
+      (new Date(expiresAt).getTime() - new Date(serverNow).getTime()) / 1000,
     ),
   );
-  const [timeRemaining, setTimeRemaining] = useState<number>(baselineRef.current);
-  const firedRef = useRef(false);
+  const [timeRemaining, setTimeRemaining] = useState<number>(baseline);
 
   // Keep the latest onExpire without resetting the interval each render.
   const onExpireRef = useRef(onExpire);
-  onExpireRef.current = onExpire;
+  useEffect(() => {
+    onExpireRef.current = onExpire;
+  });
 
   useEffect(() => {
     if (!enabled) return;
 
+    // Anchor wall-clock at mount/enable; remaining is re-derived from elapsed
+    // wall time so a throttled/background tab cannot drift.
+    const mountWall = Date.now();
+    let fired = false;
+
     const tick = () => {
-      const elapsed = Math.floor((Date.now() - mountWallRef.current) / 1000);
-      const remaining = Math.max(0, baselineRef.current - elapsed);
+      const elapsed = Math.floor((Date.now() - mountWall) / 1000);
+      const remaining = Math.max(0, baseline - elapsed);
       setTimeRemaining(remaining);
-      if (remaining === 0 && !firedRef.current) {
-        firedRef.current = true;
+      if (remaining === 0 && !fired) {
+        fired = true;
         onExpireRef.current();
       }
     };
@@ -64,7 +68,7 @@ export function useServerTimer(
     tick(); // sync immediately so the first paint shows the real value
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [enabled]);
+  }, [enabled, baseline]);
 
   const formatTime = () => {
     const minutes = Math.floor(timeRemaining / 60);

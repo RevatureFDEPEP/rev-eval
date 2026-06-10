@@ -30,7 +30,9 @@ export function useAutosave(
 
   // Latest answers, read at fire-time so the debounced save sends current state.
   const answersRef = useRef(answers);
-  answersRef.current = answers;
+  useEffect(() => {
+    answersRef.current = answers;
+  });
 
   // Change detection: a stable serialization of the answer entries.
   const serialized = JSON.stringify(Array.from(answers.entries()));

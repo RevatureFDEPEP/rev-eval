@@ -14,12 +14,15 @@ interface SingleSelectQuestionProps {
   question: SanitizedQuestion;
   selected: number[];
   onChange: (optionIds: number[]) => void;
+  /** Disable selection (W3-F4): exam locked/submitting, or reviewing an answered question. */
+  disabled?: boolean;
 }
 
 export function SingleSelectQuestion({
   question,
   selected,
   onChange,
+  disabled = false,
 }: SingleSelectQuestionProps) {
   if (!question.options || question.options.length === 0) {
     return <div className="text-sm text-red-600">Error: No options available</div>;
@@ -30,6 +33,8 @@ export function SingleSelectQuestion({
   return (
     <RadioGroup
       key={question.id}
+      disabled={disabled}
+      aria-disabled={disabled}
       value={current !== null ? current.toString() : ''}
       onValueChange={(value) => {
         const parsed = Number.parseInt(value, 10);
