@@ -34,25 +34,6 @@ def pytest_addoption(parser):
     )
 
 
-def pytest_configure(config):
-    """Wire env for the integration suite before any ``src`` module is imported.
-
-    ``src.config.settings.Settings()`` and the ``src.db.session`` engine bind
-    their env at import time, and test modules import them during collection —
-    so the integration URLs must be in the environment before collection
-    starts. ``IT_*`` variables override the localhost compose-port defaults.
-    """
-    if config.getoption("--integration"):
-        it_db_url = os.environ.setdefault(
-            "IT_DATABASE_URL",
-            "postgresql+asyncpg://root:root@localhost:5432/eval_ai_itest",
-        )
-        os.environ["DATABASE_URL"] = it_db_url
-        os.environ["QUESTION_SERVICE_URL"] = os.environ.setdefault(
-            "IT_QUESTION_SERVICE_URL", "http://localhost:8003"
-        )
-
-
 def pytest_collection_modifyitems(config, items):
     """Mark everything under tests/integration/ and gate it on --integration.
 

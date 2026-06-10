@@ -22,9 +22,14 @@ Connection knobs (defaults match the published docker-compose ports):
     IT_MONGO_DB             evalai
     IT_QUESTION_SERVICE_URL http://localhost:8003
 
-The root conftest's ``pytest_configure`` exports IT_DATABASE_URL /
-IT_QUESTION_SERVICE_URL as DATABASE_URL / QUESTION_SERVICE_URL before any
-``src`` import, so the app modules bind to the integration targets.
+Note on wiring: ``src.config.settings.Settings()`` is instantiated while
+pytest loads ``tests/conftest.py`` (it imports the models), i.e. *before* any
+pytest hook could export env vars — so the integration targets are applied at
+fixture time instead: ``app_client`` rebinds ``settings.QUESTION_SERVICE_URL``
+and rebuilds the question-client singleton, ``get_db`` is overridden onto the
+integration engine, and the Alembic subprocess gets DATABASE_URL explicitly.
+The module-global engine in ``src.db.session`` is never connected here
+(startup ``init_db()`` doesn't run under ASGITransport).
 """
 import asyncio
 import os
@@ -179,12 +184,16 @@ async def app_client(pg_database, question_service, it_db):
       the gateway's header-driven contract without the network call.
     """
     from main import app
+    from src.config.settings import settings
     from src.db.session import get_db
     from src.utils import question_client
     from src.utils.dependencies import get_current_user_from_headers
 
-    # Drop any client built by an earlier (unit) test run so the singleton
-    # rebinds to QUESTION_SERVICE_URL as exported by pytest_configure.
+    # Settings was instantiated before any hook could set env (see module
+    # docstring): point it at the host-published service port and rebuild the
+    # singleton client so it binds the new base_url.
+    original_question_url = settings.QUESTION_SERVICE_URL
+    settings.QUESTION_SERVICE_URL = IT_QUESTION_SERVICE_URL
     await question_client.aclose()
 
     async def _get_db():
@@ -214,6 +223,7 @@ async def app_client(pg_database, question_service, it_db):
             yield client
     finally:
         app.dependency_overrides.clear()
+        settings.QUESTION_SERVICE_URL = original_question_url
         await question_client.aclose()
 
 
