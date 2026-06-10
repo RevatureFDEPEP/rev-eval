@@ -3,7 +3,11 @@
 The POST goes through the real stack below the gateway: FastAPI app →
 SessionService → httpx → question-management-service → Mongo ``$sample``,
 with the session row persisted to the Alembic-migrated integration database.
+
+Extended for W3-F7 item 3: active-session reuse + the partial-unique-index
+race backstop (concurrent double-POST → one ACTIVE row, no 500).
 """
+import asyncio
 import uuid
 from datetime import datetime, timedelta
 
@@ -62,3 +66,60 @@ async def test_create_session_unknown_test_404(app_client, mongo_questions):
     mongo_questions(n=1)
     resp = await app_client.post("/v1/api/sessions/", json={"test_id": 99_999_999})
     assert resp.status_code == 404
+
+
+async def _active_rows(it_db, test_id):
+    async with it_db() as db:
+        rows = (
+            await db.execute(
+                select(Session).where(
+                    Session.test_id == test_id,
+                    Session.status == SessionStatus.ACTIVE,
+                )
+            )
+        ).scalars().all()
+    return rows
+
+
+async def test_repeat_post_reuses_the_active_session(
+    app_client, make_test, mongo_questions, it_db
+):
+    """W3-F7 item 3 — a refresh must not re-sample questions, reset the clock,
+    or orphan the prior row: the second POST returns the same session."""
+    mongo_questions(n=3)
+    test = await make_test(number_of_questions=3, duration=DURATION)
+
+    r1 = await app_client.post("/v1/api/sessions/", json={"test_id": test.id})
+    assert r1.status_code == 201, r1.text
+    r2 = await app_client.post("/v1/api/sessions/", json={"test_id": test.id})
+    assert r2.status_code == 201, r2.text
+
+    b1, b2 = r1.json(), r2.json()
+    assert b2["session_id"] == b1["session_id"]
+    assert b2["expires_at"] == b1["expires_at"]   # original clock, not reset
+    assert b2["total_questions"] == b1["total_questions"]
+
+    rows = await _active_rows(it_db, test.id)
+    assert len(rows) == 1                          # no orphaned duplicates
+
+
+async def test_concurrent_double_post_yields_one_active_session(
+    app_client, make_test, mongo_questions, it_db
+):
+    """The lookup-then-insert race: the partial unique index (Alembic 0007)
+    makes one insert lose, and the loser serves the winner's row — both
+    requests succeed with the same session_id, exactly one ACTIVE row."""
+    mongo_questions(n=3)
+    test = await make_test(number_of_questions=3, duration=DURATION)
+
+    r1, r2 = await asyncio.gather(
+        app_client.post("/v1/api/sessions/", json={"test_id": test.id}),
+        app_client.post("/v1/api/sessions/", json={"test_id": test.id}),
+    )
+
+    assert r1.status_code == 201, r1.text
+    assert r2.status_code == 201, r2.text
+    assert r1.json()["session_id"] == r2.json()["session_id"]
+
+    rows = await _active_rows(it_db, test.id)
+    assert len(rows) == 1

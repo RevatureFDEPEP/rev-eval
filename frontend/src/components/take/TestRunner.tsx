@@ -99,7 +99,10 @@ export function TestRunner({
 
   const [questions, setQuestions] = useState<SanitizedQuestion[]>(seed);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Map<string, number[]>>(new Map());
+  // Resumed sessions (W3-F7 item 3) restore the autosaved draft selections.
+  const [answers, setAnswers] = useState<Map<string, number[]>>(
+    () => new Map(Object.entries(session.draft_answers ?? {})),
+  );
   const [exam, dispatch] = useReducer(examReducer, initialExamState);
   const submittingRef = useRef(false);
 
@@ -187,7 +190,9 @@ export function TestRunner({
   const frontier = questions.length - 1;
   const isReviewing = currentIndex < frontier;
   const inputsDisabled = exam.isLocked || isReviewing;
-  const isLastQuestion = frontier >= session.total_questions - 1;
+  // Server index at mint (>0 on a resumed session) offsets the local list.
+  const baseIndex = session.current_index;
+  const isLastQuestion = baseIndex + frontier >= session.total_questions - 1;
 
   const question = questions[currentIndex];
   const selected = answers.get(question.id) ?? [];
@@ -220,7 +225,7 @@ export function TestRunner({
     <div className="mx-auto max-w-2xl space-y-4 p-6">
       <div className="flex items-center justify-between gap-4">
         <span className="text-sm text-slate-500">
-          Question {currentIndex + 1} of {session.total_questions}
+          Question {baseIndex + currentIndex + 1} of {session.total_questions}
         </span>
         <div className="w-40">
           <Timer

@@ -153,6 +153,27 @@ describe("TestRunner (W3-F4 exam client)", () => {
     expect(screen.getByRole("radio", { name: "Python" })).toBeDisabled();
   });
 
+  // W3-F7 item 3 — a reused session restores autosaved drafts + true position.
+  it("restores draft answers and offsets the question counter on a resumed session", () => {
+    render(
+      <AuthProvider initialUser={identity}>
+        <TestRunner
+          session={{
+            ...session,
+            question: q1,
+            current_index: 1,
+            total_questions: 3,
+            draft_answers: { q1: [1] },
+          }}
+          submitAnswerFn={vi.fn()}
+          saveDraftFn={noopSave}
+        />
+      </AuthProvider>,
+    );
+    expect(screen.getByText("Question 2 of 3")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Python" })).toBeChecked();
+  });
+
   // W3-F7 item 2 — a transient outage must not brick the attempt.
   it("offers Retry submission after a transient failure and recovers on success", async () => {
     const submitFn = vi
