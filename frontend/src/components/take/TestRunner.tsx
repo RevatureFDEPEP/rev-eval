@@ -31,6 +31,13 @@ import { SingleSelectQuestion } from './SingleSelectQuestion';
 
 interface TestRunnerProps {
   session: SessionOut;
+  /**
+   * Override the question list. Defaults to seeding from `session.question`
+   * (the single server-advanced question of the W3-F1 contract). This is the
+   * seam W3-F4 uses to grow the array as answers are submitted, and the hook
+   * unit tests use to exercise multi-question navigation.
+   */
+  initialQuestions?: SanitizedQuestion[];
 }
 
 /** Polymorphic dispatch: render the right leaf component for the question type. */
@@ -52,13 +59,14 @@ function renderQuestion(
   }
 }
 
-export function TestRunner({ session }: TestRunnerProps) {
+export function TestRunner({ session, initialQuestions }: TestRunnerProps) {
   const user = useAuthContext();
 
-  // Seeded from the session's first (and currently only) sanitized question.
+  // Seeded from the session's first (and currently only) sanitized question,
+  // unless an explicit list is supplied (W3-F4 growth / tests).
   const questions = useMemo<SanitizedQuestion[]>(
-    () => (session.question ? [session.question] : []),
-    [session.question],
+    () => initialQuestions ?? (session.question ? [session.question] : []),
+    [initialQuestions, session.question],
   );
 
   const [currentIndex, setCurrentIndex] = useState(0);
