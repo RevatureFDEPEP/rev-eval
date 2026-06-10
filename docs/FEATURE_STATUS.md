@@ -12,7 +12,16 @@ This file stays at summary level only.
 > start, advance, or finish a feature, update its detail file (check off steps,
 > add evidence) **and** its status row here, in the same PR as the code change.
 
-**Last assessed:** 2026-06-10 (W3-F5 completed — integration suite against real
+**Last assessed:** 2026-06-10 PM (post-merge review of the Week-3 PRs
+#72/#74/#75/#76 re-opened **W3-F4** — `useServerTimer` re-anchors its wall-clock
+baseline every time `enabled` toggles, and every submit toggles it, so the
+countdown resets to the full session duration after question 1; client-side
+auto-submit at expiry effectively never fires. The fix plus the review's
+cross-feature follow-ups (active-session reuse, `GET /questions/sample`
+role gate, take-page `error.tsx`, submit-retry affordance, autosave max-wait)
+are specced as trainer-defined
+**[W3-F7](features/w3-f7-review-remediation.md)**; W3-F4 completion is gated on
+its item 1. Prior: W3-F5 completed — integration suite against real
 containers: a `--integration`-gated pytest suite in test-management-service
 provisions a dedicated `eval_ai_itest` Postgres database per run (drop/create +
 `alembic upgrade head`), runs the app in-process over ASGI with per-request
@@ -63,9 +72,10 @@ in dependency order (W3-F1 first, W3-F6 last).
 | W3-F1 | Quiz session creation backend (`POST /sessions`, httpx integration) | 11 | ✅ Completed | [w3-f1-quiz-session-backend.md](features/w3-f1-quiz-session-backend.md) |
 | W3-F2 | Scoring engine + attempt locking (idempotency, state machine) | 12 | ✅ Completed | [w3-f2-scoring-engine-locking.md](features/w3-f2-scoring-engine-locking.md) |
 | W3-F3 | Test-taking frontend skeleton (`/take/[testId]`, AuthContext) | 13 | ✅ Completed | [w3-f3-test-taking-frontend-skeleton.md](features/w3-f3-test-taking-frontend-skeleton.md) |
-| W3-F4 | Auto-saving exam client (server timer, autosave, submit-lock) | 14 | ✅ Completed | [w3-f4-autosave-exam-client.md](features/w3-f4-autosave-exam-client.md) |
+| W3-F4 | Auto-saving exam client (server timer, autosave, submit-lock) | 14 | 🟡 In Progress (re-opened — timer defect, see W3-F7 item 1) | [w3-f4-autosave-exam-client.md](features/w3-f4-autosave-exam-client.md) |
 | W3-F5 | Integration tests vs. real Postgres/Mongo | 15 | ✅ Completed | [w3-f5-integration-tests-real-db.md](features/w3-f5-integration-tests-real-db.md) |
 | W3-F6 | Playwright E2E happy path + smoke script | 15 | ❌ Not Started | [w3-f6-playwright-e2e-smoke.md](features/w3-f6-playwright-e2e-smoke.md) |
+| W3-F7 | Week-3 review-findings remediation (trainer-defined) | — | ❌ Not Started | [w3-f7-review-remediation.md](features/w3-f7-review-remediation.md) |
 
 ## Days 16–20 (Week 4 — reporting, RBAC & trainer dashboard)
 
@@ -91,7 +101,8 @@ Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 6. ~~**W2-F8 defect cleanup**~~ — done (PR #63: skills-500, user-service dual-engine, Pydantic-v2 sweep; gateway 204 was in W2-F7).
 7. **W3-F1 sessions backend** — strict prerequisite for the whole Week 3 slice; lands as Alembic `0004` on W2-F7's chain.
 8. **W3-F2 → W3-F3 → W3-F4** — the quiz-taking slice in dependency order; W3-F2 backend before the W3-F3/W3-F4 frontend that consumes it.
-9. **W3-F5 + W3-F6** — verification layer; do last, once the endpoints + UI exist to test.
+9. **W3-F5 + W3-F6** — verification layer; do last, once the endpoints + UI exist to test. (W3-F5 done — PR #79.)
+9a. **W3-F7 review remediation before W3-F6** — fix the W3-F4 timer defect and settle active-session reuse semantics *before* the Playwright happy path freezes E2E behavior; the `/questions/sample` role gate previews W4-F3.
 10. **W2-M10 (if not already) → W4-F1 → W4-F3** — reporting backend then its RBAC gate; both extend the scaffolded reporting service.
 11. **W4-F2 → W4-F4** — results page first (builds `<ChartWrapper>`), then the trainer dashboard that reuses it; both need their W4 backends live.
 12. **W4-F5 last** — debt audit + ADRs need a substantially complete codebase; capture the W4-F1 and W3-F2 ADR decisions as those features land.

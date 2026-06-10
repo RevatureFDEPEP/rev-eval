@@ -76,6 +76,14 @@ forward/back navigation — no loading flicker, no cookie in JS bundles.
 None — all five steps complete. Answer submission, the server-anchored timer,
 autosave, and submit-lock are W3-F4.
 
+Post-merge review follow-ups (2026-06-10), specced in
+[W3-F7](w3-f7-review-remediation.md): route-level `error.tsx` for
+`/take/[testId]` — session-mint failures (404/422/502) currently surface the
+raw Next.js 500 page (item 5); refresh minting a fresh session is the
+user-visible face of W3-F1's missing reuse guard (item 3); a11y —
+`aria-labelledby` association between question text and its option group
+(item 7).
+
 ## Validation evidence
 
 - `pnpm test` — 92 passed (11 files), incl. 14 new W3-F3 specs

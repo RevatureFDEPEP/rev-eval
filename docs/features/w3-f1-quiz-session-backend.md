@@ -62,6 +62,13 @@ correlation-id propagation).
 None — all steps complete. Follow-ups (separate features, not this branch):
 - **W3-F2** consumes `question_ids` + `current_index` for answer scoring /
   locking and stores `correct_answers` server-side.
+- **Post-merge review follow-ups (2026-06-10), specced in
+  [W3-F7](w3-f7-review-remediation.md):** active-session reuse — repeated
+  `POST /sessions` mints unlimited ACTIVE sessions per (user, test),
+  user-visible as "refresh restarts the test" via the W3-F3 page (item 3);
+  `GET /questions/sample` is participant-reachable through the gateway with
+  `correct_answers` intact — role gate owed (item 4, security); `$sample`
+  duplicate guard + short-fill warning (item 8).
 - **Adjacent defect (noted, not fixed here):**
   `TestRepository.get_by_id` crashes on a missing id (`test.duration_seconds = None`
   on a `None` row). Session code sidesteps it with a direct `select(Test)` in
