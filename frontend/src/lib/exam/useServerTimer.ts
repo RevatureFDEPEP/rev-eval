@@ -66,7 +66,11 @@ export function useServerTimer(
     const deadline = deadlineRef.current;
 
     const tick = () => {
-      const remaining = Math.max(0, Math.floor((deadline - Date.now()) / 1000));
+      // ceil: remaining rounds UP so the first paint shows the full baseline
+      // even when the tick lands a few ms after the anchor was captured
+      // (floor read 59:59 on slow CI), and 0 is reached only at the true
+      // deadline — matching the old baseline−floor(elapsed) semantics.
+      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
       setTimeRemaining(remaining);
       if (remaining === 0 && !firedRef.current) {
         firedRef.current = true;
