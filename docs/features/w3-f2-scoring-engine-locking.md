@@ -71,4 +71,7 @@ None — all steps complete. Follow-ups owned by later features (not this one):
 the real-Postgres `SELECT FOR UPDATE` concurrency race is exercised in W3-F5;
 `PATCH /sessions/{id}/draft` (autosave) builds on this state machine in W3-F4;
 free-text (`text`) questions are recorded with score `0.0` awaiting manual
-grading (W4).
+grading (W4). Post-merge review hardening notes (2026-06-10) live in
+[W3-F7 item 9](w3-f7-review-remediation.md): idempotency replay doesn't
+fingerprint the request body, and the QMS question fetch runs while holding
+the `SELECT FOR UPDATE` row lock — document or tighten both.
