@@ -197,7 +197,7 @@ class QuizSessionService:
             if not race_winner:
                 raise QuizSessionError(
                     "Session conflict; please retry", status_code=409
-                )
+                ) from None
             raw = await QuizSessionService._fetch_question(
                 race_winner.question_ids[race_winner.current_index]
             )

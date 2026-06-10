@@ -198,7 +198,9 @@ class TestCreateSession:
             expires_at=now + timedelta(minutes=10),
         )
 
-        with patch(QUESTION_CLIENT, return_value=mock_question_client(sample_handler(docs))):
+        with patch(
+            QUESTION_CLIENT, return_value=mock_question_client(sample_handler(docs))
+        ):
             with patch.object(
                 QuizSessionRepository,
                 "get_active_by_test_and_user",
