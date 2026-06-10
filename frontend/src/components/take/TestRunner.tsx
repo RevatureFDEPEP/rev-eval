@@ -60,6 +60,7 @@ function renderQuestion(
   selected: number[],
   onChange: (ids: number[]) => void,
   disabled: boolean,
+  labelledBy: string,
 ) {
   switch (question.type) {
     case 'multi':
@@ -69,6 +70,7 @@ function renderQuestion(
           selected={selected}
           onChange={onChange}
           disabled={disabled}
+          labelledBy={labelledBy}
         />
       );
     default:
@@ -79,6 +81,7 @@ function renderQuestion(
           selected={selected}
           onChange={onChange}
           disabled={disabled}
+          labelledBy={labelledBy}
         />
       );
   }
@@ -265,12 +268,22 @@ export function TestRunner({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg leading-relaxed">
+          {/* id ties the question text to its option group (W3-F7 item 7). */}
+          <CardTitle
+            id={`question-${question.id}-label`}
+            className="text-lg leading-relaxed"
+          >
             {question.question_text}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {renderQuestion(question, selected, setSelected, inputsDisabled)}
+          {renderQuestion(
+            question,
+            selected,
+            setSelected,
+            inputsDisabled,
+            `question-${question.id}-label`,
+          )}
         </CardContent>
       </Card>
 

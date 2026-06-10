@@ -153,6 +153,47 @@ describe("TestRunner (W3-F4 exam client)", () => {
     expect(screen.getByRole("radio", { name: "Python" })).toBeDisabled();
   });
 
+  // W3-F7 item 7 — the question text is the option group's accessible label.
+  it("associates the question text with its option group (a11y)", async () => {
+    const submitFn = vi.fn().mockResolvedValue(advanceResult);
+    renderRunner(submitFn);
+
+    // mcq → radiogroup labelled by the rendered question text element.
+    const radioGroup = screen.getByRole("radiogroup");
+    expect(radioGroup).toHaveAttribute("aria-labelledby", "question-q1-label");
+    expect(document.getElementById("question-q1-label")).toHaveTextContent(
+      "Q1: pick one",
+    );
+
+    // multi → fieldset (role group) labelled by the question text.
+    fireEvent.click(screen.getByLabelText("Python"));
+    fireEvent.click(screen.getByTestId("submit-button"));
+    await waitFor(() => screen.getByText("Q2: pick many"));
+    expect(
+      screen.getByRole("group", { name: "Q2: pick many" }),
+    ).toHaveAttribute("aria-labelledby", "question-q2-label");
+  });
+
+  // W3-F7 item 7 — the W3-F4 spec names aria-disabled; assert it, not just
+  // the DOM disabled state.
+  it("marks the option group aria-disabled while locked", async () => {
+    const submitFn = vi.fn(() => new Promise<AnswerResult>(() => {}));
+    renderRunner(submitFn);
+
+    expect(screen.getByRole("radiogroup")).toHaveAttribute(
+      "aria-disabled",
+      "false",
+    );
+    fireEvent.click(screen.getByLabelText("Python"));
+    fireEvent.click(screen.getByTestId("submit-button"));
+    await waitFor(() =>
+      expect(screen.getByRole("radiogroup")).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      ),
+    );
+  });
+
   // W3-F7 item 3 — a reused session restores autosaved drafts + true position.
   it("restores draft answers and offsets the question counter on a resumed session", () => {
     render(
