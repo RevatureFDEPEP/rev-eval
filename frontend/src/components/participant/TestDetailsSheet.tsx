@@ -50,6 +50,7 @@ interface InterviewTranscript {
 }
 
 async function getInterviewTranscript(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _submissionId: number,
 ): Promise<InterviewTranscript> {
   throw new Error(
@@ -1006,11 +1007,6 @@ function QuestionResultCard({
     easy: "bg-green-100 text-green-800 border-green-200",
     medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
     hard: "bg-red-100 text-red-800 border-red-200",
-  };
-
-  const getOptionText = (optionId: number): string => {
-    const option = question.options?.find((opt) => opt.option_id === optionId);
-    return option?.text || `Option ${optionId}`;
   };
 
   return (

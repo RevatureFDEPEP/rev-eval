@@ -103,7 +103,7 @@ export function GradedSubmissionSheet({
         setLoading(true);
         setError(null);
         const data = await getSubmissionReviewDetails(submission.id);
-        setDetails(data);
+        setDetails(data as ReviewDetails);
       } catch (err) {
         console.error('Failed to load review details:', err);
         setError(err instanceof Error ? err.message : 'Failed to load details');
@@ -133,10 +133,6 @@ export function GradedSubmissionSheet({
     await audioPlayer.play(audioUrl);
   };
 
-  const handlePauseAudio = () => {
-    audioPlayer.pause();
-  };
-
   const handleRestartAudio = () => {
     audioPlayer.restart();
   };
@@ -154,6 +150,7 @@ export function GradedSubmissionSheet({
       audioPlayer.stop();
       setPlayingAudioIndex(null);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   if (!submission) return null;

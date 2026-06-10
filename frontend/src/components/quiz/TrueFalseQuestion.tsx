@@ -17,7 +17,7 @@ interface TrueFalseQuestionProps {
   onAnswerChange: (answer: boolean) => void;
 }
 
-export function TrueFalseQuestion({ question, selectedAnswer, onAnswerChange }: TrueFalseQuestionProps) {
+export function TrueFalseQuestion({ selectedAnswer, onAnswerChange }: TrueFalseQuestionProps) {
   return (
     <div className="grid grid-cols-2 gap-4">
       <Button
