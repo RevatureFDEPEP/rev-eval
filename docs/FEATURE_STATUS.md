@@ -12,11 +12,13 @@ This file stays at summary level only.
 > start, advance, or finish a feature, update its detail file (check off steps,
 > add evidence) **and** its status row here, in the same PR as the code change.
 
-**Last assessed:** 2026-06-09 (W3-F2 completed — `POST /sessions/{id}/answer`
-in test-management-service: pure exact-match + Jaccard partial-credit scoring,
-pessimistic `SELECT FOR UPDATE` lock, required `Idempotency-Key` dedup/replay,
-and a session state machine that finalizes to `SUBMITTED` on the last question.
-New `answers` + `idempotency_keys` tables via Alembic 0005; 89 tests, 78% cov)
+**Last assessed:** 2026-06-10 (W3-F3 completed — `/take/[testId]` Next.js
+server-component page mints a W3-F1 session server-side so the first question is
+in the initial HTML; `TestRunner` client component owns `currentIndex` +
+`answers` `Map<string, number[]>` with clamped React-state Prev/Next
+(no router nav, no re-fetch) and polymorphic single/multi-select leaf rendering;
+server-seeded `AuthContext` exposes identity without leaking the httpOnly cookie.
+Frontend: 92 tests pass, lint clean, build green)
 
 ## Status values
 
@@ -51,7 +53,7 @@ in dependency order (W3-F1 first, W3-F6 last).
 |---|---|---|---|---|
 | W3-F1 | Quiz session creation backend (`POST /sessions`, httpx integration) | 11 | ✅ Completed | [w3-f1-quiz-session-backend.md](features/w3-f1-quiz-session-backend.md) |
 | W3-F2 | Scoring engine + attempt locking (idempotency, state machine) | 12 | ✅ Completed | [w3-f2-scoring-engine-locking.md](features/w3-f2-scoring-engine-locking.md) |
-| W3-F3 | Test-taking frontend skeleton (`/take/[testId]`, AuthContext) | 13 | ❌ Not Started | [w3-f3-test-taking-frontend-skeleton.md](features/w3-f3-test-taking-frontend-skeleton.md) |
+| W3-F3 | Test-taking frontend skeleton (`/take/[testId]`, AuthContext) | 13 | ✅ Completed | [w3-f3-test-taking-frontend-skeleton.md](features/w3-f3-test-taking-frontend-skeleton.md) |
 | W3-F4 | Auto-saving exam client (server timer, autosave, submit-lock) | 14 | ❌ Not Started | [w3-f4-autosave-exam-client.md](features/w3-f4-autosave-exam-client.md) |
 | W3-F5 | Integration tests vs. real Postgres/Mongo | 15 | ❌ Not Started | [w3-f5-integration-tests-real-db.md](features/w3-f5-integration-tests-real-db.md) |
 | W3-F6 | Playwright E2E happy path + smoke script | 15 | ❌ Not Started | [w3-f6-playwright-e2e-smoke.md](features/w3-f6-playwright-e2e-smoke.md) |
