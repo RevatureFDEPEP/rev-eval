@@ -260,6 +260,22 @@ class QuestionService:
         return await QuestionRepository.delete(qid)
 
     @staticmethod
+    async def sample_questions(limit: int) -> list[Question]:
+        """
+        Return a random sample of questions from the whole bank.
+
+        Used by test-management-service to seed a quiz session. Sampling is not
+        skill-filtered — it draws from the entire question bank.
+
+        Args:
+            limit: Number of questions to sample
+
+        Returns:
+            List[Question]: Up to ``limit`` randomly selected questions
+        """
+        return await QuestionRepository.sample(limit)
+
+    @staticmethod
     async def find_by_type(question_type: str, limit: int = 100) -> list[Question]:
         """
         Find questions by type.

@@ -171,6 +171,26 @@ class QuestionRepository:
         return await Question.find(Question.difficulty == difficulty).limit(limit).to_list()
 
     @staticmethod
+    async def sample(limit: int) -> list[Question]:
+        """
+        Return a random sample of questions from the whole bank.
+
+        Uses MongoDB's ``$sample`` aggregation stage (server-side random pick)
+        rather than fetching all rows and sampling in Python. ``projection_model``
+        rehydrates each sampled document back into a Question instance.
+
+        Args:
+            limit: Number of questions to sample (the ``$sample`` size)
+
+        Returns:
+            List[Question]: Up to ``limit`` randomly selected Question documents
+        """
+        return await Question.aggregate(
+            [{"$sample": {"size": limit}}],
+            projection_model=Question,
+        ).to_list()
+
+    @staticmethod
     async def find_by_tags(tags: list[str], limit: int = 100) -> list[Question]:
         """
         Find questions that have any of the specified tags.
