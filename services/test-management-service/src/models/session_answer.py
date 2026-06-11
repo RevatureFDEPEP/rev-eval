@@ -29,6 +29,14 @@ class SessionAnswer(Base):
             "idempotency_key",
             name="uq_session_answer_idempotency",
         ),
+        # One scored answer per question per session — the durable backstop
+        # against double-scoring when no Idempotency-Key is sent or a row lock
+        # is unavailable (e.g. SQLite).
+        UniqueConstraint(
+            "session_id",
+            "question_index",
+            name="uq_session_answer_question_index",
+        ),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)

@@ -79,12 +79,3 @@ class QuizSessionRepository:
             .with_for_update()
         )
         return result.scalars().first()
-
-    @staticmethod
-    async def advance_index(
-        db: AsyncSession, session: QuizSession, new_index: int
-    ) -> QuizSession:
-        session.current_index = new_index
-        await db.commit()
-        await db.refresh(session)
-        return session

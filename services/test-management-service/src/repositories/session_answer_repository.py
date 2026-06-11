@@ -20,7 +20,7 @@ class SessionAnswerRepository:
         return result.scalars().first()
 
     @staticmethod
-    async def create(
+    def add(
         db: AsyncSession,
         *,
         session_id: str,
@@ -33,6 +33,11 @@ class SessionAnswerRepository:
         requires_manual_review: bool = False,
         idempotency_key: str | None = None,
     ) -> SessionAnswer:
+        """Stage a scored answer on the session WITHOUT committing.
+
+        The caller commits once so the answer insert and the session index
+        advance land in a single transaction (and a single FOR UPDATE window).
+        """
         answer = SessionAnswer(
             session_id=session_id,
             question_id=question_id,
@@ -45,6 +50,4 @@ class SessionAnswerRepository:
             idempotency_key=idempotency_key,
         )
         db.add(answer)
-        await db.commit()
-        await db.refresh(answer)
         return answer

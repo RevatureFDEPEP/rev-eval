@@ -9,6 +9,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from src.models.quiz_session import QuizSession, QuizSessionStatus
@@ -42,8 +43,8 @@ def question_doc(i: int, q_type: str = "mcq") -> dict:
         "_id": f"q{i}",
         "type": q_type,
         "question_text": f"Question number {i} with enough text",
-        "options": [{"option_id": 0, "text": "A"}, {"option_id": 1, "text": "B"}],
-        "correct_answers": [0],
+        "options": [{"option_id": 1, "text": "A"}, {"option_id": 2, "text": "B"}],
+        "correct_answers": [1],
         "answer_explanation": "because A",
         "difficulty": "easy",
         "skills": ["Python"],
@@ -92,7 +93,7 @@ async def seed_session(
 def make_request(question_id: str, answers=None) -> AnswerSubmitRequest:
     return AnswerSubmitRequest(
         question_id=question_id,
-        submitted_answers=answers if answers is not None else [0],
+        submitted_answers=answers if answers is not None else [1],
     )
 
 
@@ -109,7 +110,7 @@ async def test_happy_path_advances_index(db_session):
 
     with patch(SCORING_CLIENT, return_value=mock_question_client(fetch_handler(docs))):
         result = await QuizSessionScoringService.submit_answer(
-            db_session, session.session_id, 1, make_request("q0", [0]), None
+            db_session, session.session_id, 1, make_request("q0", [1]), None
         )
 
     assert result.is_correct is True
@@ -129,12 +130,16 @@ async def test_final_answer_submits_session(db_session):
 
     with patch(SCORING_CLIENT, return_value=mock_question_client(fetch_handler(docs))):
         result = await QuizSessionScoringService.submit_answer(
-            db_session, session.session_id, 1, make_request("q0", [0]), None
+            db_session, session.session_id, 1, make_request("q0", [1]), None
         )
 
     assert result.session_status == QuizSessionStatus.SUBMITTED
     assert result.question is None
     assert result.submitted_at is not None
+    # Finalize advances current_index to total so a completed quiz reports all
+    # questions consumed (not total-1).
+    assert result.current_index == 1
+    assert result.total_questions == 1
 
 
 @pytest.mark.asyncio
@@ -144,7 +149,7 @@ async def test_wrong_answer_scores_zero(db_session):
 
     with patch(SCORING_CLIENT, return_value=mock_question_client(fetch_handler(docs))):
         result = await QuizSessionScoringService.submit_answer(
-            db_session, session.session_id, 1, make_request("q0", [1]), None
+            db_session, session.session_id, 1, make_request("q0", [2]), None
         )
 
     assert result.is_correct is False
@@ -162,12 +167,12 @@ async def test_idempotency_key_returns_cached_result(db_session):
     client_mock = mock_question_client(fetch_handler(docs))
     with patch(SCORING_CLIENT, return_value=client_mock):
         r1 = await QuizSessionScoringService.submit_answer(
-            db_session, session.session_id, 1, make_request("q0", [0]), key
+            db_session, session.session_id, 1, make_request("q0", [1]), key
         )
         fetch_count_after_first = client_mock.get.call_count
 
         r2 = await QuizSessionScoringService.submit_answer(
-            db_session, session.session_id, 1, make_request("q0", [0]), key
+            db_session, session.session_id, 1, make_request("q0", [1]), key
         )
 
     # Second call fetches the next question to build the response, not re-score.
@@ -263,3 +268,107 @@ async def test_text_question_advances_with_manual_review(db_session):
     assert result.current_index == 1
     assert result.question is not None
     assert result.question.id == "q1"
+
+
+@pytest.mark.asyncio
+async def test_final_answer_retry_is_idempotent(db_session):
+    """Retrying the FINAL answer with the same key replays the cached result
+    instead of hitting the 'already submitted' 409 guard."""
+    docs = [question_doc(0)]
+    session = await seed_session(db_session, ["q0"])
+    key = "idem-final-001"
+
+    with patch(SCORING_CLIENT, return_value=mock_question_client(fetch_handler(docs))):
+        r1 = await QuizSessionScoringService.submit_answer(
+            db_session, session.session_id, 1, make_request("q0", [1]), key
+        )
+        # Session is now SUBMITTED; the retry must NOT raise 409.
+        r2 = await QuizSessionScoringService.submit_answer(
+            db_session, session.session_id, 1, make_request("q0", [1]), key
+        )
+
+    assert r1.session_status == QuizSessionStatus.SUBMITTED
+    assert r2.session_status == QuizSessionStatus.SUBMITTED
+    assert r2.is_correct == r1.is_correct
+    assert r2.points_earned == r1.points_earned
+    assert r2.question is None
+
+
+@pytest.mark.asyncio
+async def test_advance_index_prevents_resubmitting_same_question(db_session):
+    """After a normal submit the index advances, so replaying the same question
+    mismatches the current one and is rejected (422) rather than double-scored."""
+    docs = [question_doc(0), question_doc(1)]
+    session = await seed_session(db_session, ["q0", "q1"])
+
+    with patch(SCORING_CLIENT, return_value=mock_question_client(fetch_handler(docs))):
+        await QuizSessionScoringService.submit_answer(
+            db_session, session.session_id, 1, make_request("q0", [1]), None
+        )
+        with pytest.raises(QuizSessionError) as exc_info:
+            await QuizSessionScoringService.submit_answer(
+                db_session, session.session_id, 1, make_request("q0", [1]), None
+            )
+
+    assert exc_info.value.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_unique_constraint_blocks_double_score_at_same_index(db_session):
+    """Durable backstop: the (session_id, question_index) unique constraint
+    rejects a second answer row for the same question, covering the concurrent /
+    keyless / no-lock (SQLite) case the row lock cannot."""
+    from sqlalchemy.exc import IntegrityError
+
+    from src.repositories.session_answer_repository import SessionAnswerRepository
+
+    session = await seed_session(db_session, ["q0", "q1"])
+    common = dict(
+        session_id=session.session_id,
+        question_id="q0",
+        question_index=0,
+        submitted_answers=[1],
+        is_correct=True,
+        points_earned=1.0,
+    )
+    SessionAnswerRepository.add(db_session, **common)
+    await db_session.commit()
+
+    SessionAnswerRepository.add(db_session, **common)
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
+    await db_session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_qms_unreachable_raises_503(db_session):
+    """A network failure reaching QMS while scoring surfaces as 503."""
+    session = await seed_session(db_session, ["q0", "q1"])
+
+    async def _raise(url, params=None, headers=None):
+        raise httpx.RequestError("connection refused")
+
+    with patch(SCORING_CLIENT, return_value=mock_question_client(_raise)):
+        with pytest.raises(QuizSessionError) as exc_info:
+            await QuizSessionScoringService.submit_answer(
+                db_session, session.session_id, 1, make_request("q0", [1]), None
+            )
+
+    assert exc_info.value.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_qms_error_status_raises_502(db_session):
+    """A non-200 from QMS while scoring surfaces as 502."""
+    session = await seed_session(db_session, ["q0", "q1"])
+
+    async def _error(url, params=None, headers=None):
+        return make_response(502, None)
+
+    with patch(SCORING_CLIENT, return_value=mock_question_client(_error)):
+        with pytest.raises(QuizSessionError) as exc_info:
+            await QuizSessionScoringService.submit_answer(
+                db_session, session.session_id, 1, make_request("q0", [1]), None
+            )
+
+    assert exc_info.value.status_code == 502
