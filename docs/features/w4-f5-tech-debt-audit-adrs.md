@@ -36,6 +36,15 @@ prioritized repayment backlog.
 - Two ADRs are pre-determined by the spec (W4-F1 data access, W3-F2 scoring) —
   capture those decisions *as they are made* in the respective features rather
   than reconstructing them on Day 20.
+- **Debt-inventory seed from W3-F6:** legacy option-less `true_false`
+  question docs (pre-W2-F6 shape, `correct_answers: [true]`, no `options`
+  array) render as "No options available" in the `/take` TestRunner — the
+  legacy quiz page had a dedicated True/False widget; `/take` routes the type
+  to the options-based single-select (see
+  [w3-f6 Notes](w3-f6-playwright-e2e-smoke.md)). Fix is a bank data
+  migration/normalization or a true_false widget in
+  `frontend/src/components/take/`. Urgency: low — only stale local dev
+  volumes hold such docs; CI and fresh stacks never see them.
 - The existing `docs/FEATURE_STATUS.md` + `docs/features/` tracker is itself
   evidence for the narrative (what/why/how is already partly recorded per
   feature).

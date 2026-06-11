@@ -218,3 +218,88 @@ jobs:
       - name: Test
         working-directory: frontend
         run: pnpm test --if-present
+
+  # W3-F6: full-stack browser test. Sequential after the build jobs — it
+  # spends real minutes building/booting the whole compose stack, so it only
+  # runs once the cheap per-service gates are green. `always()` + explicit
+  # result checks let it run when an upstream job was skipped by the path
+  # filter (e.g. a frontend-only change still e2e-tests against the stack).
+  e2e:
+    name: E2E (Playwright + smoke)
+    needs: [changes, backend-build-test, frontend-build-test]
+    if: |
+      always() &&
+      (needs.changes.outputs.backend_any == 'true' || needs.changes.outputs.frontend == 'true') &&
+      needs.backend-build-test.result != 'failure' &&
+      needs.backend-build-test.result != 'cancelled' &&
+      needs.frontend-build-test.result != 'failure' &&
+      needs.frontend-build-test.result != 'cancelled'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare environment
+        run: cp .env.example .env
+
+      # nginx's TLS certs are generated locally and git-ignored; without them
+      # the nginx container exits and `--wait` never settles.
+      - name: Generate throwaway nginx certs
+        run: |
+          mkdir -p nginx/certs
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout nginx/certs/localhost.key \
+            -out nginx/certs/localhost.crt \
+            -subj "/CN=localhost"
+
+      - name: Start full stack
+        run: docker compose up -d --build --wait
+
+      # Mongo question bank is not auto-seeded; an empty bank 422s session
+      # minting. Then gate the browser run on every /health being green.
+      - name: Seed question bank
+        run: ./scripts/e2e-seed.sh
+
+      - name: Smoke test
+        run: ./scripts/smoke.sh
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm install
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright e2e
+        working-directory: frontend
+        run: pnpm test:e2e
+
+      # Distributed logs make cross-service failures traceable without
+      # re-running locally (spec step 5).
+      - name: Capture compose logs
+        if: always()
+        run: docker compose logs --no-color > e2e-run.log
+
+      - name: Upload e2e artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts
+          path: |
+            e2e-run.log
+            frontend/playwright-report/
+          if-no-files-found: ignore
+
+      - name: Tear down stack
+        if: always()
+        run: docker compose down -v --remove-orphans

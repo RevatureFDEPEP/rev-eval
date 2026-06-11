@@ -40,6 +40,14 @@ history, and per-entity aggregates.
   dedicated Postgres, Alembic) before these endpoints exist.
 - The shared-DB-vs-HTTP decision drives whether reporting even needs its own
   tables; make it in step 1 before writing queries.
+- **Rolled in from W3-F6:** session finalize never writes `test_submissions`
+  (the sessions/answers slice and the seeded submissions are parallel
+  systems), so a just-taken quiz shows no score anywhere — the Playwright
+  happy path had to drop its score-summary assertion (see
+  [w3-f6 Notes](w3-f6-playwright-e2e-smoke.md)). The step-1 ADR should settle
+  how scores become user-visible (read `sessions`/`answers` directly vs.
+  bridge finalize → `test_submissions` vs. a reporting-side mirror); W4-F2's
+  results page is then the score summary the W3-F6 spec asked for.
 
 ## Remaining
 

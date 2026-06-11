@@ -173,8 +173,11 @@ export default function AssociateDashboard() {
                 ) : (
                   assignedTests.slice(0, 3).map((test) => {
                     const isQuiz = test.test_type === TestType.QUIZ;
+                    // Quizzes run through the W3-F3/F4 TestRunner (server-minted
+                    // session, timer, autosave, submit-lock); interviews keep
+                    // the legacy flow.
                     const href = isQuiz
-                      ? `/participant/tests/take/mcq/${test.test_id}`
+                      ? `/take/${test.test_id}`
                       : `/participant/tests/take/interview/${test.test_id}`;
 
                     return (
