@@ -271,17 +271,21 @@ function enforceSingleCorrect(options: OptionFormValue[]): OptionFormValue[] {
 }
 
 function getDefaultValues(type: QuestionType): QuestionFormValues {
-  return {
+  const base: QuestionFormValues = {
     type,
     question_text: "",
     difficulty: "medium",
     skills: [],
     tags: "",
     answer_explanation: "",
-    options: createDefaultOptions(),
+    options: [],
     true_false_answer: undefined,
     sample_answer: "",
   };
+  if (type === "mcq" || type === "multi") {
+    return { ...base, options: createDefaultOptions() };
+  }
+  return base;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -395,7 +399,7 @@ export function QuestionAuthorForm({ initialType }: QuestionAuthorFormProps) {
     mode: "onBlur",
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append } = useFieldArray({
     control: form.control,
     name: "options",
   });
@@ -480,8 +484,8 @@ export function QuestionAuthorForm({ initialType }: QuestionAuthorFormProps) {
   };
 
   const removeOption = (index: number) => {
-    remove(index);
-    window.setTimeout(() => void form.trigger("options"), 0);
+    const current = form.getValues("options").filter((_, i) => i !== index);
+    form.setValue("options", current, { shouldValidate: true, shouldDirty: true });
   };
 
   const transformFormData = (values: QuestionFormValues): QuestionCreate => {
@@ -739,10 +743,10 @@ export function QuestionAuthorForm({ initialType }: QuestionAuthorFormProps) {
                                 <Checkbox
                                   checked={field.value}
                                   onCheckedChange={(checked) => {
-                                    field.onChange(checked === true);
-                                    window.setTimeout(
-                                      () => void form.trigger("options"),
-                                      0,
+                                    form.setValue(
+                                      `options.${index}.is_correct`,
+                                      checked === true,
+                                      { shouldValidate: true, shouldDirty: true },
                                     );
                                   }}
                                   className="mt-2"
