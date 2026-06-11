@@ -7,9 +7,16 @@ if TYPE_CHECKING:
 
 
 def score_question(
+    question_type: str,
     correct_answers: list[Any] | None,
     submitted_answers: list[Any],
 ) -> "ScoreResult":
+    """Score a single-answer question (mcq / true_false).
+
+    question_type is part of the shared scorer contract and lets this function
+    branch per type (e.g. true_false-specific normalization) as the taxonomy
+    grows; today mcq and true_false share the same set-equality rule.
+    """
     from src.scoring import ScoreResult
 
     if correct_answers is None:

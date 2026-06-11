@@ -1,4 +1,4 @@
-"""Partial-credit scoring for MULTI questions; no-op for TEXT."""
+"""Partial-credit scoring for MULTI questions (Jaccard similarity)."""
 
 from typing import TYPE_CHECKING, Any
 
@@ -11,12 +11,13 @@ def score_question(
     correct_answers: list[Any] | None,
     submitted_answers: list[Any],
 ) -> "ScoreResult":
-    from src.scoring import ScoreResult
+    """Score a multi-select question with Jaccard partial credit.
 
-    if question_type == "text":
-        return ScoreResult(
-            is_correct=False, points_earned=0.0, requires_manual_review=True
-        )
+    question_type is part of the shared scorer contract (mirrors exact_match);
+    today only `multi` routes here, but the param keeps the door open for other
+    set-overlap types without a signature change.
+    """
+    from src.scoring import ScoreResult
 
     # MULTI: Jaccard similarity between correct and submitted sets.
     correct = set(map(str, correct_answers or []))

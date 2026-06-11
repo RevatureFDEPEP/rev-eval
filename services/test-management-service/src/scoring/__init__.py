@@ -17,9 +17,18 @@ def score(
     correct_answers: list[Any] | None,
     submitted_answers: list[Any],
 ) -> ScoreResult:
-    """Dispatch to the appropriate scoring algorithm by question type."""
+    """Dispatch to the appropriate scoring algorithm by question type.
+
+    Unknown or human-graded types (text, or any type we don't auto-score) fall
+    through to manual review rather than being silently set-scored.
+    """
     if question_type in ("mcq", "true_false"):
-        return exact_match.score_question(correct_answers, submitted_answers)
-    return partial_credit.score_question(
-        question_type, correct_answers, submitted_answers
-    )
+        return exact_match.score_question(
+            question_type, correct_answers, submitted_answers
+        )
+    if question_type == "multi":
+        return partial_credit.score_question(
+            question_type, correct_answers, submitted_answers
+        )
+    # text and any unrecognized type cannot be auto-scored.
+    return ScoreResult(is_correct=False, points_earned=0.0, requires_manual_review=True)
