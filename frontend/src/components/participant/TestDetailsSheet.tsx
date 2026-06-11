@@ -12,6 +12,8 @@ import { getTestSessionBySubmission } from '@/lib/api/quiz-sessions';
 // Interview-transcript surface was removed in the PEP brownfield strip
 // (ai-interview-service is Phase 2). Candidates rebuild this on W3 D13–D14.
 interface InterviewTranscriptMessage {
+  role?: 'assistant' | 'user' | 'system' | string;
+  content?: string;
   speaker?: string;
   text?: string;
   timestamp?: string;
@@ -20,7 +22,14 @@ interface InterviewTranscriptMessage {
 interface InterviewTranscriptEvaluation {
   overall_score: number;
   score_breakdown: Record<string, number>;
-  skill_breakdown: Record<string, { score?: number }>;
+  skill_breakdown: Record<
+    string,
+    {
+      score: number;
+      proficiency_level?: string;
+      feedback?: string;
+    }
+  >;
   feedback?: string;
   strengths?: string[];
   improvements?: string[];
@@ -29,6 +38,7 @@ interface InterviewTranscriptEvaluation {
 }
 
 interface InterviewTranscript {
+  status?: string;
   messages: InterviewTranscriptMessage[];
   lambda_evaluation?: InterviewTranscriptEvaluation;
 }
@@ -95,6 +105,7 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingTranscript(true);
     setTranscriptError(null);
     getInterviewTranscript(submissionId)
@@ -115,6 +126,7 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingQuizSession(true);
     setQuizSessionError(null);
     getTestSessionBySubmission(submissionId)

@@ -62,15 +62,16 @@ export default function QuestionsPage() {
       setError(null);
       const data = await getQuestions();
       setQuestions(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to load questions:", err);
-      setError(err.message || "Failed to load questions");
+      setError(err instanceof Error ? err.message : "Failed to load questions");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadQuestions();
   }, [loadQuestions]);
 
@@ -276,7 +277,13 @@ export default function QuestionsPage() {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => router.push("/trainer/questions/create?type=mcq")}>
                 <div className="flex flex-col gap-1">
-                  <div className="font-medium">MCQ</div>
+                  <div className="font-medium">Single Choice</div>
+                  <div className="text-xs text-slate-500">Multiple choice with exactly one correct answer</div>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/trainer/questions/create?type=multi")}>
+                <div className="flex flex-col gap-1">
+                  <div className="font-medium">Multiple Choice</div>
                   <div className="text-xs text-slate-500">Multiple choice with one or more correct answers</div>
                 </div>
               </DropdownMenuItem>
@@ -365,7 +372,14 @@ export default function QuestionsPage() {
                         router.push("/trainer/questions/create?type=mcq")
                       }
                     >
-                      MCQ
+                      Single Choice
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        router.push("/trainer/questions/create?type=multi")
+                      }
+                    >
+                      Multiple Choice
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() =>
