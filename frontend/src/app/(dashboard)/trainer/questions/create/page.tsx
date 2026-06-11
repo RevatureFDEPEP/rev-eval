@@ -174,7 +174,7 @@ export default function CreateQuestionPage() {
 };
 
   const form = useForm<QuestionFormValues>({
-  resolver: zodResolver(getSchema() as z.ZodType<QuestionFormValues>),
+  resolver: zodResolver(getSchema() as any),
   defaultValues: getDefaultValues(),
 });
 
