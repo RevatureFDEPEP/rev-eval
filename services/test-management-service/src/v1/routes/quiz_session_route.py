@@ -30,7 +30,7 @@ from src.schemas.quiz_session_schema import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/test-sessions", tags=["quiz-sessions"])
 
-SESSION_TTL_HOURS = 2
+SESSION_TTL_SECONDS_DEFAULT = 7200  # 2-hour fallback when test has no duration
 
 
 def _sha256(token: str) -> str:
@@ -107,7 +107,8 @@ async def create_session(
     raw_token = secrets.token_urlsafe(32)
     token_hash = _sha256(raw_token)
     server_now = datetime.utcnow()
-    expires_at = server_now + timedelta(hours=SESSION_TTL_HOURS)
+    ttl_seconds = payload.duration_seconds or SESSION_TTL_SECONDS_DEFAULT
+    expires_at = server_now + timedelta(seconds=ttl_seconds)
 
     part_a_cfg = payload.part_a_config.model_dump() if payload.part_a_config else {"easy": 3, "medium": 4, "hard": 4}
     total_a = sum(part_a_cfg.values())

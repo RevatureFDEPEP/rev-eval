@@ -17,6 +17,7 @@ class QuizSessionCreate(BaseModel):
     user_id: int
     total_questions: Optional[int] = 20
     part_a_config: Optional[PartConfig] = None
+    duration_seconds: Optional[int] = None
 
 
 class PartData(BaseModel):
