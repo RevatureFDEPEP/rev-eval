@@ -42,12 +42,15 @@ async def create_session(
 async def submit_answer(
     session_id: str,
     request: AnswerSubmitRequest,
-    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=1),
     user_id: int = Depends(get_current_participant_id),
     db: AsyncSession = Depends(get_db),
 ):
     """Submit an answer for the current question, advance the session, and
-    return the next question (or completion state when all questions answered)."""
+    return the next question (or completion state when all questions answered).
+
+    A non-empty Idempotency-Key header is required so a retried submit replays
+    the original result instead of double-scoring (422 if missing or blank)."""
     try:
         return await QuizSessionScoringService.submit_answer(
             db, session_id, user_id, request, idempotency_key
