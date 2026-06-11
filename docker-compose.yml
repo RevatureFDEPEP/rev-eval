@@ -209,6 +209,33 @@ services:
       api-gateway:
         condition: service_healthy
 
+  reporting-and-analytics-service:
+    build:
+      context: ./services/reporting-and-analytics-service
+      dockerfile: Dockerfile
+    container_name: rev-eval-reporting
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_USERNAME: ${POSTGRES_USER:-root}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-root}
+      DB_NAME: ${POSTGRES_DB:-eval_ai_dev}
+      SERVICE_NAME: reporting-and-analytics-service
+      PORT: 8004
+      ALLOW_ORIGINS: http://localhost:3000
+      USER_SERVICE_URL: http://user-service:8002
+    ports:
+      - "8004:8004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
 volumes:
   postgres_data:
   mongo_data:
