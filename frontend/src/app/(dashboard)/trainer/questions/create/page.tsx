@@ -183,7 +183,8 @@ export default function CreateQuestionPage() {
 // Then update the form initialization
 const form = useForm<QuestionFormValues>({
   resolver: getResolverForSchema(getSchema()),
-  defaultValues: getDefaultValues(),
+  defaultValues: getDefaultValues() as QuestionFormValues,
+  mode: "onBlur",
 });
 
   const { fields, append, remove } = useFieldArray({
