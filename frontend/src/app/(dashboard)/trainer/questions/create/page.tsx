@@ -173,10 +173,10 @@ export default function CreateQuestionPage() {
   }
 };
 
-  const form = useForm<QuestionFormValues>({
-    resolver: zodResolver(getSchema()),
-    defaultValues: getDefaultValues(),
-  });
+  const form = useForm({
+  resolver: zodResolver(getSchema()),
+  defaultValues: getDefaultValues(),
+} as Parameters<typeof useForm>[0]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
