@@ -344,7 +344,18 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   }
 
   if (isNaN(submissionId)) {
-    notFound();
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Card className="max-w-md">
+          <CardContent className="pt-6 text-center">
+            <AlertCircle className="mx-auto mb-4 h-12 w-12 text-amber-500" />
+            <h2 className="mb-2 text-lg font-semibold">Missing submission ID</h2>
+            <p className="mb-4 text-sm text-slate-600">No valid submission was linked to this quiz URL.</p>
+            <Button onClick={() => router.push('/participant/tests')}>Back to Tests</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // ─── HANDLERS ────────────────────────────────────────────────────────────────

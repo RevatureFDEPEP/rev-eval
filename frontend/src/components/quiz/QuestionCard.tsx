@@ -15,8 +15,9 @@ import { MultiQuestion } from './MultiQuestion';
 import { TrueFalseQuestion } from './TrueFalseQuestion';
 import { cn } from '@/lib/utils';
 
-function assertNever(x: never): never {
-  throw new Error(`Unhandled question type: ${JSON.stringify(x)}`);
+function assertNever(x: never): null {
+  console.error(`Unknown question type: ${JSON.stringify(x)}`);
+  return null;
 }
 
 type QuestionResponse = number | number[] | boolean;
@@ -43,7 +44,8 @@ export function QuestionCard({
       case 'true_false':
         return { label: 'True or False', hint: 'Choose whether the statement is correct.' };
       default:
-        return assertNever(question.question_type);
+        assertNever(question.question_type);
+        return { label: 'Question', hint: '' };
     }
   };
 
