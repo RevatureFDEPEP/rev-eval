@@ -129,6 +129,34 @@ async def get_presigned_upload_url(
         ) from e
 
 
+# NOTE: declared BEFORE "/{id}" — otherwise the path parameter captures
+# "sample" and this endpoint becomes unreachable.
+@router.get(
+    "/sample",
+    response_model=list[QuestionResponse],
+    summary="Sample N random questions from the whole bank",
+    description="""
+    Return a random sample of questions drawn from the entire question bank
+    using MongoDB's ``$sample`` aggregation. Used internally by
+    test-management-service to seed a quiz session.
+
+    Sampling is **not** skill-filtered — it draws from all questions.
+    """,
+)
+async def sample_questions(
+    limit: int = Query(..., ge=1, le=500, description="Number of questions to sample"),
+):
+    """Return ``limit`` randomly sampled questions."""
+    try:
+        questions = await QuestionService.sample_questions(limit)
+        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while sampling questions: {str(e)}"
+        )
+
+
 @router.get(
     "/{id}",
     response_model=QuestionResponse,

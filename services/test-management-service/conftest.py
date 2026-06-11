@@ -29,6 +29,7 @@ async def db_session() -> AsyncSession:
     from src.db.session import Base
     from src.models.category import Category  # noqa: F401
     from src.models.category_skill import CategorySkill  # noqa: F401
+    from src.models.session import QuizSession  # noqa: F401
     from src.models.skill import Skill  # noqa: F401
     from src.models.test import Test  # noqa: F401
     from src.models.test_skill import TestSkill  # noqa: F401
