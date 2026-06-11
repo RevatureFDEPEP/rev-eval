@@ -38,6 +38,14 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str = "question-images"
     S3_REGION: str = "us-east-1"
     S3_PRESIGN_EXPIRY_SECONDS: int = 3600
+    # Browser-reachable endpoint used ONLY for signing pre-signed URLs.
+    # SigV4 binds the Host header into the signature, so URLs handed to the
+    # browser must be signed against a host the browser can resolve
+    # (localhost), while internal bucket/object ops keep using S3_ENDPOINT_URL
+    # (minio:9000) inside the compose network.
+    S3_PUBLIC_ENDPOINT_URL: str = "http://localhost:9000"
+    # Hard ceiling enforced server-side in the pre-signed POST policy.
+    S3_MAX_UPLOAD_BYTES: int = 5 * 1024 * 1024
 
     @property
     def mongo_url(self) -> str:

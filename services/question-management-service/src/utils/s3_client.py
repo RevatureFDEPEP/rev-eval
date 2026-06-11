@@ -20,10 +20,10 @@ from src.config.settings import settings
 logger = logging.getLogger(__name__)
 
 
-def _build_client():
+def _build_client(endpoint_url: str):
     return boto3.client(
         "s3",
-        endpoint_url=settings.S3_ENDPOINT_URL,
+        endpoint_url=endpoint_url,
         aws_access_key_id=settings.S3_ACCESS_KEY,
         aws_secret_access_key=settings.S3_SECRET_KEY,
         region_name=settings.S3_REGION,
@@ -31,7 +31,14 @@ def _build_client():
     )
 
 
-s3_client = _build_client()
+# Internal client: bucket/object operations from inside the compose network.
+s3_client = _build_client(settings.S3_ENDPOINT_URL)
+
+# Presign-only client: signs against the browser-reachable public endpoint.
+# SigV4 binds the Host header into the signature, so a URL signed by the
+# internal client (minio:9000) would fail when the browser PUTs/POSTs to it.
+# Presigning is an offline computation — this client never opens a connection.
+s3_presign_client = _build_client(settings.S3_PUBLIC_ENDPOINT_URL)
 
 
 def ensure_bucket(bucket_name: str | None = None) -> None:
@@ -56,7 +63,7 @@ def generate_presigned_put_url(
     bucket_name: str | None = None,
 ) -> str:
     """Generate a pre-signed URL that clients can PUT directly to."""
-    return s3_client.generate_presigned_url(
+    return s3_presign_client.generate_presigned_url(
         ClientMethod="put_object",
         Params={
             "Bucket": bucket_name or settings.S3_BUCKET_NAME,
@@ -67,13 +74,39 @@ def generate_presigned_put_url(
     )
 
 
+def generate_presigned_post(
+    key: str,
+    content_type: str,
+    max_bytes: int | None = None,
+    expires_in: int | None = None,
+    bucket_name: str | None = None,
+) -> dict:
+    """Generate a pre-signed POST policy for a direct browser upload.
+
+    Unlike a pre-signed PUT URL, the POST policy lets us enforce an upload
+    size ceiling server-side via content-length-range — the browser cannot
+    exceed it even if the client-side check is bypassed. Returns a dict with
+    ``url`` and the ``fields`` the client must include in a multipart POST.
+    """
+    return s3_presign_client.generate_presigned_post(
+        Bucket=bucket_name or settings.S3_BUCKET_NAME,
+        Key=key,
+        Fields={"Content-Type": content_type},
+        Conditions=[
+            {"Content-Type": content_type},
+            ["content-length-range", 1, max_bytes or settings.S3_MAX_UPLOAD_BYTES],
+        ],
+        ExpiresIn=expires_in or settings.S3_PRESIGN_EXPIRY_SECONDS,
+    )
+
+
 def generate_presigned_get_url(
     key: str,
     expires_in: int | None = None,
     bucket_name: str | None = None,
 ) -> str:
     """Generate a pre-signed URL for read-only access to an existing object."""
-    return s3_client.generate_presigned_url(
+    return s3_presign_client.generate_presigned_url(
         ClientMethod="get_object",
         Params={
             "Bucket": bucket_name or settings.S3_BUCKET_NAME,

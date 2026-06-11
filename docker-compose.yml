@@ -43,6 +43,9 @@ services:
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
+      # Allow the browser to POST uploads directly to MinIO from the frontend
+      # origin(s). Without this the pre-signed POST preflight fails.
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_CORS_ORIGINS:-http://localhost:3000}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -113,6 +116,8 @@ services:
       SERVICE_NAME: question-management-service
       PORT: 8003
       S3_ENDPOINT_URL: http://minio:9000
+      # Browser-reachable host used only for signing pre-signed upload/GET URLs.
+      S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-http://localhost:9000}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
       S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME:-question-images}

@@ -1,0 +1,4 @@
+# Dev/test dependencies — production requirements.txt intentionally excludes these.
+-r requirements.txt
+pytest>=8,<9
+pytest-cov>=5,<7
