@@ -39,6 +39,20 @@ class QuizSessionRepository:
         return result.scalars().first()
 
     @staticmethod
+    async def get_for_update(db: AsyncSession, session_id) -> Optional[QuizSession]:
+        """Fetch a session with a row-level write lock (SELECT ... FOR UPDATE).
+
+        Serializes concurrent answer submissions for the same session so
+        retries/parallel tabs queue instead of racing on current_index.
+        """
+        result = await db.execute(
+            select(QuizSession)
+            .where(QuizSession.session_id == session_id)
+            .with_for_update()
+        )
+        return result.scalars().first()
+
+    @staticmethod
     async def get_questions_for_session(
         db: AsyncSession, quiz_session_id: int
     ) -> List[QuizSessionQuestion]:

@@ -50,6 +50,8 @@ async def init_db():
         # Import all models here so they are registered with Base before
         # create_all runs. Without these explicit imports, table creation would
         # depend on the fragile side effect of route modules importing models.
+        import src.models.idempotency_key  # noqa: F401
+        import src.models.quiz_answer  # noqa: F401
         import src.models.quiz_session  # noqa: F401
         import src.models.skill  # noqa: F401
         import src.models.test  # noqa: F401

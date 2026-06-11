@@ -1,8 +1,8 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class QuizSessionCreate(BaseModel):
@@ -27,3 +27,26 @@ class QuizSessionStartResponse(BaseModel):
     question: QuizQuestionOut
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AnswerSubmit(BaseModel):
+    session_token: str
+    question_id: str
+    # Capped to bound payload size — far above any real option count (multi
+    # allows up to 10 options; true/false and single-select need 1).
+    answers: List[Union[int, bool, str]] = Field(..., max_length=50)
+
+
+class AnswerAck(BaseModel):
+    """Answer-submission acknowledgement.
+
+    Intentionally omits per-question correctness/score: that is recorded
+    server-side only so candidates cannot brute-force answers mid-test.
+    """
+
+    question_id: str
+    recorded: bool
+    current_index: int
+    status: str
+    finished: bool
+    next_question: Optional[QuizQuestionOut] = None
