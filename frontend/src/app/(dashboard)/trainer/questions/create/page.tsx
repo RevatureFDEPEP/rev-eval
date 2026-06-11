@@ -45,11 +45,15 @@ import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   createQuestion,
+  getPresignedUpload,
+  uploadToPresignedPost,
   QuestionCreate,
   QuestionType,
   getSkills,
   SkillInfo,
 } from "@/lib/api";
+import { imageFileSchema } from "@/lib/schemas/question-form.schema";
+import { ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 
 export default function CreateQuestionPage() {
@@ -59,6 +63,27 @@ export default function CreateQuestionPage() {
   const [error, setError] = useState<string | null>(null);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  const handleImageSelect = (file: File | null) => {
+    setImageError(null);
+    if (!file) {
+      setImageFile(null);
+      setImagePreview(null);
+      return;
+    }
+    const parsed = imageFileSchema.safeParse(file);
+    if (!parsed.success) {
+      setImageError(parsed.error.issues[0]?.message ?? "Invalid image");
+      setImageFile(null);
+      setImagePreview(null);
+      return;
+    }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
 
   const questionType = (searchParams.get("type") as QuestionType) || "mcq";
 
@@ -202,6 +227,14 @@ export default function CreateQuestionPage() {
       setSubmitting(true);
       setError(null);
       const data = transformFormData(values);
+
+      // Upload the diagram (if any) directly to MinIO before persisting, so
+      // the question is only created once its image key is known.
+      if (imageFile) {
+        const presigned = await getPresignedUpload(imageFile.type);
+        data.image_object_key = await uploadToPresignedPost(presigned, imageFile);
+      }
+
       await createQuestion(data);
       toast.success("Question created successfully!", {
         description: `"${values.question_text.slice(0, 50)}..." has been added to your question bank.`,
@@ -654,6 +687,53 @@ export default function CreateQuestionPage() {
                   </FormItem>
                 )}
               />
+            </CardContent>
+          </Card>
+
+          {/* Diagram / Screenshot (Optional) */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Diagram or Screenshot (Optional)</CardTitle>
+              <CardDescription>
+                Attach a .png or .jpg image (max 5MB) shown alongside the question
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {imagePreview ? (
+                <div className="space-y-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imagePreview}
+                    alt="Question diagram preview"
+                    className="max-h-64 rounded-lg border object-contain"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleImageSelect(null)}
+                    disabled={submitting}
+                  >
+                    <X className="mr-2 size-4" />
+                    Remove image
+                  </Button>
+                </div>
+              ) : (
+                <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-slate-50 p-8 text-center text-sm text-slate-500 hover:bg-slate-100">
+                  <ImagePlus className="size-6" />
+                  <span>Click to select a .png or .jpg image (max 5MB)</span>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    className="hidden"
+                    disabled={submitting}
+                    onChange={(e) => handleImageSelect(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+              )}
+              {imageError && (
+                <p className="text-sm font-medium text-destructive">{imageError}</p>
+              )}
             </CardContent>
           </Card>
 

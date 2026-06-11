@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.config.settings import settings
 from src.db.session import close_db, init_db
+from src.utils.s3_client import ensure_bucket
 from src.v1.routes.question_routes import router as question_router
 
 app = FastAPI(
@@ -34,6 +35,12 @@ def health():
 @app.on_event("startup")
 async def on_startup():
     await init_db()
+    # Best-effort bucket bootstrap — no `mc` init container exists. Non-fatal:
+    # if MinIO is briefly unavailable at boot, the first upload will surface it.
+    try:
+        ensure_bucket()
+    except Exception as e:
+        print(f"⚠️ MinIO bucket ensure failed (uploads may 500 until fixed): {e}")
 
 @app.on_event("shutdown")
 async def on_shutdown():

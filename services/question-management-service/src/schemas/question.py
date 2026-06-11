@@ -27,6 +27,9 @@ class QuestionCreate(BaseModel):
     difficulty: str | None = Field(default="medium", pattern="^(easy|medium|hard)$")
     skills: list[str] = Field(default_factory=list, max_length=20)
     tags: list[str] = Field(default_factory=list, max_length=30)
+    image_object_key: str | None = Field(
+        None, max_length=256, description="MinIO object key of an uploaded diagram/screenshot"
+    )
 
     @field_validator('question_text')
     @classmethod
@@ -189,6 +192,7 @@ class QuestionUpdate(BaseModel):
     difficulty: str | None = Field(None, pattern="^(easy|medium|hard)$")
     skills: list[str] | None = Field(None, max_length=20)
     tags: list[str] | None = Field(None, max_length=30)
+    image_object_key: str | None = Field(None, max_length=256)
 
     @field_validator('question_text')
     @classmethod
@@ -289,6 +293,11 @@ class QuestionResponse(BaseModel):
     difficulty: str | None = "medium"
     skills: list[str] = []
     tags: list[str] = []
+    image_object_key: str | None = None
+    image_url: str | None = Field(
+        None,
+        description="Pre-signed GET URL for the attached image (populated when image_object_key is set)",
+    )
     created_at: datetime
     updated_at: datetime
 
@@ -298,3 +307,12 @@ class QuestionResponse(BaseModel):
         json_encoders = {
             datetime: lambda v: v.isoformat()
         }
+
+
+class PresignedUploadResponse(BaseModel):
+    """Response for a pre-signed question-image upload policy."""
+    url: str = Field(..., description="MinIO endpoint the client POSTs the file to")
+    fields: dict = Field(..., description="Form fields the client must include in the multipart POST")
+    object_key: str = Field(..., description="Server-generated object key to store on the question")
+    max_bytes: int = Field(..., description="Maximum allowed upload size in bytes (enforced by the policy)")
+    expires_in: int = Field(..., description="Seconds until the policy expires")
