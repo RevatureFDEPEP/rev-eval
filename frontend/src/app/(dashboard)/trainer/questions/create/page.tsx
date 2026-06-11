@@ -174,7 +174,12 @@ export default function CreateQuestionPage() {
 };
 
   const form = useForm<QuestionFormValues>({
-  resolver: zodResolver(getSchema() as any),
+  resolver: zodResolver(
+    getSchema() as 
+      | typeof mcqSchema 
+      | typeof trueFalseSchema 
+      | typeof textSchema
+  ),
   defaultValues: getDefaultValues(),
 });
 
