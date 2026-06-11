@@ -9,7 +9,12 @@
 
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
-import { createSessionServer, ServerApiError } from '@/lib/api/server';
+import {
+  createSessionServer,
+  getCurrentUserServer,
+  ServerApiError,
+} from '@/lib/api/server';
+import { AuthProvider } from '@/lib/auth/AuthContext';
 import { TestRunner } from '@/components/quiz/TestRunner';
 import { SessionResponse } from '@/lib/api/types';
 
@@ -68,9 +73,13 @@ export default async function TakeTestPage({ params }: TakeTestPageProps) {
     throw e;
   }
 
+  const user = await getCurrentUserServer();
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
-      <TestRunner session={quizSession} />
+      <AuthProvider user={user}>
+        <TestRunner session={quizSession} />
+      </AuthProvider>
     </main>
   );
 }

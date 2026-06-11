@@ -5,6 +5,7 @@
  */
 import 'server-only';
 import { getSession } from '@/lib/session';
+import type { AuthUser } from '@/lib/auth/useAuth';
 import { SessionResponse, TrainerDashboardStats, TrainerTestInfo } from './types';
 
 const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://api-gateway:8000';
@@ -53,6 +54,31 @@ export async function getTrainerTestsServer(): Promise<TrainerTestInfo[]> {
     throw new ServerApiError(response.status, response.statusText, await response.text());
   }
   return response.json();
+}
+
+/**
+ * Fetch the authenticated user's identity server-side via a validated token
+ * call (GET /v1/api/auth/me — user-service verifies the Bearer). Returns the
+ * derived identity for server-seeding AuthContext; null if unauthenticated.
+ */
+export async function getCurrentUserServer(): Promise<AuthUser | null> {
+  let response: Response;
+  try {
+    response = await authedFetch('/v1/api/auth/me');
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+  const p = await response.json();
+  return {
+    id: p.id,
+    email: p.email,
+    firstName: p.first_name ?? undefined,
+    lastName: p.last_name ?? undefined,
+    fullName: p.full_name ?? undefined,
+    role: p.role,
+    organizationId: p.organization_id ?? undefined,
+  };
 }
 
 /**
