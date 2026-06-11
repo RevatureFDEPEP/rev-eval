@@ -129,10 +129,12 @@ export default function TrainerTestsPage() {
       }
     };
 
-    loadUser();
-    loadTests();
-    loadEvaluatedSubmissions();
-    loadGradedSubmissions();
+    Promise.all([
+      loadUser(),
+      loadTests(),
+      loadEvaluatedSubmissions(),
+      loadGradedSubmissions(),
+    ]).catch(console.error);
 
     return () => {
       cancelled = true;

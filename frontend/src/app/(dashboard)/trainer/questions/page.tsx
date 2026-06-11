@@ -73,7 +73,7 @@ export default function QuestionsPage() {
 
   useEffect(() => {
     loadQuestions();
-  }, []);
+  }, [loadQuestions]);
 
   // Get unique skills from all questions
   const allSkills = useMemo(() => {
