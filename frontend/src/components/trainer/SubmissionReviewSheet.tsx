@@ -141,6 +141,7 @@ export function SubmissionReviewSheet({
   useEffect(() => {
     const load = async () => {
       if (!submission || !open) {
+        await Promise.resolve();
         setDetails(null);
         setError(null);
         setTrainerScore('');
@@ -213,6 +214,7 @@ export function SubmissionReviewSheet({
   useEffect(() => {
     const handleOpenChange = async () => {
       if (!open) {
+        await Promise.resolve();
         setPlayingAudioIndex(null);
         audioPlayer.stop();
       }

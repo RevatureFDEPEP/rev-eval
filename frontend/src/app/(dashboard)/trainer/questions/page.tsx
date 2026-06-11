@@ -58,6 +58,7 @@ export default function QuestionsPage() {
   // Load questions
   const loadQuestions = useCallback(async () => {
     try {
+      await Promise.resolve();
       setLoading(true);
       setError(null);
       const data = await getQuestions();
@@ -72,7 +73,7 @@ export default function QuestionsPage() {
 
   useEffect(() => {
     loadQuestions();
-  }, [loadQuestions]);
+  }, []);
 
   // Get unique skills from all questions
   const allSkills = useMemo(() => {

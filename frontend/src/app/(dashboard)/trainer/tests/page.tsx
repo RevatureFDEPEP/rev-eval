@@ -59,6 +59,7 @@ export default function TrainerTestsPage() {
 
   const loadTests = useCallback(async () => {
     try {
+      await Promise.resolve();
       setLoadingTests(true);
       setTestsError(null);
       const data = await getTrainerTests();
@@ -74,6 +75,7 @@ export default function TrainerTestsPage() {
 
   const loadEvaluatedSubmissions = useCallback(async () => {
     try {
+      await Promise.resolve();
       setLoadingSubmissions(true);
       setSubmissionsError(null);
       const data = await getEvaluatedSubmissionsForTrainer();
@@ -89,6 +91,7 @@ export default function TrainerTestsPage() {
 
   const loadGradedSubmissions = useCallback(async () => {
     try {
+      await Promise.resolve();
       setLoadingGraded(true);
       setGradedError(null);
       const data = await getAllSubmissionsForTrainer();
@@ -108,6 +111,7 @@ export default function TrainerTestsPage() {
 
     const loadUser = async () => {
       try {
+        await Promise.resolve();
         setLoadingUser(true);
         const profile = await getCurrentUser();
         if (!cancelled) {
