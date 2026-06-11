@@ -134,37 +134,44 @@ export default function CreateQuestionPage() {
 
   // Get default values based on question type
   const getDefaultValues = (): QuestionFormValues => {
-    const base = {
-      question_text: "",
-      difficulty: undefined,
-      skills: [],
-      tags: [],
-      answer_explanation: "",
-    };
-
-    switch (questionType) {
-      case "mcq":
-        return {
-          ...base,
-          options: [
-            { text: "", is_correct: false },
-            { text: "", is_correct: false },
-          ],
-        };
-      case "true_false":
-        return {
-          ...base,
-          true_false_answer: false,
-        };
-      case "text":
-        return {
-          ...base,
-          sample_answer: "",
-        };
-      default:
-        return base;
-    }
+  const base = {
+    question_text: "",
+    difficulty: undefined,
+    skills: [],
+    tags: [],
+    answer_explanation: "",
   };
+
+  switch (questionType) {
+    case "mcq":
+      return {
+        ...base,
+        options: [
+          { text: "", is_correct: false },
+          { text: "", is_correct: false },
+        ],
+      };
+    case "true_false":
+      return {
+        ...base,
+        true_false_answer: false,
+      };
+    case "text":
+      return {
+        ...base,
+        sample_answer: "",
+      };
+    default:
+      // Return MCQ defaults as fallback to match QuestionFormValues type
+      return {
+        ...base,
+        options: [
+          { text: "", is_correct: false },
+          { text: "", is_correct: false },
+        ],
+      };
+  }
+};
 
   const form = useForm<QuestionFormValues>({
     resolver: zodResolver(getSchema()),
