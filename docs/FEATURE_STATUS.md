@@ -12,7 +12,20 @@ This file stays at summary level only.
 > start, advance, or finish a feature, update its detail file (check off steps,
 > add evidence) **and** its status row here, in the same PR as the code change.
 
-**Last assessed:** 2026-06-10 PM (**W3-F7 completed** — all nine review-remediation
+**Last assessed:** 2026-06-11 (**W3-F6 completed** — Week 3 slice closed on
+`richardh-feat-W3F6`: Playwright happy path drives login → dashboard → Start →
+count-agnostic answer loop → locked confirmation through the W3-F4 TestRunner
+(dashboard quiz links rewired from the legacy mcq page to `/take/[testId]`),
+green twice against the live compose stack; `scripts/smoke.sh` gates on every
+`/health` in dependency order (negative check verified) and
+`scripts/e2e-seed.sh` idempotently seeds the Mongo question bank; CI gains a
+sequential `e2e` job (throwaway nginx certs, `compose up -d --build --wait`,
+seed → smoke → Playwright) uploading `e2e-run.log` + the Playwright report as
+artifacts. Spec's score-summary assertion deliberately adapted: session
+finalize never writes `test_submissions` — gap documented in the feature doc
+for the W4 reporting slice; E2E also surfaced legacy option-less true_false
+bank docs rendering "No options available" in TestRunner, noted as a cleanup
+candidate. Frontend 130 units + lint/build green. Prior: **W3-F7 completed** — all nine review-remediation
 items landed on `richardh-feat-W3F7`, closing the W3-F4 re-open: the
 `useServerTimer` deadline is anchored once in a ref (countdown survives submit
 toggles; disable→re-enable regression specs added), `SUBMIT_RETRY` gives a
@@ -79,7 +92,7 @@ in dependency order (W3-F1 first, W3-F6 last).
 | W3-F3 | Test-taking frontend skeleton (`/take/[testId]`, AuthContext) | 13 | ✅ Completed | [w3-f3-test-taking-frontend-skeleton.md](features/w3-f3-test-taking-frontend-skeleton.md) |
 | W3-F4 | Auto-saving exam client (server timer, autosave, submit-lock) | 14 | ✅ Completed (re-open closed by W3-F7 item 1) | [w3-f4-autosave-exam-client.md](features/w3-f4-autosave-exam-client.md) |
 | W3-F5 | Integration tests vs. real Postgres/Mongo | 15 | ✅ Completed | [w3-f5-integration-tests-real-db.md](features/w3-f5-integration-tests-real-db.md) |
-| W3-F6 | Playwright E2E happy path + smoke script | 15 | ❌ Not Started | [w3-f6-playwright-e2e-smoke.md](features/w3-f6-playwright-e2e-smoke.md) |
+| W3-F6 | Playwright E2E happy path + smoke script | 15 | ✅ Completed | [w3-f6-playwright-e2e-smoke.md](features/w3-f6-playwright-e2e-smoke.md) |
 | W3-F7 | Week-3 review-findings remediation (trainer-defined) | — | ✅ Completed | [w3-f7-review-remediation.md](features/w3-f7-review-remediation.md) |
 
 ## Days 16–20 (Week 4 — reporting, RBAC & trainer dashboard)
@@ -106,7 +119,7 @@ Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 6. ~~**W2-F8 defect cleanup**~~ — done (PR #63: skills-500, user-service dual-engine, Pydantic-v2 sweep; gateway 204 was in W2-F7).
 7. **W3-F1 sessions backend** — strict prerequisite for the whole Week 3 slice; lands as Alembic `0004` on W2-F7's chain.
 8. **W3-F2 → W3-F3 → W3-F4** — the quiz-taking slice in dependency order; W3-F2 backend before the W3-F3/W3-F4 frontend that consumes it.
-9. **W3-F5 + W3-F6** — verification layer; do last, once the endpoints + UI exist to test. (W3-F5 done — PR #79.)
+9. ~~**W3-F5 + W3-F6**~~ — verification layer, done. (W3-F5 — PR #79; W3-F6 — branch `richardh-feat-W3F6`.)
 9a. ~~**W3-F7 review remediation before W3-F6**~~ — done (branch `richardh-feat-W3F7`): timer fix + reuse semantics landed before the Playwright happy path; the `/questions/sample` role gate previews W4-F3.
 10. **W2-M10 (if not already) → W4-F1 → W4-F3** — reporting backend then its RBAC gate; both extend the scaffolded reporting service.
 11. **W4-F2 → W4-F4** — results page first (builds `<ChartWrapper>`), then the trainer dashboard that reuses it; both need their W4 backends live.
