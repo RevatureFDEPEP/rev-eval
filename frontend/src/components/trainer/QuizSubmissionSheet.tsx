@@ -27,12 +27,12 @@ export function QuizSubmissionSheet({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!submission || !open) {
-      setSession(null);
-      setError(null);
-      return;
-    }
     const load = async () => {
+      if (!submission || !open) {
+        setSession(null);
+        setError(null);
+        return;
+      }
       setLoading(true);
       setError(null);
       try {

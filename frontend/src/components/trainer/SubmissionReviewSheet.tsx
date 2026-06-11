@@ -139,22 +139,22 @@ export function SubmissionReviewSheet({
   const audioPlayer = useAudioPlayer();
 
   useEffect(() => {
-    if (!submission || !open) {
-      setDetails(null);
-      setError(null);
-      setTrainerScore('');
-      setOverallFeedback('');
-      setStrengths('');
-      setImprovements('');
-      setTechnicalKnowledge('');
-      setProblemSolving('');
-      setCommunication('');
-      setCodeQuality('');
-      setEngagement('');
-      setSkillsAssessment({});
-      return;
-    }
     const load = async () => {
+      if (!submission || !open) {
+        setDetails(null);
+        setError(null);
+        setTrainerScore('');
+        setOverallFeedback('');
+        setStrengths('');
+        setImprovements('');
+        setTechnicalKnowledge('');
+        setProblemSolving('');
+        setCommunication('');
+        setCodeQuality('');
+        setEngagement('');
+        setSkillsAssessment({});
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
@@ -174,7 +174,7 @@ export function SubmissionReviewSheet({
       }
     };
     load();
-  }, [submission, open]);
+  }, [submission, open, readOnly]);
 
   const handlePlayAudio = async (audioUrl: string, messageIndex: number) => {
     // If already playing this audio, pause it
@@ -211,15 +211,17 @@ export function SubmissionReviewSheet({
   };
 
   useEffect(() => {
-    if (!open) {
-      setPlayingAudioIndex(null);
-      audioPlayer.stop();
-      return;
-    }
+    const handleOpenChange = async () => {
+      if (!open) {
+        setPlayingAudioIndex(null);
+        audioPlayer.stop();
+      }
+    };
+    handleOpenChange();
     return () => {
       audioPlayer.stop();
     };
-  }, [open]);
+  }, [open, audioPlayer]);
 
   const handleUseAIValue = (setter: (value: string) => void, value: string | string[] | undefined) => {
     if (Array.isArray(value)) {

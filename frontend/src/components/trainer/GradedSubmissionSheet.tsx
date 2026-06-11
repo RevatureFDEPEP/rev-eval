@@ -92,12 +92,12 @@ export function GradedSubmissionSheet({
   const audioPlayer = useAudioPlayer();
 
   useEffect(() => {
-    if (!submission || !open) {
-      setDetails(null);
-      setError(null);
-      return;
-    }
     const load = async () => {
+      if (!submission || !open) {
+        setDetails(null);
+        setError(null);
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
@@ -144,15 +144,17 @@ export function GradedSubmissionSheet({
   };
 
   useEffect(() => {
-    if (!open) {
-      setPlayingAudioIndex(null);
-      audioPlayer.stop();
-      return;
-    }
+    const handleOpenChange = async () => {
+      if (!open) {
+        setPlayingAudioIndex(null);
+        audioPlayer.stop();
+      }
+    };
+    handleOpenChange();
     return () => {
       audioPlayer.stop();
     };
-  }, [open, audioPlayer]);  // Added audioPlayer to dependency array
+  }, [open, audioPlayer]);
 
   if (!submission) return null;
 

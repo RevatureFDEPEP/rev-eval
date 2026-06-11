@@ -58,7 +58,8 @@ export function AssignTestModal({ tests, onSuccess, triggerClassName, defaultTes
   ).padStart(2, '0')}`;
 
   useEffect(() => {
-    const syncDefaultTest = () => {
+    const syncDefaultTest = async () => {
+      if (!open) return;
       if (defaultTestId) {
         setSelectedTestId(`${defaultTestId}`);
       }
@@ -67,31 +68,34 @@ export function AssignTestModal({ tests, onSuccess, triggerClassName, defaultTes
   }, [defaultTestId, open]);
 
   useEffect(() => {
-    if (!dueDate || !dueTime) {
-      return;
-    }
+    const validateDueTime = async () => {
+      if (!dueDate || !dueTime) {
+        return;
+      }
 
-    const current = new Date();
-    const isToday =
-      dueDate.getFullYear() === current.getFullYear() &&
-      dueDate.getMonth() === current.getMonth() &&
-      dueDate.getDate() === current.getDate();
+      const current = new Date();
+      const isToday =
+        dueDate.getFullYear() === current.getFullYear() &&
+        dueDate.getMonth() === current.getMonth() &&
+        dueDate.getDate() === current.getDate();
 
-    if (!isToday) {
-      return;
-    }
+      if (!isToday) {
+        return;
+      }
 
-    const [hours, minutes] = dueTime.split(':').map(Number);
-    if (Number.isNaN(hours) || Number.isNaN(minutes)) {
-      return;
-    }
+      const [hours, minutes] = dueTime.split(':').map(Number);
+      if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+        return;
+      }
 
-    const candidate = new Date(dueDate);
-    candidate.setHours(hours, minutes, 0, 0);
+      const candidate = new Date(dueDate);
+      candidate.setHours(hours, minutes, 0, 0);
 
-    if (candidate.getTime() <= current.getTime()) {
-      setDueTime('');
-    }
+      if (candidate.getTime() <= current.getTime()) {
+        setDueTime('');
+      }
+    };
+    validateDueTime();
   }, [dueDate, dueTime]);
 
   const handleSubmit = async () => {

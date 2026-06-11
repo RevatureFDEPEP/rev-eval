@@ -99,7 +99,7 @@ export default function QuestionsPage() {
     return { total, byType };
   }, [questions]);
 
-  const handleQuestionClick = (question: Question) => {
+  const handleQuestionClick = async (question: Question) => {
     setSelectedQuestion(question);
     setSheetOpen(true);
   };
@@ -322,7 +322,7 @@ export default function QuestionsPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setSkillFilter("all")}
+                onClick={async () => setSkillFilter("all")}
               >
                 Clear Filter
               </Button>
@@ -480,7 +480,7 @@ export default function QuestionsPage() {
         <QuestionDetailsSheet
           question={selectedQuestion}
           open={sheetOpen}
-          onOpenChange={(open) => {
+          onOpenChange={async (open) => {
             setSheetOpen(open);
             if (!open) {
               setSelectedQuestion(null);
