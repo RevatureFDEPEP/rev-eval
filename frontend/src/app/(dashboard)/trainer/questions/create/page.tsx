@@ -187,13 +187,17 @@ const createQuestionSchema = (type: QuestionType) => {
   }
 };
 
-  const form = useMemo(() => 
+  const [form] = useState(() =>
     useForm<QuestionFormValues>({
       resolver: zodResolver(createQuestionSchema(questionType)),
       defaultValues: getDefaultValues(),
-    }),
-    [questionType]
+    })
   );
+
+  // Reset form when questionType changes
+  useEffect(() => {
+    form.reset(getDefaultValues());
+  }, [questionType, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
