@@ -174,17 +174,23 @@ export default function CreateQuestionPage() {
 };
 
 // Create a resolver function that returns the correct resolver based on the schema
-  const getResolverForSchema = (
-  schema: typeof mcqSchema | typeof trueFalseSchema | typeof textSchema
-) => {
-  return zodResolver(schema as z.ZodType<QuestionFormValues, z.ZodTypeDef, QuestionFormValues>);
+const getResolverForSchema = () => {
+  switch (questionType) {
+    case "mcq":
+      return zodResolver(mcqSchema);
+    case "true_false":
+      return zodResolver(trueFalseSchema);
+    case "text":
+      return zodResolver(textSchema);
+    default:
+      return zodResolver(mcqSchema);
+  }
 };
 
 // Then update the form initialization
 const form = useForm<QuestionFormValues>({
-  resolver: getResolverForSchema(getSchema()),
-  defaultValues: getDefaultValues() as QuestionFormValues,
-  mode: "onBlur",
+  resolver: getResolverForSchema(),
+  defaultValues: getDefaultValues(),
 });
 
   const { fields, append, remove } = useFieldArray({
