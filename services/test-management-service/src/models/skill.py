@@ -13,6 +13,9 @@ class Skill(Base):
     # Relationship to TestSkill association object
     test_skills = relationship("TestSkill", back_populates="skill", cascade="all, delete-orphan")
 
+    # Relationship to CategorySkill association object
+    category_skills = relationship("CategorySkill", back_populates="skill", cascade="all, delete-orphan")
+
     # Convenience read-only relationship to Tests
     tests = relationship("Test", secondary="test_skills", viewonly=True)
 
