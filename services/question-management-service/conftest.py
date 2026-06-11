@@ -1,8 +1,9 @@
 """Test configuration for question-management-service.
 
-Settings require a few env vars at import time (e.g. SERVICE_NAME). Set them
-here — conftest is imported before any test module — so importing the app code
-under test never fails on missing configuration.
+Lives at the service root so pytest (prepend import mode) puts this directory
+on sys.path, making `import src.*` resolve. Settings also require a few env
+vars at import time (e.g. SERVICE_NAME) — set them here, before any test module
+imports the app code, so importing under test never fails on missing config.
 """
 import os
 
