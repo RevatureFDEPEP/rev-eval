@@ -173,11 +173,15 @@ export default function CreateQuestionPage() {
   }
 };
 
-  const form = useForm<QuestionFormValues>({
-   resolver: zodResolver(
-     getSchema() as z.ZodType<QuestionFormValues>
-   ),
-   defaultValues: getDefaultValues(),
+// Create a resolver function that returns the correct resolver based on the schema
+  const getResolverForSchema = (schema: typeof mcqSchema | typeof trueFalseSchema | typeof textSchema) => {
+  return zodResolver(schema as z.ZodType<QuestionFormValues>);
+};
+
+// Then update the form initialization
+const form = useForm<QuestionFormValues>({
+  resolver: getResolverForSchema(getSchema()),
+  defaultValues: getDefaultValues(),
 });
 
   const { fields, append, remove } = useFieldArray({
