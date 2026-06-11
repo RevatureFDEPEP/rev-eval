@@ -367,6 +367,12 @@ class QuizSessionService:
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
+        # --- Expiry check ---
+        if datetime.utcnow() > session.expires_at:
+            session.status = SessionStatus.EXPIRED
+            await QuizSessionRepository.save(db, session)
+            raise HTTPException(status_code=410, detail="Session has expired")
+
         # --- Idempotency check ---
         if idempotency_key:
             incoming_hash = _sha256(idempotency_key)
@@ -511,6 +517,12 @@ class QuizSessionService:
         session = await QuizSessionRepository.get_by_id_for_update(db, session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
+
+        # --- Expiry check ---
+        if datetime.utcnow() > session.expires_at:
+            session.status = SessionStatus.EXPIRED
+            await QuizSessionRepository.save(db, session)
+            raise HTTPException(status_code=410, detail="Session has expired")
 
         # --- Idempotency check ---
         if idempotency_key:
