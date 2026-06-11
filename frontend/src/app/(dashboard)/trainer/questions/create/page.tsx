@@ -174,13 +174,10 @@ export default function CreateQuestionPage() {
 };
 
   const form = useForm<QuestionFormValues>({
-  resolver: zodResolver(
-    getSchema() as 
-      | typeof mcqSchema 
-      | typeof trueFalseSchema 
-      | typeof textSchema
-  ),
-  defaultValues: getDefaultValues(),
+   resolver: zodResolver(
+     getSchema() as z.ZodType<QuestionFormValues>
+   ),
+   defaultValues: getDefaultValues(),
 });
 
   const { fields, append, remove } = useFieldArray({
