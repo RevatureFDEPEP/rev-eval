@@ -27,6 +27,7 @@ async def db_session() -> AsyncSession:
     fixture lifetime — a fresh :memory: DB disappears when its connection closes.
     """
     from src.db.session import Base
+    from src.models.answer import QuizAnswer  # noqa: F401
     from src.models.category import Category  # noqa: F401
     from src.models.category_skill import CategorySkill  # noqa: F401
     from src.models.session import QuizSession  # noqa: F401
