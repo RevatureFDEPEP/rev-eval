@@ -5,6 +5,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from src.config.settings import settings
 from src.db.session import Base
 
 # Import all models so they register on Base.metadata for autogenerate.
@@ -26,8 +27,14 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    """Resolve the database URL from the environment, coerced to an async driver."""
-    url = os.getenv("DATABASE_URL", "postgresql://localhost/dev")
+    """Resolve the database URL, coerced to an async driver.
+
+    Mirrors src/db/session.py: prefer an explicit DATABASE_URL, else build from
+    the DB_* settings (how the service is actually configured in docker-compose,
+    where DATABASE_URL is unset). Without this fallback alembic defaulted to
+    localhost and could not reach the `postgres` container at boot.
+    """
+    url = os.getenv("DATABASE_URL") or settings.SQLALCHEMY_DATABASE_URL
     if url.startswith("postgresql://"):
         return url.replace("postgresql://", "postgresql+asyncpg://")
     if url.startswith("postgresql+psycopg2://"):
