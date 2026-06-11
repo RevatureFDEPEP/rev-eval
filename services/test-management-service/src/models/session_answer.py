@@ -53,5 +53,5 @@ class SessionAnswer(Base):
     points_earned = Column(Float, nullable=False)
     max_points = Column(Float, nullable=False, default=1.0)
     requires_manual_review = Column(Boolean, nullable=False, default=False)
-    idempotency_key = Column(String(64), nullable=True, index=True)
+    idempotency_key = Column(String(64), nullable=False, index=True)
     created_at = Column(DateTime, default=_utcnow)

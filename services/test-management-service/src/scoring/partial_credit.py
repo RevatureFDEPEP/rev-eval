@@ -28,6 +28,9 @@ def score_question(
         return ScoreResult(is_correct=False, points_earned=0.0)
 
     jaccard = len(correct & submitted) / len(union)
+    # Grading precision: partial credit is rounded to 4 decimal places. This is
+    # the contract downstream reporting (W4-F1) should aggregate against — change
+    # it deliberately, as it sets the floor for score reproducibility.
     return ScoreResult(
         is_correct=(jaccard == 1.0),
         points_earned=round(jaccard, 4),

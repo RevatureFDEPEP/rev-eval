@@ -110,7 +110,7 @@ async def test_happy_path_advances_index(db_session):
 
     with patch(SCORING_CLIENT, return_value=mock_question_client(fetch_handler(docs))):
         result = await QuizSessionScoringService.submit_answer(
-            db_session, session.session_id, 1, make_request("q0", [1]), None
+            db_session, session.session_id, 1, make_request("q0", [1]), "idem-happy-01"
         )
 
     assert result.is_correct is True
@@ -130,7 +130,7 @@ async def test_final_answer_submits_session(db_session):
 
     with patch(SCORING_CLIENT, return_value=mock_question_client(fetch_handler(docs))):
         result = await QuizSessionScoringService.submit_answer(
-            db_session, session.session_id, 1, make_request("q0", [1]), None
+            db_session, session.session_id, 1, make_request("q0", [1]), "idem-final-01"
         )
 
     assert result.session_status == QuizSessionStatus.SUBMITTED
@@ -149,7 +149,7 @@ async def test_wrong_answer_scores_zero(db_session):
 
     with patch(SCORING_CLIENT, return_value=mock_question_client(fetch_handler(docs))):
         result = await QuizSessionScoringService.submit_answer(
-            db_session, session.session_id, 1, make_request("q0", [2]), None
+            db_session, session.session_id, 1, make_request("q0", [2]), "idem-wrong-01"
         )
 
     assert result.is_correct is False
@@ -281,7 +281,7 @@ async def test_text_question_advances_with_manual_review(db_session):
             session.session_id,
             1,
             make_request("qt0", ["Recursion is when a function calls itself"]),
-            None,
+            "idem-text-01",
         )
 
     assert result.points_earned == 0.0
@@ -324,11 +324,17 @@ async def test_advance_index_prevents_resubmitting_same_question(db_session):
 
     with patch(SCORING_CLIENT, return_value=mock_question_client(fetch_handler(docs))):
         await QuizSessionScoringService.submit_answer(
-            db_session, session.session_id, 1, make_request("q0", [1]), None
+            db_session, session.session_id, 1, make_request("q0", [1]), "idem-adv-01"
         )
+        # A fresh key (so it is not an idempotent replay) still mismatches the
+        # now-advanced current_index and is rejected.
         with pytest.raises(QuizSessionError) as exc_info:
             await QuizSessionScoringService.submit_answer(
-                db_session, session.session_id, 1, make_request("q0", [1]), None
+                db_session,
+                session.session_id,
+                1,
+                make_request("q0", [1]),
+                "idem-adv-02",
             )
 
     assert exc_info.value.status_code == 422
@@ -338,7 +344,9 @@ async def test_advance_index_prevents_resubmitting_same_question(db_session):
 async def test_unique_constraint_blocks_double_score_at_same_index(db_session):
     """Durable backstop: the (session_id, question_index) unique constraint
     rejects a second answer row for the same question, covering the concurrent /
-    keyless / no-lock (SQLite) case the row lock cannot."""
+    no-lock (SQLite) case the row lock cannot. The two writes carry *different*
+    idempotency keys, so the rejection comes from the question_index constraint
+    rather than the idempotency one."""
     from sqlalchemy.exc import IntegrityError
 
     from src.repositories.session_answer_repository import SessionAnswerRepository
@@ -352,10 +360,10 @@ async def test_unique_constraint_blocks_double_score_at_same_index(db_session):
         is_correct=True,
         points_earned=1.0,
     )
-    SessionAnswerRepository.add(db_session, **common)
+    SessionAnswerRepository.add(db_session, **common, idempotency_key="idem-dup-01")
     await db_session.commit()
 
-    SessionAnswerRepository.add(db_session, **common)
+    SessionAnswerRepository.add(db_session, **common, idempotency_key="idem-dup-02")
     with pytest.raises(IntegrityError):
         await db_session.commit()
     await db_session.rollback()
