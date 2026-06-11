@@ -5,7 +5,7 @@
  */
 import 'server-only';
 import { getSession } from '@/lib/session';
-import { TrainerDashboardStats, TrainerTestInfo } from './types';
+import { SessionResponse, TrainerDashboardStats, TrainerTestInfo } from './types';
 
 const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://api-gateway:8000';
 
@@ -20,17 +20,21 @@ export class ServerApiError extends Error {
   }
 }
 
-async function authedFetch(path: string): Promise<Response> {
+async function authedFetch(
+  path: string,
+  init?: { method?: string; body?: unknown },
+): Promise<Response> {
   const session = await getSession();
   if (!session) {
     throw new ServerApiError(401, 'Unauthorized', { error: 'No session cookie' });
   }
   return fetch(`${API_GATEWAY_URL}${path}`, {
-    method: 'GET',
+    method: init?.method ?? 'GET',
     headers: {
       Authorization: `Bearer ${session.token}`,
       'Content-Type': 'application/json',
     },
+    body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
     cache: 'no-store',
   });
 }
@@ -45,6 +49,21 @@ export async function getTrainerDashboardStatsServer(): Promise<TrainerDashboard
 
 export async function getTrainerTestsServer(): Promise<TrainerTestInfo[]> {
   const response = await authedFetch('/v1/api/dashboard/trainer/tests');
+  if (!response.ok) {
+    throw new ServerApiError(response.status, response.statusText, await response.text());
+  }
+  return response.json();
+}
+
+/**
+ * Mint a quiz session for the given test, server-side, so the first question is
+ * in the initial HTML (no client spinner). POST /v1/api/sessions (W3-F1).
+ */
+export async function createSessionServer(testId: number): Promise<SessionResponse> {
+  const response = await authedFetch('/v1/api/sessions', {
+    method: 'POST',
+    body: { test_id: testId },
+  });
   if (!response.ok) {
     throw new ServerApiError(response.status, response.statusText, await response.text());
   }
