@@ -3,6 +3,9 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+days_6_10_features.md
+days_11_15_features.md
+
 # C extensions
 *.so
 

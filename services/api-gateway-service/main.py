@@ -5,6 +5,7 @@ import httpx
 import uvicorn
 import re
 import logging
+import uuid
 from os import getenv
 from typing import Optional, Dict
 from dotenv import load_dotenv
@@ -47,6 +48,7 @@ ROUTES = [
     {"pattern": r"^/v1/api/tests(/.*)?$", "service": "test-management-service"},
     {"pattern": r"^/v1/api/submissions(/.*)?$", "service": "test-management-service"},
     {"pattern": r"^/v1/api/skills(/.*)?$", "service": "test-management-service"},
+    {"pattern": r"^/v1/api/sessions(/.*)?$", "service": "test-management-service"},
     {"pattern": r"^/v1/api/questions(/.*)?$", "service": "question-management-service"},
 ]
 
@@ -200,6 +202,14 @@ async def smart_gateway(
             headers.pop('content-length', None)
             headers.pop('x-forwarded-proto', None)
             headers.pop('x-forwarded-scheme', None)
+
+            # Mint a correlation ID if the client did not supply one, then
+            # ensure it is forwarded to every downstream service so the full
+            # hop chain is traceable in logs.
+            if not headers.get('x-correlation-id'):
+                headers['x-correlation-id'] = str(uuid.uuid4())
+            correlation_id = headers['x-correlation-id']
+            logger.info(f"🔗 Correlation-ID: {correlation_id}")
 
             # Add user context headers for downstream services
             headers = add_user_context_headers(headers, user_context)

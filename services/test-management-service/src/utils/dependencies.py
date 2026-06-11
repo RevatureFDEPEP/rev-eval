@@ -10,17 +10,21 @@ from typing import Any, Dict, Optional
 import httpx
 from fastapi import Depends, Header, HTTPException, status
 
+from src.utils.http_client import call_service
+
 
 async def get_current_user_from_headers(
     x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
     x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
     x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+    x_correlation_id: Optional[str] = Header(None, alias="X-Correlation-ID"),
 ) -> Dict[str, Any]:
     """
     Resolve the authenticated user from gateway-supplied headers.
 
     Prefers X-User-Id (database PK) for lookup; falls back to X-User-Email
-    when only the email header is present.
+    when only the email header is present. Propagates X-Correlation-ID to the
+    user-service call so the hop is traceable.
     """
     if not x_user_id and not x_user_email:
         raise HTTPException(
@@ -36,12 +40,17 @@ async def get_current_user_from_headers(
         endpoint = f"{user_service_url}/v1/api/users/by-email/{x_user_email}"
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(endpoint)
-    except httpx.RequestError as e:
+        response = await call_service(
+            "GET",
+            endpoint,
+            correlation_id=x_correlation_id,
+            timeout=10.0,
+            max_retries=2,
+        )
+    except httpx.RequestError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Cannot connect to user-service: {e}",
+            detail=f"Cannot connect to user-service: {exc}",
         )
 
     if response.status_code == 200:
