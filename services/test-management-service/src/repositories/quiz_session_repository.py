@@ -65,6 +65,11 @@ class QuizSessionRepository:
         session.status = status
         if status == QuizSessionStatus.SUBMITTED:
             session.submitted_at = datetime.now(UTC).replace(tzinfo=None)
+        elif status == QuizSessionStatus.EXPIRED and session.submitted_at is None:
+            # Finalize an expired attempt at its timeout (not at detection time),
+            # so any already-scored answers count as a terminal result. EXPIRED
+            # stays distinct from SUBMITTED; submitted_at is the "finalized at" time.
+            session.submitted_at = session.expires_at
         await db.commit()
         await db.refresh(session)
         return session

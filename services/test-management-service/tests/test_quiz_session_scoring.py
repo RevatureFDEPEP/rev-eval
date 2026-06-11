@@ -197,6 +197,27 @@ async def test_expired_session_raises_409(db_session):
 
 
 @pytest.mark.asyncio
+async def test_expired_session_is_finalized_at_timeout(db_session):
+    """Option A: hitting an expired attempt finalizes it — status EXPIRED with
+    submitted_at set to the timeout moment, so partial answers count as a
+    terminal result for reporting (distinct from a real SUBMITTED)."""
+    session = await seed_session(
+        db_session, ["q0"], expires_delta=timedelta(seconds=-5)
+    )
+    expires_at = session.expires_at
+    assert session.submitted_at is None
+
+    with pytest.raises(QuizSessionError):
+        await QuizSessionScoringService.submit_answer(
+            db_session, session.session_id, 1, make_request("q0"), None
+        )
+
+    await db_session.refresh(session)
+    assert session.status == QuizSessionStatus.EXPIRED
+    assert session.submitted_at == expires_at
+
+
+@pytest.mark.asyncio
 async def test_submitted_session_raises_409(db_session):
     session = await seed_session(db_session, ["q0"], status=QuizSessionStatus.SUBMITTED)
 
