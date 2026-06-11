@@ -32,7 +32,10 @@ class QuizSessionRepository:
     @staticmethod
     async def get_by_submission_id(db: AsyncSession, submission_id: int) -> Optional[QuizSession]:
         result = await db.execute(
-            select(QuizSession).where(QuizSession.submission_id == submission_id)
+            select(QuizSession)
+            .where(QuizSession.submission_id == submission_id)
+            .order_by(QuizSession.created_at.desc())
+            .limit(1)
         )
         return result.scalar_one_or_none()
 

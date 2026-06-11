@@ -1,5 +1,5 @@
 # src/v1/routes/quiz_session_route.py
-from fastapi import APIRouter, Depends, HTTPException, Header, status
+from fastapi import APIRouter, Depends, Header, status
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
