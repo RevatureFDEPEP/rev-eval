@@ -174,8 +174,10 @@ export default function CreateQuestionPage() {
 };
 
 // Create a resolver function that returns the correct resolver based on the schema
-  const getResolverForSchema = (schema: typeof mcqSchema | typeof trueFalseSchema | typeof textSchema) => {
-  return zodResolver(schema as z.ZodType<QuestionFormValues>);
+  const getResolverForSchema = (
+  schema: typeof mcqSchema | typeof trueFalseSchema | typeof textSchema
+) => {
+  return zodResolver(schema as z.ZodType<QuestionFormValues, z.ZodTypeDef, QuestionFormValues>);
 };
 
 // Then update the form initialization
