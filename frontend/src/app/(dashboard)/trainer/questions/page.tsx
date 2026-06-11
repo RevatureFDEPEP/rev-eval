@@ -72,41 +72,44 @@ export default function QuestionsPage() {
   }, []);
 
   useEffect(() => {
-    loadQuestions();
+    (async () => {
+      await loadQuestions();
+    })();
   }, [loadQuestions]);
 
   // Get unique skills from all questions
   const allSkills = useMemo(() => {
     const skillSet = new Set<string>();
-    questions.forEach((q) => q.skills.forEach((s) => skillSet.add(s)));
+    questions.forEach((q: Question) => q.skills.forEach((s: string) => skillSet.add(s)));
     return Array.from(skillSet).sort();
   }, [questions]);
 
   // Filter questions by skill
   const filteredQuestions = useMemo(() => {
     if (skillFilter === "all") return questions;
-    return questions.filter((q) => q.skills.includes(skillFilter));
+    return questions.filter((q: Question) => q.skills.includes(skillFilter));
   }, [questions, skillFilter]);
 
   // Calculate stats
   const stats = useMemo(() => {
     const total = questions.length;
     const byType = {
-      mcq: questions.filter((q) => q.type === "mcq").length,
-      multi: questions.filter((q) => q.type === "multi").length,
-      true_false: questions.filter((q) => q.type === "true_false").length,
-      text: questions.filter((q) => q.type === "text").length,
+      mcq: questions.filter((q: Question) => q.type === "mcq").length,
+      multi: questions.filter((q: Question) => q.type === "multi").length,
+      true_false: questions.filter((q: Question) => q.type === "true_false").length,
+      text: questions.filter((q: Question) => q.type === "text").length,
     };
     return { total, byType };
   }, [questions]);
 
   const handleQuestionClick = async (question: Question) => {
+    await Promise.resolve();
     setSelectedQuestion(question);
     setSheetOpen(true);
   };
 
-  const handleQuestionDeleted = () => {
-    loadQuestions();
+  const handleQuestionDeleted = async () => {
+    await loadQuestions();
   };
 
   const getTypeColor = (type: QuestionType) => {
@@ -312,7 +315,7 @@ export default function QuestionsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Skills</SelectItem>
-                {allSkills.map((skill) => (
+                {allSkills.map((skill: string) => (
                   <SelectItem key={skill} value={skill}>
                     {skill}
                   </SelectItem>
@@ -323,7 +326,10 @@ export default function QuestionsPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={async () => setSkillFilter("all")}
+                onClick={async () => {
+                  await Promise.resolve();
+                  setSkillFilter("all");
+                }}
               >
                 Clear Filter
               </Button>
@@ -410,7 +416,7 @@ export default function QuestionsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredQuestions.map((question, index) => (
+                  {filteredQuestions.map((question: Question, index: number) => (
                     <TableRow
                       key={question.id || `question-${index}`}
                       onClick={() => handleQuestionClick(question)}
@@ -445,7 +451,7 @@ export default function QuestionsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {question.skills.slice(0, 2).map((skill, idx) => (
+                          {question.skills.slice(0, 2).map((skill: string, idx: number) => (
                             <Badge
                               key={`${question.id}-skill-${idx}`}
                               variant="outline"
@@ -482,6 +488,7 @@ export default function QuestionsPage() {
           question={selectedQuestion}
           open={sheetOpen}
           onOpenChange={async (open) => {
+            await Promise.resolve();
             setSheetOpen(open);
             if (!open) {
               setSelectedQuestion(null);

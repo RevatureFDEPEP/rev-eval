@@ -59,9 +59,10 @@ export default function TrainerTestsPage() {
 
   const loadTests = useCallback(async () => {
     try {
-      await Promise.resolve();
-      setLoadingTests(true);
-      setTestsError(null);
+      await Promise.resolve().then(() => {
+        setLoadingTests(true);
+        setTestsError(null);
+      });
       const data = await getTrainerTests();
       setTests(data);
     } catch (err: unknown) {
@@ -75,9 +76,10 @@ export default function TrainerTestsPage() {
 
   const loadEvaluatedSubmissions = useCallback(async () => {
     try {
-      await Promise.resolve();
-      setLoadingSubmissions(true);
-      setSubmissionsError(null);
+      await Promise.resolve().then(() => {
+        setLoadingSubmissions(true);
+        setSubmissionsError(null);
+      });
       const data = await getEvaluatedSubmissionsForTrainer();
       setSubmissions(data);
     } catch (err: unknown) {
@@ -91,9 +93,10 @@ export default function TrainerTestsPage() {
 
   const loadGradedSubmissions = useCallback(async () => {
     try {
-      await Promise.resolve();
-      setLoadingGraded(true);
-      setGradedError(null);
+      await Promise.resolve().then(() => {
+        setLoadingGraded(true);
+        setGradedError(null);
+      });
       const data = await getAllSubmissionsForTrainer();
       setGradedSubmissions(data);
     } catch (err: unknown) {
@@ -106,40 +109,41 @@ export default function TrainerTestsPage() {
   }, []);
 
   useEffect(() => {
-    if (authLoading || !user) return;
-    let cancelled = false;
+  if (authLoading || !user) return;
+  let cancelled = false;
 
-    const loadUser = async () => {
-      try {
-        await Promise.resolve();
-        setLoadingUser(true);
-        const profile = await getCurrentUser();
-        if (!cancelled) {
-          setCurrentUserId(profile.id);
-        }
-      } catch (err) {
-        console.error('Failed to load current user profile:', err);
-        if (!cancelled) {
-          setCurrentUserId(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingUser(false);
-        }
+  const loadData = async () => {
+    try {
+      // Load all data in parallel
+      const [profile] = await Promise.all([
+        getCurrentUser(),
+        getTrainerTests(),
+        getEvaluatedSubmissionsForTrainer(),
+        getAllSubmissionsForTrainer(),
+      ]);
+
+      // Only update state if not cancelled
+      if (!cancelled) {
+        setCurrentUserId(profile.id);
+        setLoadingUser(false);
+        setLoadingTests(false);
+        setLoadingSubmissions(false);
+        setLoadingGraded(false);
       }
-    };
+    } catch (err) {
+      console.error('Failed to load data:', err);
+      if (!cancelled) {
+        setLoadingUser(false);
+      }
+    }
+  };
 
-    Promise.all([
-      loadUser(),
-      loadTests(),
-      loadEvaluatedSubmissions(),
-      loadGradedSubmissions(),
-    ]).catch(console.error);
+  loadData();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [authLoading, user, loadTests, loadEvaluatedSubmissions, loadGradedSubmissions]);
+  return () => {
+    cancelled = true;
+  };
+}, [authLoading, user]);
 
   const testStats = useMemo(() => {
     const active = tests.filter((test) => test.active).length;
@@ -232,9 +236,8 @@ export default function TrainerTestsPage() {
     setSelectedSubmission(null);
   };
 
-  const handleReviewSuccess = () => {
-    loadEvaluatedSubmissions();
-    loadGradedSubmissions();
+  const handleReviewSuccess = async () => {
+    await Promise.all([loadEvaluatedSubmissions(), loadGradedSubmissions()]);
     handleReviewSheetClose();
   };
 
