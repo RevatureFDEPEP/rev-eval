@@ -15,6 +15,10 @@ import { MultiQuestion } from './MultiQuestion';
 import { TrueFalseQuestion } from './TrueFalseQuestion';
 import { cn } from '@/lib/utils';
 
+function assertNever(x: never): never {
+  throw new Error(`Unhandled question type: ${JSON.stringify(x)}`);
+}
+
 type QuestionResponse = number | number[] | boolean;
 
 interface QuestionCardProps {
@@ -39,7 +43,7 @@ export function QuestionCard({
       case 'true_false':
         return { label: 'True or False', hint: 'Choose whether the statement is correct.' };
       default:
-        return { label: 'Question', hint: '' };
+        return assertNever(question.question_type);
     }
   };
 
@@ -90,7 +94,7 @@ export function QuestionCard({
         );
 
       default:
-        return <div className="text-sm text-red-600">Unknown question type</div>;
+        return assertNever(question.question_type);
     }
   };
 
