@@ -154,7 +154,7 @@ export default function CreateQuestionPage() {
       case "true_false":
         return {
           ...base,
-          true_false_answer: undefined,
+          true_false_answer: false,
         };
       case "text":
         return {
