@@ -49,6 +49,12 @@ async def init_db():
     """
     try:
         # Import all models here so they are registered with Base
+        from src.models.category import Category  # noqa: F401
+        from src.models.category_skill import CategorySkill  # noqa: F401
+        from src.models.skill import Skill  # noqa: F401
+        from src.models.test import Test  # noqa: F401
+        from src.models.test_skill import TestSkill  # noqa: F401
+        from src.models.test_submission import TestSubmission  # noqa: F401
 
         # Create tables in async context
         async with engine.begin() as conn:
