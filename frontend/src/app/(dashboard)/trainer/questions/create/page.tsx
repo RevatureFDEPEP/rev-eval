@@ -173,23 +173,22 @@ export default function CreateQuestionPage() {
   }
 };
 
-// Create a resolver function that returns the correct resolver based on the schema
-const getResolverForSchema = () => {
-  switch (questionType) {
+// Create a discriminated union schema that handles all question types
+const createQuestionSchema = (type: QuestionType) => {
+  switch (type) {
     case "mcq":
-      return zodResolver(mcqSchema);
+      return mcqSchema;
     case "true_false":
-      return zodResolver(trueFalseSchema);
+      return trueFalseSchema;
     case "text":
-      return zodResolver(textSchema);
+      return textSchema;
     default:
-      return zodResolver(mcqSchema);
+      return mcqSchema;
   }
 };
 
-// Then update the form initialization
 const form = useForm<QuestionFormValues>({
-  resolver: getResolverForSchema(),
+  resolver: zodResolver(createQuestionSchema(questionType)),
   defaultValues: getDefaultValues(),
 });
 
