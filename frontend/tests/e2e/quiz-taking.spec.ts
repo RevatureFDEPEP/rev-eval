@@ -28,14 +28,24 @@ const CANDIDATE_PASSWORD = 'password123';
 const MAX_QUESTIONS = 40;
 
 /** Pick the first option of the live question (radio for mcq/true_false,
- *  checkbox for multi) — correctness doesn't matter for the happy path. */
-async function answerCurrentQuestion(page: Page): Promise<void> {
+ *  checkbox for multi) — correctness doesn't matter for the happy path.
+ *  Returns false when the question renders no options at all: legacy dev
+ *  banks contain option-less true_false docs (pre-W2-F6 shape) that the
+ *  TestRunner shows as "No options available"; the backend accepts an empty
+ *  submitted_answers list, so the loop submits those unanswered instead of
+ *  hanging. */
+async function answerCurrentQuestion(page: Page): Promise<boolean> {
   const radios = page.getByRole('radio');
   if ((await radios.count()) > 0) {
     await radios.first().click();
-    return;
+    return true;
   }
-  await page.getByRole('checkbox').first().click();
+  const checkboxes = page.getByRole('checkbox');
+  if ((await checkboxes.count()) > 0) {
+    await checkboxes.first().click();
+    return true;
+  }
+  return false;
 }
 
 test('candidate completes an assigned quiz end to end', async ({ page }) => {
@@ -48,11 +58,13 @@ test('candidate completes an assigned quiz end to end', async ({ page }) => {
   // 2. PARTICIPANT role lands on the participant dashboard.
   await page.waitForURL('**/participant/dashboard', { timeout: 30_000 });
   await expect(
-    page.getByRole('heading', { name: /upcoming tests/i }),
+    page.getByRole('heading', { name: 'My Dashboard' }),
   ).toBeVisible();
 
   // 3. Start the first assigned quiz → the W3-F3/F4 TestRunner.
-  await page.getByRole('link', { name: 'Start Test' }).first().click();
+  const startLink = page.getByRole('link', { name: 'Start Test' }).first();
+  await expect(startLink).toBeVisible({ timeout: 30_000 });
+  await startLink.click();
   await page.waitForURL(/\/take\/\d+/, { timeout: 30_000 });
 
   // First question is server-rendered into the initial HTML, with the
@@ -65,11 +77,14 @@ test('candidate completes an assigned quiz end to end', async ({ page }) => {
 
   // 4. Answer-to-advance loop: the backend is strictly sequential, so each
   // submit either appends the next question or finalizes the session.
+  let answeredCount = 0;
   for (let i = 0; i < MAX_QUESTIONS; i += 1) {
     await expect(submitButton).toBeEnabled();
     const isLast = (await submitButton.textContent())?.trim() === 'Submit Exam';
 
-    await answerCurrentQuestion(page);
+    if (await answerCurrentQuestion(page)) {
+      answeredCount += 1;
+    }
 
     if (isLast) {
       await submitButton.click();
@@ -81,6 +96,9 @@ test('candidate completes an assigned quiz end to end', async ({ page }) => {
     // Advance is confirmed by the counter moving on (e.g. 3 of 20 → 4 of 20).
     await expect(counter).not.toHaveText(before, { timeout: 30_000 });
   }
+  // The run must have genuinely exercised the option widgets, not just
+  // submitted empty answers past a malformed bank.
+  expect(answeredCount).toBeGreaterThan(0);
 
   // 5. Locked confirmation replaces the exam UI: no answer inputs remain.
   const confirmation = page.getByTestId('exam-confirmation');
