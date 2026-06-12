@@ -17,13 +17,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.settings import settings
-from src.models.quiz_session import QuizSessionStatus
+from src.models.quiz_session import QuizSession, QuizSessionStatus
 from src.models.test import TestType
 from src.repositories.quiz_session_repository import QuizSessionRepository
 from src.repositories.skill_repository import SkillRepository
 from src.repositories.test_repository import TestRepository
 from src.repositories.test_skill_repository import TestSkillRepository
 from src.schemas.quiz_session_schema import (
+    DraftSaveResponse,
     ParticipantQuestion,
     SessionCreateResponse,
     SessionStateResponse,
@@ -115,6 +116,49 @@ class QuizSessionService:
         return response.json()
 
     @staticmethod
+    async def _load_owned_session(
+        db: AsyncSession, session_id: str, user_id: int
+    ) -> tuple[QuizSession, datetime]:
+        """Load a session for its owner, applying lazy expiry.
+
+        Shared by get_session and save_draft: 404 if missing, 403 if not the
+        owner, and an ACTIVE-but-past session is flipped to EXPIRED so callers
+        see a consistent terminal state. Returns the (possibly transitioned)
+        session and the server `now` used for the expiry check.
+        """
+        session = await QuizSessionRepository.get_by_id(db, session_id)
+        if not session:
+            raise ValueError("Session not found")
+        if session.user_id != user_id:
+            raise QuizSessionError("Not authorized for this session", status_code=403)
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        if session.status == QuizSessionStatus.ACTIVE and session.expires_at <= now:
+            session = await QuizSessionRepository.set_status(
+                db, session, QuizSessionStatus.EXPIRED
+            )
+        return session, now
+
+    @staticmethod
+    def _base_response_fields(
+        session: QuizSession, question: ParticipantQuestion, now: datetime
+    ) -> dict:
+        """Common SessionBaseResponse fields built from a session row + question.
+
+        Single source of truth so the four response sites (fresh/resume/race
+        create + get_session) can't drift as fields are added."""
+        return {
+            "session_id": session.session_id,
+            "status": session.status,
+            "server_now": now,
+            "expires_at": session.expires_at,
+            "total_questions": len(session.question_ids),
+            "current_index": session.current_index,
+            "question": question,
+            "draft_answers": session.draft_answers,
+        }
+
+    @staticmethod
     async def create_session(
         db: AsyncSession, test_id: int, user_id: int
     ) -> SessionCreateResponse:
@@ -143,14 +187,8 @@ class QuizSessionService:
                 )
                 question = _participant_question(raw, existing.current_index)
                 return SessionCreateResponse(
-                    session_id=existing.session_id,
+                    **QuizSessionService._base_response_fields(existing, question, now),
                     session_token=existing.session_token,
-                    status=existing.status,
-                    server_now=now,
-                    expires_at=existing.expires_at,
-                    total_questions=len(existing.question_ids),
-                    current_index=existing.current_index,
-                    question=question,
                 )
 
         skill_names = await QuizSessionService._get_skill_names(db, test_id)
@@ -203,44 +241,23 @@ class QuizSessionService:
             )
             question = _participant_question(raw, race_winner.current_index)
             return SessionCreateResponse(
-                session_id=race_winner.session_id,
+                **QuizSessionService._base_response_fields(race_winner, question, now),
                 session_token=race_winner.session_token,
-                status=race_winner.status,
-                server_now=now,
-                expires_at=race_winner.expires_at,
-                total_questions=len(race_winner.question_ids),
-                current_index=race_winner.current_index,
-                question=question,
             )
 
         question = _participant_question(sample[0], 0)
         return SessionCreateResponse(
-            session_id=session.session_id,
+            **QuizSessionService._base_response_fields(session, question, now),
             session_token=session.session_token,
-            status=session.status,
-            server_now=now,
-            expires_at=session.expires_at,
-            total_questions=len(question_ids),
-            current_index=0,
-            question=question,
         )
 
     @staticmethod
     async def get_session(
         db: AsyncSession, session_id: str, user_id: int
     ) -> SessionStateResponse:
-        session = await QuizSessionRepository.get_by_id(db, session_id)
-        if not session:
-            raise ValueError("Session not found")
-        if session.user_id != user_id:
-            raise QuizSessionError("Not authorized for this session", status_code=403)
-
-        now = datetime.now(UTC).replace(tzinfo=None)
-
-        if session.status == QuizSessionStatus.ACTIVE and session.expires_at <= now:
-            session = await QuizSessionRepository.set_status(
-                db, session, QuizSessionStatus.EXPIRED
-            )
+        session, now = await QuizSessionService._load_owned_session(
+            db, session_id, user_id
+        )
 
         if session.current_index >= len(session.question_ids):
             raise QuizSessionError(
@@ -252,11 +269,36 @@ class QuizSessionService:
         )
         question = _participant_question(raw, session.current_index)
         return SessionStateResponse(
+            **QuizSessionService._base_response_fields(session, question, now)
+        )
+
+    @staticmethod
+    async def save_draft(
+        db: AsyncSession,
+        session_id: str,
+        user_id: int,
+        answers: dict[str, list[int]],
+    ) -> DraftSaveResponse:
+        """Persist an advisory autosave snapshot without scoring or advancing.
+
+        Last-write-wins: overwrites draft_answers, leaves current_index/status
+        untouched. Rejects a non-active session with 409 (semantic — the client
+        halts rather than retrying) so autosave can't write to a finished or
+        expired attempt.
+        """
+        session, now = await QuizSessionService._load_owned_session(
+            db, session_id, user_id
+        )
+
+        if session.status != QuizSessionStatus.ACTIVE:
+            raise QuizSessionError(
+                "Session is not active; cannot save draft", status_code=409
+            )
+
+        session = await QuizSessionRepository.save_draft(db, session, answers)
+        return DraftSaveResponse(
             session_id=session.session_id,
             status=session.status,
-            server_now=now,
-            expires_at=session.expires_at,
-            total_questions=len(session.question_ids),
             current_index=session.current_index,
-            question=question,
+            saved_at=now,
         )

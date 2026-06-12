@@ -75,6 +75,17 @@ class QuizSessionRepository:
         return session
 
     @staticmethod
+    async def save_draft(
+        db: AsyncSession, session: QuizSession, answers: dict[str, list[int]]
+    ) -> QuizSession:
+        """Persist an advisory autosave snapshot (last-write-wins). Does not
+        touch current_index or status, so no refresh is needed — the caller only
+        reads the unchanged status/current_index it already holds."""
+        session.draft_answers = answers
+        await db.commit()
+        return session
+
+    @staticmethod
     async def lock_for_update(db: AsyncSession, session_id: str) -> QuizSession | None:
         """Load a session with SELECT FOR UPDATE (row-level lock on Postgres;
         silently ignored on SQLite used in hermetic tests)."""

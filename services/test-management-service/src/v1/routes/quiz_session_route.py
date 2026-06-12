@@ -3,6 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.session import get_db
 from src.schemas.quiz_session_schema import (
+    DraftSaveRequest,
+    DraftSaveResponse,
     SessionCreateRequest,
     SessionCreateResponse,
     SessionStateResponse,
@@ -54,6 +56,29 @@ async def submit_answer(
     try:
         return await QuizSessionScoringService.submit_answer(
             db, session_id, user_id, request, idempotency_key
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except QuizSessionError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail) from e
+
+
+@router.patch("/{session_id}/draft", response_model=DraftSaveResponse)
+async def save_draft(
+    session_id: str,
+    request: DraftSaveRequest,
+    user_id: int = Depends(get_current_participant_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Autosave the participant's in-progress selections (advisory snapshot).
+
+    Persists the answer map without scoring, advancing current_index, or
+    changing status. Last-write-wins (no Idempotency-Key). A non-active or
+    expired session is rejected with 409 so the client halts rather than
+    retrying."""
+    try:
+        return await QuizSessionService.save_draft(
+            db, session_id, user_id, request.answers
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
