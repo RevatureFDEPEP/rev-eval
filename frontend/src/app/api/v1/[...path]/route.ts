@@ -32,15 +32,35 @@ async function handleRequest(
     }
   }
 
+  // Forward client headers generically (Idempotency-Key, If-Match, etc.) rather
+  // than allow-listing one at a time. Drop hop-by-hop headers and every header we
+  // re-mint below — otherwise a forwarded copy plus our own value collide into a
+  // comma-joined header (e.g. "Content-Type: application/json, application/json",
+  // which the downstream no longer recognises as JSON).
+  const STRIP = new Set([
+    'host',
+    'connection',
+    'content-length',
+    'transfer-encoding',
+    'keep-alive',
+    'cookie',
+    'authorization', // replaced by the Bearer token
+    'content-type', // re-minted below
+    'x-correlation-id', // re-minted below
+  ]);
+  const headers: Record<string, string> = {};
+  request.headers.forEach((value, key) => {
+    if (!STRIP.has(key.toLowerCase())) headers[key] = value;
+  });
+  headers['Authorization'] = `Bearer ${session.token}`;
+  headers['Content-Type'] = 'application/json';
+  headers['X-Correlation-Id'] =
+    request.headers.get('x-correlation-id') ??
+    crypto.randomUUID().replace(/-/g, '');
+
   const response = await fetch(url.toString(), {
     method: request.method,
-    headers: {
-      Authorization: `Bearer ${session.token}`,
-      'Content-Type': 'application/json',
-      'X-Correlation-Id':
-        request.headers.get('x-correlation-id') ??
-        crypto.randomUUID().replace(/-/g, ''),
-    },
+    headers,
     body,
   });
 
