@@ -44,7 +44,7 @@ Default seeded users share password `password123` (see
 |------|---------|------|----|
 | `services/user-service/` | Auth + users (JWT + bcrypt) | 8002 | Postgres |
 | `services/question-management-service/` | Question bank + MinIO uploads | 8003 | Mongo |
-| `services/test-management-service/` | Tests, skills, submissions | 8001 | Postgres |
+| `services/test-management-service/` | Tests, skills, submissions, quiz sessions + scoring | 8001 | Postgres |
 | `services/api-gateway-service/` | JWT verify + request routing | 8000 | — |
 | `services/reporting-and-analytics-service/` | (empty — W2 D10 candidate task) | — | — |
 
