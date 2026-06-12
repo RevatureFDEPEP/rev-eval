@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -54,14 +54,7 @@ const baseSchema = {
     .array(z.string())
     .min(1, "Select at least one skill")
     .max(20, "Maximum 20 skills allowed"),
-  tags: z
-    .union([z.string(), z.array(z.string())])
-    .optional()
-    .transform((val: string | string[] | undefined) => {
-      if (Array.isArray(val)) return val;
-      if (typeof val === "string") return val ? val.split(",").map((t) => t.trim()) : [];
-      return [];
-    }),
+  tags: z.union([z.string(), z.array(z.string())]).optional(),
   answer_explanation: z.string().optional(),
 };
 
@@ -119,76 +112,59 @@ export default function CreateQuestionPage() {
   const questionType = (searchParams.get("type") as QuestionType) || "mcq";
 
   // Get default values based on question type
-  const getDefaultValues = (): QuestionFormValues => {
-  const base = {
-    question_text: "",
-    difficulty: undefined,
-    skills: [],
-    tags: [],
-    answer_explanation: "",
-  };
+  const getDefaultValues = useCallback(() => {
+    const base = {
+      question_text: "",
+      difficulty: undefined as "easy" | "medium" | "hard" | undefined,
+      skills: [] as string[],
+      tags: [] as string[],
+      answer_explanation: "",
+    };
 
-  switch (questionType) {
-    case "mcq":
-      return {
-        ...base,
-        options: [
-          { text: "", is_correct: false },
-          { text: "", is_correct: false },
-        ],
-      };
-    case "true_false":
-      return {
-        ...base,
-        true_false_answer: false,
-      };
-    case "text":
-      return {
-        ...base,
-        sample_answer: "",
-      };
-    default:
-      // Return MCQ defaults as fallback to match QuestionFormValues type
-      return {
-        ...base,
-        options: [
-          { text: "", is_correct: false },
-          { text: "", is_correct: false },
-        ],
-      };
-  }
-};
+    switch (questionType) {
+      case "mcq":
+        return {
+          ...base,
+          questionType: "mcq" as const,
+          options: [
+            { text: "", is_correct: false },
+            { text: "", is_correct: false },
+          ],
+        };
+      case "true_false":
+        return {
+          ...base,
+          questionType: "true_false" as const,
+          true_false_answer: false,
+        };
+      case "text":
+        return {
+          ...base,
+          questionType: "text" as const,
+          sample_answer: "",
+        };
+      default:
+        return {
+          ...base,
+          questionType: "mcq" as const,
+          options: [
+            { text: "", is_correct: false },
+            { text: "", is_correct: false },
+          ],
+        };
+    }
+  }, [questionType]);
 
 // Create a discriminated union schema that handles all question types
-/*
-const createQuestionSchema = (type: QuestionType) => {
-  switch (type) {
-    case "mcq":
-      return mcqSchema;
-    case "true_false":
-      return trueFalseSchema;
-    case "text":
-      return textSchema;
-    default:
-      return mcqSchema;
-  }
-};
-
-  const form = useForm<QuestionFormValues>({
-    resolver: zodResolver(createQuestionSchema(questionType)),
-    defaultValues: getDefaultValues(),
-  });
-  */
-
 const questionSchema = z.discriminatedUnion("questionType", [
   mcqSchema.extend({ questionType: z.literal("mcq") }),
   trueFalseSchema.extend({ questionType: z.literal("true_false") }),
   textSchema.extend({ questionType: z.literal("text") }),
 ]);
 
-  const form = useForm({
+  const form = useForm<z.infer<typeof questionSchema>>({
     resolver: zodResolver(questionSchema),
-    defaultValues: { ...getDefaultValues(), questionType },
+    defaultValues: getDefaultValues(),
   });
 
   // Reset form when questionType changes
@@ -201,6 +177,7 @@ const questionSchema = z.discriminatedUnion("questionType", [
     name: "options",
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const watchSkills = form.watch("skills");
   const selectedSkills = Array.isArray(watchSkills) ? watchSkills : [];
   const [searchQuery, setSearchQuery] = useState("");
@@ -266,7 +243,9 @@ const questionSchema = z.discriminatedUnion("questionType", [
       question_text: values.question_text,
       difficulty: values.difficulty,
       skills: values.skills,
-      tags: typeof values.tags === "string" ? [] : values.tags || [],
+      tags: typeof values.tags === "string"
+        ? values.tags.split(",").map((t) => t.trim()).filter(Boolean)
+        : values.tags || [],
       options,
       correct_answers,
       sample_answer: questionType === "text" ? (values as TextFormValues).sample_answer || undefined : undefined,
@@ -440,9 +419,9 @@ const questionSchema = z.discriminatedUnion("questionType", [
                     Add Option
                   </Button>
                 )}
-                {form.formState.errors.options?.message && (
+                {(form.formState.errors as { options?: { message?: string } }).options?.message && (
                   <p className="text-sm font-medium text-destructive">
-                    {String(form.formState.errors.options.message)}
+                    {String((form.formState.errors as { options?: { message?: string } }).options!.message)}
                   </p>
                 )}
               </CardContent>
