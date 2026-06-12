@@ -20,7 +20,7 @@ interface InterviewTranscriptMessage {
 interface InterviewTranscriptEvaluation {
   overall_score: number;
   score_breakdown: Record<string, number>;
-  skill_breakdown: Record<string, { score?: number }>;
+  skill_breakdown: Record<string, { score?: number; proficiency_level?: string; feedback?: string }>;
   feedback?: string;
   strengths?: string[];
   improvements?: string[];
@@ -595,7 +595,7 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
                                           >
                                             {skill.proficiency_level}
                                           </Badge>
-                                          <span className="text-sm font-medium text-slate-700">{Math.round(skill.score)}%</span>
+                                          <span className="text-sm font-medium text-slate-700">{Math.round(skill.score ?? 0)}%</span>
                                     </div>
                                     </div>
                                       <p className="text-xs text-slate-600">{skill.feedback}</p>
@@ -669,7 +669,7 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
                           <p className="text-xs text-slate-500 mt-1">
                             {loadingTranscript
                               ? 'Loading evaluation data...'
-                              : transcript?.status === 'COMPLETED'
+                              : transcript
                                 ? 'Your interview is being evaluated. This may take a few minutes.'
                                 : 'Complete the interview to receive your evaluation.'}
                           </p>
