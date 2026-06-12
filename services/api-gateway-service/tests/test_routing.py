@@ -38,6 +38,8 @@ client = TestClient(main.app, raise_server_exceptions=False)
         ("/v1/api/categories/1/skills", "test-management-service"),
         ("/v1/api/questions", "question-management-service"),
         ("/v1/api/questions/abc123", "question-management-service"),
+        ("/v1/api/reports/user/7", "reporting-and-analytics-service"),
+        ("/v1/api/reports/user/7/attempts", "reporting-and-analytics-service"),
     ],
 )
 def test_every_route_pattern_maps_to_its_service(path, expected_service):
@@ -50,6 +52,7 @@ def test_routes_table_has_an_entry_per_known_service():
         "user-service",
         "test-management-service",
         "question-management-service",
+        "reporting-and-analytics-service",
     }
 
 
@@ -65,6 +68,10 @@ def test_get_service_url_resolves_known_ports():
     assert main.get_service_url("user-service") == "http://user-service:8002"
     assert main.get_service_url("test-management-service") == "http://test-management-service:8001"
     assert main.get_service_url("question-management-service") == "http://question-management-service:8003"
+    assert (
+        main.get_service_url("reporting-and-analytics-service")
+        == "http://reporting-and-analytics-service:8004"
+    )
 
 
 def test_get_service_url_unknown_raises():
