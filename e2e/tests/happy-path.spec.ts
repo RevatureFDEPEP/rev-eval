@@ -34,6 +34,7 @@ const TRAINER = {
 
 let trainerToken: string;
 let testId: number;
+let submissionId: number;
 
 // ---------------------------------------------------------------------------
 // Setup: register users + create + assign a test via API
@@ -65,14 +66,41 @@ test.beforeAll(async () => {
   const testBody = await testResp.json();
   testId = testBody.id;
 
+  // Seed MCQ questions so the quiz session service can fetch them
+  const DIFFICULTIES = [
+    "easy", "easy", "easy", "easy", "easy",
+    "medium", "medium", "medium", "medium", "medium",
+    "hard", "hard", "hard", "hard", "hard",
+  ];
+  for (let i = 0; i < DIFFICULTIES.length; i++) {
+    await api.post("/v1/api/questions/", {
+      headers: { Authorization: `Bearer ${trainerToken}` },
+      data: {
+        type: "mcq",
+        question_text: `E2E test question ${i + 1}: which pattern applies to software engineering practices?`,
+        options: [
+          { text: "Option A" },
+          { text: "Option B" },
+          { text: "Option C" },
+          { text: "Option D" },
+        ],
+        correct_answers: [1],
+        difficulty: DIFFICULTIES[i],
+        skills: ["Software Engineering"],
+      },
+    });
+  }
+
   // Trainer assigns the test to the participant via bulk-assign
-  await api.post("/v1/api/submissions/bulk-assign", {
+  const assignResp = await api.post("/v1/api/submissions/bulk-assign", {
     headers: { Authorization: `Bearer ${trainerToken}` },
     data: {
       test_id: testId,
       participant_emails: [PARTICIPANT.email],
     },
   });
+  const assignBody = await assignResp.json();
+  submissionId = assignBody.created_submissions?.[0]?.id;
 
   await api.dispose();
 });
@@ -183,4 +211,55 @@ test("API gateway generates X-Request-Id when none supplied", async () => {
   );
 
   await api.dispose();
+});
+
+// ---------------------------------------------------------------------------
+// Test 4: Submit Part A, answer Part B, verify completion
+// ---------------------------------------------------------------------------
+
+test("participant submits Part A and Part B and sees quiz completed", async ({ browser }) => {
+  test.skip(!fs.existsSync(AUTH_FILE), "auth state not available — run login test first");
+  test.skip(!submissionId, "submissionId not captured in beforeAll — check bulk-assign response");
+
+  const context = await browser.newContext({ storageState: AUTH_FILE });
+  const page = await context.newPage();
+
+  // Auto-accept confirm dialogs (unanswered-question warnings on submit)
+  page.on("dialog", (dialog) => dialog.accept());
+
+  // Navigate directly to quiz page with test and submission IDs
+  await page.goto(`/participant/tests/take/mcq/${testId}?submission=${submissionId}`);
+
+  // Wait for Part A to load — "Submit Part A" button is visible in part-a state
+  await expect(
+    page.getByRole("button", { name: /Submit Part A/i })
+  ).toBeVisible({ timeout: 30_000 });
+
+  // Answer the first visible question (click first radio option)
+  const firstRadio = page.getByRole("radio").first();
+  if (await firstRadio.count() > 0) {
+    await firstRadio.click();
+  }
+
+  // Submit Part A
+  await page.getByRole("button", { name: /Submit Part A/i }).click();
+
+  // Wait for Part B to load — button changes to "Submit Quiz"
+  await expect(
+    page.getByRole("button", { name: /Submit Quiz/i })
+  ).toBeVisible({ timeout: 30_000 });
+
+  // Answer the first visible Part B question
+  const partBRadio = page.getByRole("radio").first();
+  if (await partBRadio.count() > 0) {
+    await partBRadio.click();
+  }
+
+  // Submit Part B (final submit)
+  await page.getByRole("button", { name: /Submit Quiz/i }).click();
+
+  // Verify quiz completion state
+  await expect(page.getByText(/Quiz Submitted/i)).toBeVisible({ timeout: 30_000 });
+
+  await context.close();
 });

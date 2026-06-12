@@ -49,6 +49,7 @@ def _make_engine():
 
 async def _bootstrap_schema(engine):
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
 

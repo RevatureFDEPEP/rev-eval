@@ -3,6 +3,8 @@ import httpx
 import logging
 import uuid
 from datetime import datetime, timezone
+from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.repositories.test_submission_repository import TestSubmissionRepository
 from src.services.test_service import TestService
@@ -24,8 +26,13 @@ class TestSubmissionService:
 
     @staticmethod
     async def create_submission(db: AsyncSession, submission_in: TestSubmissionCreate) -> TestSubmissionOut:
-
-        submission = await TestSubmissionRepository.create(db, submission_in)
+        try:
+            submission = await TestSubmissionRepository.create(db, submission_in)
+        except IntegrityError:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Test {submission_in.test_id} not found or FK constraint violated",
+            )
         # Re-fetch with selectinload so TestSubmissionOut.from_orm can access .test
         submission = await TestSubmissionRepository.get_by_id(db, submission.id)  # pragma: no cover
         # test = await TestService.get_test_by_id(db, submission_in.test_id)
