@@ -87,7 +87,11 @@ class SessionService:
         """Call question-management-service's ``$sample`` endpoint via the
         shared httpx singleton, propagating the correlation id for tracing."""
         url = f"{settings.QUESTION_SERVICE_URL}/v1/api/questions/sample"
-        headers = {}
+        # Direct service-to-service call (bypasses the gateway), so we present
+        # the trainer role ourselves to satisfy question-mgmt's guard on the
+        # answer-bearing read surface. Safe: the gateway overwrites X-User-Role
+        # from the verified JWT, so browser traffic can never forge this.
+        headers = {"X-User-Role": "TRAINER"}
         if correlation_id:
             headers["X-Correlation-Id"] = correlation_id
 
@@ -247,7 +251,9 @@ class SessionService:
         question-management-service via the httpx singleton, for server-side
         scoring. The answer key never reaches the client through this path."""
         url = f"{settings.QUESTION_SERVICE_URL}/v1/api/questions/{question_id}"
-        headers = {}
+        # Trainer role for the gateway-guarded answer-bearing endpoint (see
+        # _fetch_sample). The answer key never reaches the client via this path.
+        headers = {"X-User-Role": "TRAINER"}
         if correlation_id:
             headers["X-Correlation-Id"] = correlation_id
 

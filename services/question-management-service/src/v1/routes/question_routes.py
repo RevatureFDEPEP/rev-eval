@@ -6,6 +6,7 @@ from src.models.question import Question
 from src.schemas.question import (
     PresignedUploadResponse,
     QuestionCreate,
+    QuestionPublic,
     QuestionResponse,
     QuestionUpdate,
 )
@@ -78,9 +79,10 @@ async def create_question(question: QuestionCreate):
     "/",
     response_model=list[QuestionResponse],
     summary="Get all questions",
-    description="Retrieve all questions from the database."
+    description="Retrieve all questions from the database. **Trainer only** "
+    "— the full document includes the answer key."
 )
-async def get_all_questions():
+async def get_all_questions(_: str = Depends(require_trainer)):
     """Retrieve all questions."""
     try:
         questions = await QuestionService.get_all_questions()
@@ -133,23 +135,26 @@ async def get_presigned_upload_url(
 # "sample" and this endpoint becomes unreachable.
 @router.get(
     "/sample",
-    response_model=list[QuestionResponse],
+    response_model=list[QuestionPublic],
     summary="Sample N random questions from the whole bank",
     description="""
     Return a random sample of questions drawn from the entire question bank
     using MongoDB's ``$sample`` aggregation. Used internally by
-    test-management-service to seed a quiz session.
+    test-management-service to seed a quiz session. **Trainer only** — the
+    internal caller presents the trainer role; the response is answer-key-free
+    (``QuestionPublic``) since it ultimately reaches the test-taker.
 
     Sampling is **not** skill-filtered — it draws from all questions.
     """,
 )
 async def sample_questions(
     limit: int = Query(..., ge=1, le=500, description="Number of questions to sample"),
+    _: str = Depends(require_trainer),
 ):
-    """Return ``limit`` randomly sampled questions."""
+    """Return ``limit`` randomly sampled questions (answer key stripped)."""
     try:
         questions = await QuestionService.sample_questions(limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return [QuestionPublic(**q.model_dump(by_alias=True, mode='json')) for q in questions]
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -161,9 +166,11 @@ async def sample_questions(
     "/{id}",
     response_model=QuestionResponse,
     summary="Get question by ID",
-    description="Retrieve a specific question by its MongoDB _id."
+    description="Retrieve a specific question by its MongoDB _id. **Trainer "
+    "only** — the full document includes the answer key (also used by "
+    "test-management-service for server-side scoring)."
 )
-async def get_question_by_id(id: str):
+async def get_question_by_id(id: str, _: str = Depends(require_trainer)):
     """Retrieve a specific question by ID."""
     try:
         question = await QuestionService.get_question_by_id(id)
@@ -273,7 +280,8 @@ async def delete_question(id: str):
 )
 async def get_questions_by_type(
     question_type: str,
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    _: str = Depends(require_trainer),
 ):
     """Get questions filtered by type."""
     try:
@@ -296,7 +304,8 @@ async def get_questions_by_type(
 )
 async def get_questions_by_skill(
     skill: str,
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    _: str = Depends(require_trainer),
 ):
     """Get questions filtered by skill."""
     try:
@@ -326,7 +335,8 @@ async def get_questions_by_skill(
 )
 async def get_questions_by_difficulty(
     difficulty: str,
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    _: str = Depends(require_trainer),
 ):
     """Get questions filtered by difficulty."""
     try:
@@ -356,7 +366,8 @@ async def get_questions_by_difficulty(
 )
 async def get_questions_by_tags(
     tags: list[str] = Query(..., description="List of tags to filter by"),
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    _: str = Depends(require_trainer),
 ):
     """Get questions filtered by tags."""
     try:
@@ -396,7 +407,8 @@ async def filter_questions(
     skill: str | None = Query(None, description="Skill filter"),
     difficulty: str | None = Query(None, description="Difficulty filter"),
     tags: list[str] | None = Query(None, description="Tags filter (OR condition)"),
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    _: str = Depends(require_trainer),
 ):
     """
     Filter questions using multiple criteria with AND conditions.
