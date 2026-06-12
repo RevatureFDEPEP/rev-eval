@@ -1,23 +1,37 @@
-FROM python:3.11-slim
+# user-service Dockerfile — three-stage build
+# base  : shared OS deps + runtime Python packages
+# test  : installs dev/test deps, runs pytest; build fails if tests fail
+# production : clean final image with no test tooling
+
+FROM python:3.11-slim AS base
 
 WORKDIR /app
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY user-service/requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
 
-# Expose port
+FROM base AS test
+
+COPY requirements-dev.txt ./requirements-dev.txt
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+COPY user-service/ .
+
+RUN pytest tests/ --tb=short -q
+
+
+FROM base AS production
+
+COPY user-service/ .
+
 EXPOSE 8002
 
-# Run the application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]
