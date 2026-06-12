@@ -16,6 +16,7 @@ from src.repositories.test_repository import TestRepository
 from src.schemas.answer_schema import AnswerCreate, AnswerResponse
 from src.schemas.session_schema import SessionResponse
 from src.scoring import partial_credit
+from src.scoring.result import ScoreResult
 from src.utils.http_client import get_http_client
 
 # Fallback session length when a test has no explicit duration.
@@ -129,13 +130,6 @@ class SessionService:
         question transitions the session to SUBMITTED and rejects all further
         mutations with 409.
         """
-        # Fast-path replay (re-checked under the row lock below to close the
-        # concurrent-duplicate window).
-        if idempotency_key:
-            prior = await AnswerRepository.get_by_idempotency_key(db, idempotency_key)
-            if prior is not None:
-                return AnswerResponse(**prior.response_payload)
-
         session = await SessionRepository.get_by_id_for_update(db, session_id)
         if session is None:
             raise HTTPException(
@@ -149,13 +143,20 @@ class SessionService:
                 detail="This session belongs to another user",
             )
 
-        # Re-check idempotency now that the row is locked: a concurrent request
-        # with the same key was serialized behind us and has already committed.
+        # Idempotency replay — checked AFTER the 404/ownership guards and scoped
+        # to this session, so a key reused across sessions or users can't replay
+        # another context's response. Read the payload into a local BEFORE the
+        # rollback: rollback expires loaded ORM instances, so touching
+        # ``prior.response_payload`` afterwards could re-query (or raise) under a
+        # real concurrent race.
         if idempotency_key:
-            prior = await AnswerRepository.get_by_idempotency_key(db, idempotency_key)
+            prior = await AnswerRepository.get_by_session_and_key(
+                db, session_id, idempotency_key
+            )
             if prior is not None:
+                payload = prior.response_payload
                 await db.rollback()
-                return AnswerResponse(**prior.response_payload)
+                return AnswerResponse(**payload)
 
         now = datetime.utcnow()
 
@@ -194,11 +195,20 @@ class SessionService:
             )
 
         question = await SessionService._fetch_question(current_qid, correlation_id)
-        result = partial_credit.score_question(
-            question.get("type"),
-            question.get("correct_answers"),
-            body.submitted_answers,
-        )
+        try:
+            result = partial_credit.score_question(
+                question.get("type"),
+                question.get("correct_answers"),
+                body.submitted_answers,
+            )
+        except ValueError:
+            # Not auto-scorable (e.g. a TEXT question that slipped into the
+            # sample). Record zero and flag for manual grading rather than
+            # 500-ing — that would leave current_index stuck and wedge the
+            # session permanently on this question.
+            result = ScoreResult(
+                is_correct=False, score=0.0, algorithm="manual_grading_required"
+            )
 
         # Advance; finalize if that was the last question.
         new_index = idx + 1
@@ -235,11 +245,13 @@ class SessionService:
         try:
             await db.commit()
         except IntegrityError:
-            # Lost an idempotency-key race against a different session's commit;
-            # replay the now-stored response.
+            # Lost a concurrent race on (session_id, idempotency_key); the
+            # winning request already committed, so replay its stored response.
             await db.rollback()
             if idempotency_key:
-                prior = await AnswerRepository.get_by_idempotency_key(db, idempotency_key)
+                prior = await AnswerRepository.get_by_session_and_key(
+                    db, session_id, idempotency_key
+                )
                 if prior is not None:
                     return AnswerResponse(**prior.response_payload)
             raise

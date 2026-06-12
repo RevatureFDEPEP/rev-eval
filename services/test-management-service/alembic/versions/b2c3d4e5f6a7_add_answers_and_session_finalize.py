@@ -39,10 +39,16 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_quiz_answers_id'), 'quiz_answers', ['id'], unique=False)
     op.create_index(op.f('ix_quiz_answers_session_id'), 'quiz_answers', ['session_id'], unique=False)
-    op.create_index(op.f('ix_quiz_answers_idempotency_key'), 'quiz_answers', ['idempotency_key'], unique=True)
+    # Idempotency keys are scoped to their session, not table-wide: the same key
+    # reused across sessions/users must NOT replay another session's response.
+    op.create_index(op.f('ix_quiz_answers_idempotency_key'), 'quiz_answers', ['idempotency_key'], unique=False)
+    op.create_unique_constraint(
+        'uq_quiz_answer_session_idem', 'quiz_answers', ['session_id', 'idempotency_key']
+    )
 
 
 def downgrade() -> None:
+    op.drop_constraint('uq_quiz_answer_session_idem', 'quiz_answers', type_='unique')
     op.drop_index(op.f('ix_quiz_answers_idempotency_key'), table_name='quiz_answers')
     op.drop_index(op.f('ix_quiz_answers_session_id'), table_name='quiz_answers')
     op.drop_index(op.f('ix_quiz_answers_id'), table_name='quiz_answers')

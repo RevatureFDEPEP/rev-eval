@@ -8,13 +8,20 @@ from src.models.answer import QuizAnswer
 class AnswerRepository:
 
     @staticmethod
-    async def get_by_idempotency_key(
-        db: AsyncSession, idempotency_key: str
+    async def get_by_session_and_key(
+        db: AsyncSession, session_id: str, idempotency_key: str
     ) -> QuizAnswer | None:
-        """Return the prior answer recorded under ``idempotency_key`` (used to
-        replay a retried submission), or None if the key is unseen."""
+        """Return the prior answer recorded under ``idempotency_key`` *within
+        this session* (used to replay a retried submission), or None if unseen.
+
+        Scoped to ``session_id`` so a key reused across sessions or users can
+        never replay another session's response — the lookup runs only after
+        the caller has verified ownership of ``session_id``."""
         result = await db.execute(
-            select(QuizAnswer).where(QuizAnswer.idempotency_key == idempotency_key)
+            select(QuizAnswer).where(
+                QuizAnswer.session_id == session_id,
+                QuizAnswer.idempotency_key == idempotency_key,
+            )
         )
         return result.scalars().first()
 

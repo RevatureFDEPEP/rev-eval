@@ -28,6 +28,8 @@ _QUESTIONS = {
     "q-mcq": {"_id": "q-mcq", "type": "mcq", "correct_answers": [2]},
     "q-multi": {"_id": "q-multi", "type": "multi", "correct_answers": [1, 2, 3]},
     "q-tf": {"_id": "q-tf", "type": "true_false", "correct_answers": [True]},
+    # Not auto-scorable — graded against a sample answer, no key.
+    "q-text": {"_id": "q-text", "type": "text", "sample_answer": "anything"},
 }
 
 _USER_ID = 42
@@ -266,3 +268,54 @@ async def test_idempotency_key_replays_without_re_advancing(session_factory):
             select(QuizSession).where(QuizSession.session_id == sid)
         )).scalars().first()
         assert row.current_index == 1  # advanced once, not twice
+
+
+@pytest.mark.asyncio
+async def test_text_question_scores_zero_and_advances_not_500(session_factory):
+    """A non-auto-scorable TEXT question must not 500 or wedge the session:
+    record zero, flag manual grading, and advance current_index."""
+    sid = await _seed_session(session_factory, question_ids=["q-text", "q-tf"])
+    async with _build_client(session_factory) as client:
+        resp = await client.post(
+            f"/v1/api/sessions/{sid}/answer",
+            json={"submitted_answers": ["my essay"]},
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["is_correct"] is False
+    assert body["score"] == 0.0
+    assert body["algorithm"] == "manual_grading_required"
+    assert body["current_index"] == 1  # advanced — not stuck on the text question
+    assert body["status"] == "ACTIVE"
+
+
+@pytest.mark.asyncio
+async def test_idempotency_key_is_scoped_per_session(session_factory):
+    """The same Idempotency-Key on a DIFFERENT session must not replay the
+    first session's response — each session scores its own answer."""
+    sid_a = await _seed_session(
+        session_factory, question_ids=["q-mcq"], session_id="sess-a"
+    )
+    sid_b = await _seed_session(
+        session_factory, question_ids=["q-tf"], session_id="sess-b"
+    )
+    headers = {"Idempotency-Key": "shared-key"}
+    async with _build_client(session_factory) as client:
+        a = await client.post(
+            f"/v1/api/sessions/{sid_a}/answer",
+            json={"submitted_answers": [2]},
+            headers=headers,
+        )
+        b = await client.post(
+            f"/v1/api/sessions/{sid_b}/answer",
+            json={"submitted_answers": [True]},
+            headers=headers,
+        )
+    assert a.status_code == 200 and b.status_code == 200
+    # Session B was scored independently, NOT replayed from A.
+    assert b.json()["status"] == "SUBMITTED"  # q-tf was B's only question
+    assert b.json()["finished"] is True
+
+    async with session_factory() as session:
+        rows = (await session.execute(select(QuizAnswer))).scalars().all()
+        assert len(rows) == 2  # one row per session, key not collided
