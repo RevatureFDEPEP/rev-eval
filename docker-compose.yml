@@ -139,8 +139,13 @@ services:
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_EXPIRY_MINUTES: ${JWT_EXPIRY_MINUTES:-60}
       ALLOW_ORIGINS: http://localhost:3000
+    # Internal microservice — published to loopback ONLY (127.0.0.1) for local
+    # debugging. It trusts gateway-injected X-User-* identity headers, so it
+    # must not be reachable from the LAN/host network where a caller could
+    # bypass the gateway and spoof identity. The API gateway (:8000) is the
+    # only intended public entry point. Reach it over Docker DNS in-network.
     ports:
-      - "8002:8002"
+      - "127.0.0.1:8002:8002"
     depends_on:
       postgres:
         condition: service_healthy
@@ -168,8 +173,12 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME:-question-images}
       ALLOW_ORIGINS: http://localhost:3000
+    # Internal microservice — loopback-only publish (see user-service note).
+    # Answer keys are role-gated on its read endpoints; the gateway sets the
+    # verified caller role. Trusted server-to-server callers (test-management's
+    # quiz session snapshot fetch) reach it over Docker DNS, not this port.
     ports:
-      - "8003:8003"
+      - "127.0.0.1:8003:8003"
     depends_on:
       mongo:
         condition: service_healthy
@@ -198,9 +207,11 @@ services:
       PORT: 8001
       SERVICE_HOSTNAME: test-management-service
       USER_SERVICE_URL: http://user-service:8002
+      QUESTION_SERVICE_URL: http://question-management-service:8003
       ALLOW_ORIGINS: http://localhost:3000
+    # Internal microservice — loopback-only publish (see user-service note).
     ports:
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"
     depends_on:
       postgres:
         condition: service_healthy

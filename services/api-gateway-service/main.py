@@ -10,7 +10,11 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from src.logging_config import configure_json_logging, install_request_logging
-from src.middleware.auth import add_user_context_headers, verify_jwt_token
+from src.middleware.auth import (
+    add_user_context_headers,
+    strip_client_identity_headers,
+    verify_jwt_token,
+)
 
 # Load environment variables
 load_dotenv()
@@ -281,6 +285,10 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
             headers.pop('content-length', None)
             headers.pop('x-forwarded-proto', None)
             headers.pop('x-forwarded-scheme', None)
+
+            # This route performs no JWT verification, so a client must not be
+            # able to smuggle gateway-trusted identity headers through it.
+            headers = strip_client_identity_headers(headers)
 
             resp = await client.request(
                 method,

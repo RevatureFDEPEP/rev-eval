@@ -1,11 +1,42 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Header, HTTPException, Query, status
 from pydantic import ValidationError
-from src.schemas.question import QuestionCreate, QuestionResponse, QuestionUpdate
+from src.schemas.question import (
+    QuestionCreate,
+    QuestionPublic,
+    QuestionResponse,
+    QuestionUpdate,
+)
 from src.services.question_service import QuestionService
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
+
+# Roles allowed to see answer keys. The gateway injects the verified caller
+# role as X-User-Role; everyone else (participants, anonymous) gets the safe
+# QuestionPublic view with correct_answers/sample_answer/answer_explanation
+# stripped. Trusted server-to-server callers (e.g. the quiz session service
+# building its snapshot) identify as ADMIN.
+_PRIVILEGED_ROLES = {"TRAINER", "ADMIN"}
+
+
+def _is_privileged(role: Optional[str]) -> bool:
+    return (role or "").strip().upper() in _PRIVILEGED_ROLES
+
+
+def _serialize(question, privileged: bool) -> dict:
+    """Serialize a Question document to a role-appropriate dict.
+
+    Privileged callers get the full payload; everyone else gets the safe view,
+    which omits the answer-key fields entirely (not merely nulls them).
+    """
+    data = question.model_dump(by_alias=True, mode="json")
+    schema = QuestionResponse if privileged else QuestionPublic
+    return schema(**data).model_dump(by_alias=True, mode="json")
+
+
+def _serialize_many(questions, privileged: bool) -> list:
+    return [_serialize(q, privileged) for q in questions]
 
 
 @router.post(
@@ -53,16 +84,20 @@ async def create_question(question: QuestionCreate):
 
 @router.get(
     "/",
-    response_model=list[QuestionResponse],
+    response_model=None,
     summary="Get all questions",
-    description="Retrieve all questions from the database."
+    description=(
+        "Retrieve all questions. Answer keys are included only for "
+        "trainer/admin callers; participants receive the safe view."
+    ),
 )
-async def get_all_questions():
-    """Retrieve all questions."""
+async def get_all_questions(
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+):
+    """Retrieve all questions (answer keys stripped for non-privileged roles)."""
     try:
         questions = await QuestionService.get_all_questions()
-        # Convert Beanie documents to response schema (mode='json' converts ObjectId to string)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return _serialize_many(questions, _is_privileged(x_user_role))
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -72,12 +107,18 @@ async def get_all_questions():
 
 @router.get(
     "/{id}",
-    response_model=QuestionResponse,
+    response_model=None,
     summary="Get question by ID",
-    description="Retrieve a specific question by its MongoDB _id."
+    description=(
+        "Retrieve a specific question by its MongoDB _id. Answer keys are "
+        "included only for trainer/admin callers."
+    ),
 )
-async def get_question_by_id(id: str):
-    """Retrieve a specific question by ID."""
+async def get_question_by_id(
+    id: str,
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+):
+    """Retrieve a specific question by ID (answer keys role-gated)."""
     try:
         question = await QuestionService.get_question_by_id(id)
         if not question:
@@ -85,8 +126,7 @@ async def get_question_by_id(id: str):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Question with ID '{id}' not found"
             )
-        # Convert Beanie document to response schema (mode='json' converts ObjectId to string)
-        return QuestionResponse(**question.model_dump(by_alias=True, mode='json'))
+        return _serialize(question, _is_privileged(x_user_role))
     except HTTPException:
         raise
     except Exception as e:
@@ -172,7 +212,7 @@ async def delete_question(id: str):
 
 @router.get(
     "/by-type/{question_type}",
-    response_model=List[QuestionResponse],
+    response_model=None,
     summary="Get questions by type",
     description="""
     Retrieve questions filtered by type.
@@ -186,12 +226,13 @@ async def delete_question(id: str):
 )
 async def get_questions_by_type(
     question_type: str,
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
 ):
     """Get questions filtered by type."""
     try:
         questions = await QuestionService.find_by_type(question_type, limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return _serialize_many(questions, _is_privileged(x_user_role))
     except HTTPException:
         raise
     except Exception as e:
@@ -203,18 +244,19 @@ async def get_questions_by_type(
 
 @router.get(
     "/by-skill/{skill}",
-    response_model=List[QuestionResponse],
+    response_model=None,
     summary="Get questions by skill",
     description="Retrieve questions that include the specified skill."
 )
 async def get_questions_by_skill(
     skill: str,
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
 ):
     """Get questions filtered by skill."""
     try:
         questions = await QuestionService.find_by_skill(skill, limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return _serialize_many(questions, _is_privileged(x_user_role))
     except HTTPException:
         raise
     except Exception as e:
@@ -226,7 +268,7 @@ async def get_questions_by_skill(
 
 @router.get(
     "/by-difficulty/{difficulty}",
-    response_model=List[QuestionResponse],
+    response_model=None,
     summary="Get questions by difficulty",
     description="""
     Retrieve questions filtered by difficulty level.
@@ -239,12 +281,13 @@ async def get_questions_by_skill(
 )
 async def get_questions_by_difficulty(
     difficulty: str,
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
 ):
     """Get questions filtered by difficulty."""
     try:
         questions = await QuestionService.find_by_difficulty(difficulty, limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return _serialize_many(questions, _is_privileged(x_user_role))
     except HTTPException:
         raise
     except Exception as e:
@@ -256,7 +299,7 @@ async def get_questions_by_difficulty(
 
 @router.get(
     "/by-tags",
-    response_model=List[QuestionResponse],
+    response_model=None,
     summary="Get questions by tags",
     description="""
     Retrieve questions that have any of the specified tags.
@@ -269,12 +312,13 @@ async def get_questions_by_difficulty(
 )
 async def get_questions_by_tags(
     tags: List[str] = Query(..., description="List of tags to filter by"),
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
 ):
     """Get questions filtered by tags."""
     try:
         questions = await QuestionService.find_by_tags(tags, limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return _serialize_many(questions, _is_privileged(x_user_role))
     except HTTPException:
         raise
     except Exception as e:
@@ -286,7 +330,7 @@ async def get_questions_by_tags(
 
 @router.get(
     "/filter",
-    response_model=List[QuestionResponse],
+    response_model=None,
     summary="Filter questions by multiple criteria",
     description="""
     Advanced filtering endpoint that supports multiple criteria simultaneously.
@@ -309,7 +353,8 @@ async def filter_questions(
     skill: Optional[str] = Query(None, description="Skill filter"),
     difficulty: Optional[str] = Query(None, description="Difficulty filter"),
     tags: Optional[List[str]] = Query(None, description="Tags filter (OR condition)"),
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
 ):
     """
     Filter questions using multiple criteria with AND conditions.
@@ -325,7 +370,7 @@ async def filter_questions(
             tags=tags,
             limit=limit
         )
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return _serialize_many(questions, _is_privileged(x_user_role))
     except HTTPException:
         raise
     except Exception as e:

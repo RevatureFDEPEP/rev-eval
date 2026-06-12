@@ -20,7 +20,7 @@ const config = {
     "!src/app/**/not-found.tsx",
     "!src/test/**",
   ],
-  testPathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/node_modules/"],
+  testPathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/node_modules/", "<rootDir>/e2e/"],
 }
 
 export default createJestConfig(config)
