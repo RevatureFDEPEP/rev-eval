@@ -12,7 +12,27 @@ This file stays at summary level only.
 > start, advance, or finish a feature, update its detail file (check off steps,
 > add evidence) **and** its status row here, in the same PR as the code change.
 
-**Last assessed:** 2026-06-12 (**W4-F2 completed** — candidate results page on
+**Last assessed:** 2026-06-12 (**W4-F3 completed** — RBAC + aggregate
+reporting on `richardh-feat-W4F3`: the reporting service is the first to
+re-verify the JWT itself (defense-in-depth) — `require_trainer`
+(`src/v1/dependencies/auth.py`, python-jose + shared `JWT_SECRET`) returns 401
+on missing/invalid/expired tokens and 403 unless the *verified* role claim is
+TRAINER (spec-strict: ADMIN excluded), never reading role from `X-User-*`
+headers — spoofed-header curls straight to :8004 are rejected, proven in unit
+tests and live. Two gated endpoints: `GET /reports/aggregate` GROUPs SUBMITTED
+sessions BY test (attempts, distinct candidates, avg score, pass rate vs. the
+configurable `REPORT_PASS_THRESHOLD`, median time-to-complete via
+`percentile_cont WITHIN GROUP` on Postgres with a portable ROW_NUMBER median
+on the sqlite fixture; `min_attempts` renders as HAVING, plus test/date
+filters for the W4-F4 dashboard) and `GET /reports/test/{id}/questions`
+(per-question correct rate grouped by the stable Mongo question_id, hardest-
+first `RANK() OVER (ORDER BY correct_rate ASC)`, 4-bucket partial-credit
+histogram, 404 on unknown test). `TmsAnswer` mirror gained
+`question_id`/`is_correct` (mapping-only). Reporting suite 40 passed / 92.62%
+cov (gate matrix with real HS256 tokens + aggregate value tests); gateway 51
+unchanged (`^/v1/api/reports` already routes, Authorization forwarded); live
+smoke: trainer 200 with real `percentile_cont` (median 26.81s), participant
+403, no-token 401, HAVING/422/404 verified. Prior: **W4-F2 completed** — candidate results page on
 `richardh-feat-W4F2`: `/results/[sessionId]` is a parallel-route layout whose
 three data regions (summary headline, attempts table, score chart) each carry
 their own `loading.tsx` skeleton and `error.tsx` boundary, so chrome streams on
@@ -133,7 +153,7 @@ Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 |---|---|---|---|---|
 | W4-F1 | Candidate results reporting endpoints (filtering + pagination) | 16 | ✅ Completed | [w4-f1-results-reporting-endpoints.md](features/w4-f1-results-reporting-endpoints.md) |
 | W4-F2 | Candidate results page (Suspense, error boundaries, chart) | 17 | ✅ Completed | [w4-f2-candidate-results-page.md](features/w4-f2-candidate-results-page.md) |
-| W4-F3 | Role-based authz (API) + aggregate reporting queries | 18 | ❌ Not Started | [w4-f3-rbac-aggregate-queries.md](features/w4-f3-rbac-aggregate-queries.md) |
+| W4-F3 | Role-based authz (API) + aggregate reporting queries | 18 | ✅ Completed | [w4-f3-rbac-aggregate-queries.md](features/w4-f3-rbac-aggregate-queries.md) |
 | W4-F4 | Trainer dashboard frontend (server RBAC, URL-synced filters) | 19 | ❌ Not Started | [w4-f4-trainer-dashboard-frontend.md](features/w4-f4-trainer-dashboard-frontend.md) |
 | W4-F5 | Technical debt audit + ADR documentation | 20 | ❌ Not Started | [w4-f5-tech-debt-audit-adrs.md](features/w4-f5-tech-debt-audit-adrs.md) |
 
@@ -149,6 +169,6 @@ Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 8. **W3-F2 → W3-F3 → W3-F4** — the quiz-taking slice in dependency order; W3-F2 backend before the W3-F3/W3-F4 frontend that consumes it.
 9. ~~**W3-F5 + W3-F6**~~ — verification layer, done. (W3-F5 — PR #79; W3-F6 — branch `richardh-feat-W3F6`.)
 9a. ~~**W3-F7 review remediation before W3-F6**~~ — done (branch `richardh-feat-W3F7`): timer fix + reuse semantics landed before the Playwright happy path; the `/questions/sample` role gate previews W4-F3.
-10. **W2-M10 ~~(if not already)~~ → ~~W4-F1~~ → W4-F3** — reporting backend done (branch `richardh-feat-W4F1`); next its RBAC gate, extending the same service.
-11. **~~W4-F2~~ → W4-F4** — results page done (branch `richardh-feat-W4F2`, builds `<ChartWrapper>`); next the trainer dashboard that reuses it once its W4-F3 backend is live.
+10. ~~**W2-M10 → W4-F1 → W4-F3**~~ — done; RBAC gate + aggregate endpoints landed on `richardh-feat-W4F3`.
+11. **~~W4-F2~~ → W4-F4** — results page done (branch `richardh-feat-W4F2`, builds `<ChartWrapper>`); next the trainer dashboard that reuses it — its W4-F3 backend is now live.
 12. **W4-F5 last** — debt audit + ADRs need a substantially complete codebase; capture the W4-F1 and W3-F2 ADR decisions as those features land.
