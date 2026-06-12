@@ -56,9 +56,7 @@ QUESTIONS: list[dict[str, Any]] = [
         "question_text": "What is the primary purpose of the retrieval component in a RAG system?",
         "options": [
             {"text": "To generate random text"},
-            {
-                "text": "To fetch relevant documents or information from a knowledge base"
-            },
+            {"text": "To fetch relevant documents or information from a knowledge base"},
             {"text": "To compress the language model"},
             {"text": "To train the model faster"},
         ],
@@ -106,9 +104,7 @@ QUESTIONS: list[dict[str, Any]] = [
         "type": "mcq",
         "question_text": "What is chunking in the context of RAG systems?",
         "options": [
-            {
-                "text": "Dividing large documents into smaller, manageable pieces for embedding and retrieval"
-            },
+            {"text": "Dividing large documents into smaller, manageable pieces for embedding and retrieval"},
             {"text": "Compressing the language model to reduce size"},
             {"text": "Grouping similar queries together"},
             {"text": "Removing irrelevant words from documents"},
@@ -138,9 +134,7 @@ QUESTIONS: list[dict[str, Any]] = [
         "type": "multi",
         "question_text": "What are common challenges when implementing RAG systems? (Select all that apply)",
         "options": [
-            {
-                "text": "Handling outdated or incorrect information in the knowledge base"
-            },
+            {"text": "Handling outdated or incorrect information in the knowledge base"},
             {"text": "Balancing retrieval relevance with context window limitations"},
             {"text": "Managing embedding costs and latency"},
             {"text": "Eliminating all hallucinations"},
@@ -185,9 +179,7 @@ QUESTIONS: list[dict[str, Any]] = [
         "question_text": "What is the purpose of a reranking model in an advanced RAG pipeline?",
         "options": [
             {"text": "To generate embeddings faster"},
-            {
-                "text": "To refine the initial retrieval results by scoring document relevance more accurately"
-            },
+            {"text": "To refine the initial retrieval results by scoring document relevance more accurately"},
             {"text": "To compress the documents before storage"},
             {"text": "To translate documents into multiple languages"},
         ],
@@ -211,13 +203,9 @@ QUESTIONS: list[dict[str, Any]] = [
         "question_text": "In a RAG system, what is the 'lost in the middle' problem?",
         "options": [
             {"text": "The vector database failing to index middle documents"},
-            {
-                "text": "Language models performing worse on information in the middle of long contexts"
-            },
+            {"text": "Language models performing worse on information in the middle of long contexts"},
             {"text": "Embeddings losing quality for medium-length texts"},
-            {
-                "text": "The retrieval system skipping documents in the middle of the corpus"
-            },
+            {"text": "The retrieval system skipping documents in the middle of the corpus"},
         ],
         "correct_answers": [2],
         "answer_explanation": "The 'lost in the middle' problem refers to research showing that LLMs often pay less attention to information placed in the middle of long contexts, performing better on information at the beginning or end. This affects RAG systems when multiple retrieved documents are concatenated.",
@@ -249,9 +237,7 @@ QUESTIONS: list[dict[str, Any]] = [
         "question_text": "What is context engineering in the realm of large language models?",
         "options": [
             {"text": "The process of training new language models"},
-            {
-                "text": "The practice of designing and optimizing input context to improve model outputs"
-            },
+            {"text": "The practice of designing and optimizing input context to improve model outputs"},
             {"text": "Hardware optimization for AI systems"},
             {"text": "The compression of model weights"},
         ],
@@ -309,9 +295,7 @@ QUESTIONS: list[dict[str, Any]] = [
         "question_text": "What is few-shot prompting in context engineering?",
         "options": [
             {"text": "Using a small language model"},
-            {
-                "text": "Providing a few examples in the context to guide the model's response pattern"
-            },
+            {"text": "Providing a few examples in the context to guide the model's response pattern"},
             {"text": "Running the model multiple times with different inputs"},
             {"text": "Fine-tuning the model on a small dataset"},
         ],
@@ -351,9 +335,7 @@ QUESTIONS: list[dict[str, Any]] = [
         "question_text": "What is the primary benefit of using system messages or role definitions in context engineering?",
         "options": [
             {"text": "They make the model run faster"},
-            {
-                "text": "They establish consistent behavior patterns and boundaries for the model"
-            },
+            {"text": "They establish consistent behavior patterns and boundaries for the model"},
             {"text": "They increase the context window size"},
             {"text": "They eliminate the need for examples"},
         ],
@@ -389,9 +371,7 @@ QUESTIONS: list[dict[str, Any]] = [
         "question_text": "Which factors should be considered when designing context for multi-turn conversations? (Select all that apply)",
         "options": [
             {"text": "Conversation history pruning strategies"},
-            {
-                "text": "Maintaining relevant context across turns while managing window limits"
-            },
+            {"text": "Maintaining relevant context across turns while managing window limits"},
             {"text": "Identifying and preserving key entities and facts"},
             {"text": "Ignoring previous turns to keep context fresh"},
             {"text": "Summarization of older conversation segments"},
@@ -547,9 +527,7 @@ async def seed_questions():
 
     for i, question in enumerate(QUESTIONS, start=1):
         try:
-            print(
-                f"Creating question {i}/{len(QUESTIONS)}: {question['question_text'][:60]}..."
-            )
+            print(f"Creating question {i}/{len(QUESTIONS)}: {question['question_text'][:60]}...")
             result = await create_question(question)
             created_count += 1
             print(f"✅ Created question ID: {result.get('_id', 'unknown')}\n")
@@ -569,9 +547,7 @@ async def seed_questions():
     rag_count = sum(1 for q in QUESTIONS if "RAG using Pinecone" in q["skills"])
     context_count = sum(1 for q in QUESTIONS if "Context Engineering" in q["skills"])
     both_count = sum(
-        1
-        for q in QUESTIONS
-        if "RAG using Pinecone" in q["skills"] and "Context Engineering" in q["skills"]
+        1 for q in QUESTIONS if "RAG using Pinecone" in q["skills"] and "Context Engineering" in q["skills"]
     )
     print(f"   RAG using Pinecone: {rag_count} questions")
     print(f"   Context Engineering: {context_count} questions")

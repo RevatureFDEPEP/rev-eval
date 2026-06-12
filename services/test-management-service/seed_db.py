@@ -583,9 +583,7 @@ def main():
         cur.execute("SELECT COUNT(*) FROM test_submissions WHERE status = 'COMPLETED';")
         completed_count = cur.fetchone()[0]
 
-        cur.execute(
-            "SELECT COUNT(*) FROM test_submissions WHERE status = 'IN_PROGRESS';"
-        )
+        cur.execute("SELECT COUNT(*) FROM test_submissions WHERE status = 'IN_PROGRESS';")
         in_progress_count = cur.fetchone()[0]
 
         cur.execute("SELECT COUNT(*) FROM test_submissions WHERE status = 'ASSIGNED';")

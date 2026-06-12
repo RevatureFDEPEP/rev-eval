@@ -27,20 +27,14 @@ class AuthService:
     @staticmethod
     def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
         to_encode = data.copy()
-        expire = datetime.now(UTC) + (
-            expires_delta or timedelta(minutes=settings.JWT_EXPIRY_MINUTES)
-        )
+        expire = datetime.now(UTC) + (expires_delta or timedelta(minutes=settings.JWT_EXPIRY_MINUTES))
         to_encode.update({"exp": expire})
-        return jwt.encode(
-            to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM
-        )
+        return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
     @staticmethod
     def decode_access_token(token: str) -> dict:
         """Decode and verify JWT; raises jwt.PyJWTError on failure."""
-        return jwt.decode(
-            token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
-        )
+        return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
 
     @staticmethod
     def get_user_by_email(db: Session, email: str) -> User | None:
@@ -99,9 +93,5 @@ class AuthService:
         return AuthService.authenticate_user(db, email, password)
 
     @staticmethod
-    def create_student(
-        db: Session, email: str, password: str, full_name: str | None = None
-    ) -> User:
-        return AuthService.create_user(
-            db, email, password, full_name, UserRole.PARTICIPANT
-        )
+    def create_student(db: Session, email: str, password: str, full_name: str | None = None) -> User:
+        return AuthService.create_user(db, email, password, full_name, UserRole.PARTICIPANT)

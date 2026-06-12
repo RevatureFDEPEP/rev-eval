@@ -36,9 +36,5 @@ class Test(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    submissions = relationship(
-        "TestSubmission", back_populates="test", cascade="all, delete-orphan"
-    )
-    test_skills = relationship(
-        "TestSkill", back_populates="test", cascade="all, delete-orphan"
-    )
+    submissions = relationship("TestSubmission", back_populates="test", cascade="all, delete-orphan")
+    test_skills = relationship("TestSkill", back_populates="test", cascade="all, delete-orphan")

@@ -57,10 +57,7 @@ async def get_all_questions():
     try:
         questions = await QuestionService.get_all_questions()
         # Convert Beanie documents to response schema (mode='json' converts ObjectId to string)
-        return [
-            QuestionResponse(**q.model_dump(by_alias=True, mode="json"))
-            for q in questions
-        ]
+        return [QuestionResponse(**q.model_dump(by_alias=True, mode="json")) for q in questions]
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -178,17 +175,12 @@ async def delete_question(id: str):
 )
 async def get_questions_by_type(
     question_type: str,
-    limit: int = Query(
-        100, ge=1, le=500, description="Maximum number of questions to return"
-    ),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
 ):
     """Get questions filtered by type."""
     try:
         questions = await QuestionService.find_by_type(question_type, limit)
-        return [
-            QuestionResponse(**q.model_dump(by_alias=True, mode="json"))
-            for q in questions
-        ]
+        return [QuestionResponse(**q.model_dump(by_alias=True, mode="json")) for q in questions]
     except HTTPException:
         raise
     except Exception as e:
@@ -206,17 +198,12 @@ async def get_questions_by_type(
 )
 async def get_questions_by_skill(
     skill: str,
-    limit: int = Query(
-        100, ge=1, le=500, description="Maximum number of questions to return"
-    ),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
 ):
     """Get questions filtered by skill."""
     try:
         questions = await QuestionService.find_by_skill(skill, limit)
-        return [
-            QuestionResponse(**q.model_dump(by_alias=True, mode="json"))
-            for q in questions
-        ]
+        return [QuestionResponse(**q.model_dump(by_alias=True, mode="json")) for q in questions]
     except HTTPException:
         raise
     except Exception as e:
@@ -241,17 +228,12 @@ async def get_questions_by_skill(
 )
 async def get_questions_by_difficulty(
     difficulty: str,
-    limit: int = Query(
-        100, ge=1, le=500, description="Maximum number of questions to return"
-    ),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
 ):
     """Get questions filtered by difficulty."""
     try:
         questions = await QuestionService.find_by_difficulty(difficulty, limit)
-        return [
-            QuestionResponse(**q.model_dump(by_alias=True, mode="json"))
-            for q in questions
-        ]
+        return [QuestionResponse(**q.model_dump(by_alias=True, mode="json")) for q in questions]
     except HTTPException:
         raise
     except Exception as e:
@@ -276,17 +258,12 @@ async def get_questions_by_difficulty(
 )
 async def get_questions_by_tags(
     tags: list[str] = Query(..., description="List of tags to filter by"),
-    limit: int = Query(
-        100, ge=1, le=500, description="Maximum number of questions to return"
-    ),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
 ):
     """Get questions filtered by tags."""
     try:
         questions = await QuestionService.find_by_tags(tags, limit)
-        return [
-            QuestionResponse(**q.model_dump(by_alias=True, mode="json"))
-            for q in questions
-        ]
+        return [QuestionResponse(**q.model_dump(by_alias=True, mode="json")) for q in questions]
     except HTTPException:
         raise
     except Exception as e:
@@ -321,9 +298,7 @@ async def filter_questions(
     skill: str | None = Query(None, description="Skill filter"),
     difficulty: str | None = Query(None, description="Difficulty filter"),
     tags: list[str] | None = Query(None, description="Tags filter (OR condition)"),
-    limit: int = Query(
-        100, ge=1, le=500, description="Maximum number of questions to return"
-    ),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
 ):
     """
     Filter questions using multiple criteria with AND conditions.
@@ -339,10 +314,7 @@ async def filter_questions(
             tags=tags,
             limit=limit,
         )
-        return [
-            QuestionResponse(**q.model_dump(by_alias=True, mode="json"))
-            for q in questions
-        ]
+        return [QuestionResponse(**q.model_dump(by_alias=True, mode="json")) for q in questions]
     except HTTPException:
         raise
     except Exception as e:

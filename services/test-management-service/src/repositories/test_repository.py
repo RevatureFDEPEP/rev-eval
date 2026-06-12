@@ -48,9 +48,7 @@ class TestRepository:
 
         # Convert seconds → timedelta
         if "duration_seconds" in update_data:
-            update_data["duration"] = timedelta(
-                seconds=update_data.pop("duration_seconds")
-            )
+            update_data["duration"] = timedelta(seconds=update_data.pop("duration_seconds"))
 
         for field, value in update_data.items():
             setattr(test, field, value)
@@ -67,11 +65,7 @@ class TestRepository:
     @staticmethod
     async def list_by_creator(db: AsyncSession, creator_id: int) -> list[Test]:
         """Get all tests created by a specific user"""
-        result = await db.execute(
-            select(Test)
-            .where(Test.created_by_id == creator_id)
-            .order_by(Test.created_at.desc())
-        )
+        result = await db.execute(select(Test).where(Test.created_by_id == creator_id).order_by(Test.created_at.desc()))
         tests = list(result.scalars().all())
         for test in tests:
             if test.duration:

@@ -90,9 +90,7 @@ async def get_database():
         RuntimeError: If database is not initialized (init_db not called)
     """
     if db is None:
-        raise RuntimeError(
-            "Database not initialized. Call init_db() during application startup."
-        )
+        raise RuntimeError("Database not initialized. Call init_db() during application startup.")
     return db
 
 
@@ -107,9 +105,7 @@ async def get_client():
         RuntimeError: If client is not initialized
     """
     if client is None:
-        raise RuntimeError(
-            "MongoDB client not initialized. Call init_db() during application startup."
-        )
+        raise RuntimeError("MongoDB client not initialized. Call init_db() during application startup.")
     return client
 
 

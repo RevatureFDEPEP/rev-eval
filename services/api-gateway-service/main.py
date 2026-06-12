@@ -58,9 +58,7 @@ PUBLIC_PATH_PREFIXES = (
 
 
 # Compile patterns for performance
-COMPILED_ROUTES = [
-    {"pattern": re.compile(r["pattern"]), "service": r["service"]} for r in ROUTES
-]
+COMPILED_ROUTES = [{"pattern": re.compile(r["pattern"]), "service": r["service"]} for r in ROUTES]
 
 
 def find_service_for_path(path: str) -> str | None:
@@ -108,9 +106,7 @@ def health():
 @app.get("/routes")
 def list_routes():
     """List all configured routes"""
-    return {
-        "routes": [{"pattern": r["pattern"], "service": r["service"]} for r in ROUTES]
-    }
+    return {"routes": [{"pattern": r["pattern"], "service": r["service"]} for r in ROUTES]}
 
 
 # ===== PUBLIC AUTH PASS-THROUGH (no JWT required) =====
@@ -156,9 +152,7 @@ async def public_auth_proxy(auth_path: str, request: Request):
 
 
 # ===== SMART ROUTING (NO SERVICE NAME IN URL) =====
-@app.api_route(
-    "/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
-)
+@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def smart_gateway(
     path: str,
     request: Request,
@@ -179,9 +173,7 @@ async def smart_gateway(
 
     if not service_name:
         logger.error(f"❌ No service found for path: /{path}")
-        raise HTTPException(
-            status_code=404, detail=f"No service configured for path: /{path}"
-        )
+        raise HTTPException(status_code=404, detail=f"No service configured for path: /{path}")
 
     logger.info(f"📍 Matched service: {service_name}")
 
@@ -313,9 +305,7 @@ async def legacy_gateway(service_name: str, path: str, request: Request):
         raise
     except httpx.ConnectError as e:
         logger.info(f"❌ Connection Error: {str(e)}")
-        raise HTTPException(
-            status_code=503, detail=f"Cannot connect to service: {str(e)}"
-        ) from e
+        raise HTTPException(status_code=503, detail=f"Cannot connect to service: {str(e)}") from e
     except Exception as e:
         logger.info(f"❌ ERROR: {str(e)}")
         import traceback

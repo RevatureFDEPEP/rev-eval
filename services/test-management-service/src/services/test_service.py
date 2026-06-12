@@ -9,9 +9,7 @@ from src.schemas.test_skill_schema import TestSkillCreate
 
 class TestService:
     @staticmethod
-    async def create_test(
-        db: AsyncSession, test_in: TestCreate, creator_id: int
-    ) -> TestOut:
+    async def create_test(db: AsyncSession, test_in: TestCreate, creator_id: int) -> TestOut:
         """
         Create a new test and automatically link skills
         """
@@ -32,14 +30,10 @@ class TestService:
             if skill:
                 skills.append(skill)
 
-        return TestOut.from_orm(test).copy(
-            update={"skills": [SkillOut.from_orm(s) for s in skills]}
-        )
+        return TestOut.from_orm(test).copy(update={"skills": [SkillOut.from_orm(s) for s in skills]})
 
     @staticmethod
-    async def update_test(
-        db: AsyncSession, test_id: int, test_in: TestUpdate
-    ) -> TestOut:
+    async def update_test(db: AsyncSession, test_id: int, test_in: TestUpdate) -> TestOut:
         """
         Update a test and optionally update its skills
         """
@@ -79,9 +73,7 @@ class TestService:
                 if skill:
                     skills.append(skill)
 
-        return TestOut.from_orm(test).copy(
-            update={"skills": [SkillOut.from_orm(s) for s in skills]}
-        )
+        return TestOut.from_orm(test).copy(update={"skills": [SkillOut.from_orm(s) for s in skills]})
 
     @staticmethod
     async def delete_test(db: AsyncSession, test_id: int) -> None:
@@ -104,9 +96,7 @@ class TestService:
             if skill:
                 skills.append(skill)
 
-        return TestOut.from_orm(test).copy(
-            update={"skills": [SkillOut.from_orm(s) for s in skills]}
-        )
+        return TestOut.from_orm(test).copy(update={"skills": [SkillOut.from_orm(s) for s in skills]})
 
     @staticmethod
     async def list_all_tests(db: AsyncSession) -> list[TestOut]:
@@ -122,18 +112,12 @@ class TestService:
                 if skill:
                     skills.append(skill)
 
-            results.append(
-                TestOut.from_orm(test).copy(
-                    update={"skills": [SkillOut.from_orm(s) for s in skills]}
-                )
-            )
+            results.append(TestOut.from_orm(test).copy(update={"skills": [SkillOut.from_orm(s) for s in skills]}))
 
         return results
 
     @staticmethod
-    async def list_tests_created_by_user(
-        db: AsyncSession, user_id: int
-    ) -> list[TestOut]:
+    async def list_tests_created_by_user(db: AsyncSession, user_id: int) -> list[TestOut]:
         """
         Return all tests created by a specific user
         """
@@ -149,18 +133,12 @@ class TestService:
                 if skill:
                     skills.append(skill)
 
-            results.append(
-                TestOut.from_orm(test).copy(
-                    update={"skills": [SkillOut.from_orm(s) for s in skills]}
-                )
-            )
+            results.append(TestOut.from_orm(test).copy(update={"skills": [SkillOut.from_orm(s) for s in skills]}))
 
         return results
 
     @staticmethod
-    async def list_tests_with_submissions_by_user(
-        db: AsyncSession, user_id: int
-    ) -> list[TestOut]:
+    async def list_tests_with_submissions_by_user(db: AsyncSession, user_id: int) -> list[TestOut]:
         """
         Return all tests for which the user has submitted (has test submissions)
         """
@@ -184,10 +162,6 @@ class TestService:
                     if skill:
                         skills.append(skill)
 
-                results.append(
-                    TestOut.from_orm(test).copy(
-                        update={"skills": [SkillOut.from_orm(s) for s in skills]}
-                    )
-                )
+                results.append(TestOut.from_orm(test).copy(update={"skills": [SkillOut.from_orm(s) for s in skills]}))
 
         return results

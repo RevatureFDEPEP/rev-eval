@@ -23,9 +23,7 @@ logger = logging.getLogger(__name__)
 
 class TestSubmissionService:
     @staticmethod
-    async def create_submission(
-        db: AsyncSession, submission_in: TestSubmissionCreate
-    ) -> TestSubmissionOut:
+    async def create_submission(db: AsyncSession, submission_in: TestSubmissionCreate) -> TestSubmissionOut:
         submission = await TestSubmissionRepository.create(db, submission_in)
         # test = await TestService.get_test_by_id(db, submission_in.test_id)
         # if not test:
@@ -74,7 +72,8 @@ class TestSubmissionService:
         #                 submission_data = TestSubmissionCreate(
         #                     test_id=request.test_id,
         #                     user_id=user_id,
-        #                     assigned_by_id=current_user["id"],  # Use authenticated user's database ID from user-service
+        #                     # Use authenticated user's database ID from user-service
+        #                     assigned_by_id=current_user["id"],
         #                     due_date=request.due_date
         #                 )
 
@@ -89,7 +88,10 @@ class TestSubmissionService:
         #                     test_skills = [ts.name for ts in test.skills] if test.skills else []
         #                     duration_minutes = int(test.duration_seconds / 60) if test.duration_seconds else 60
 
-        #                     logger.info(f"📤 Publishing TEST_ASSIGNED event for {email} (submission_id: {submission.id})")
+        #                     logger.info(
+        #                         f"📤 Publishing TEST_ASSIGNED event for {email}"
+        #                         f" (submission_id: {submission.id})"
+        #                     )
 
         #                     sqs_success = await sqs_client.publish_test_assigned_event(
         #                         test_id=test.id,
@@ -116,7 +118,10 @@ class TestSubmissionService:
 
         #                 except Exception as sqs_error:
         #                     # Don't fail the assignment if SQS publishing fails
-        #                     logger.error(f"❌ Exception while publishing TEST_ASSIGNED event for {email}: {str(sqs_error)}")
+        #                     logger.error(
+        #                         f"❌ Exception while publishing TEST_ASSIGNED event"
+        #                         f" for {email}: {str(sqs_error)}"
+        #                     )
         #                     import traceback
         #                     logger.error(traceback.format_exc())
 
@@ -142,9 +147,7 @@ class TestSubmissionService:
         submission = await TestSubmissionRepository.get_by_id(db, submission_id)
         if not submission:
             raise ValueError("Submission not found")
-        submission = await TestSubmissionRepository.update(
-            db, submission, submission_in
-        )
+        submission = await TestSubmissionRepository.update(db, submission, submission_in)
         return TestSubmissionOut.from_orm(submission)
 
     @staticmethod
@@ -155,9 +158,7 @@ class TestSubmissionService:
         await TestSubmissionRepository.delete(db, submission)
 
     @staticmethod
-    async def get_submission_by_id(
-        db: AsyncSession, submission_id: int
-    ) -> TestSubmissionOut:
+    async def get_submission_by_id(db: AsyncSession, submission_id: int) -> TestSubmissionOut:
         submission = await TestSubmissionRepository.get_by_id(db, submission_id)
         if not submission:
             raise ValueError("Submission not found")
@@ -169,17 +170,13 @@ class TestSubmissionService:
         return [TestSubmissionOut.from_orm(s) for s in submissions]
 
     @staticmethod
-    async def list_submissions_by_user(
-        db: AsyncSession, user_id: int
-    ) -> list[TestSubmissionOut]:
+    async def list_submissions_by_user(db: AsyncSession, user_id: int) -> list[TestSubmissionOut]:
         """Get all submissions for a specific user (participant view)"""
         submissions = await TestSubmissionRepository.list_by_user(db, user_id)
         return [TestSubmissionOut.from_orm(s) for s in submissions]
 
     @staticmethod
-    async def bulk_assign_test(
-        db: AsyncSession, request: BulkAssignRequest, current_user: dict
-    ) -> BulkAssignResult:
+    async def bulk_assign_test(db: AsyncSession, request: BulkAssignRequest, current_user: dict) -> BulkAssignResult:
         """
         Bulk assign a test to multiple participants.
         For each email:
@@ -210,9 +207,7 @@ class TestSubmissionService:
             for email in request.participant_emails:
                 try:
                     # Check if user exists (direct call to user-service)
-                    user_response = await client.get(
-                        f"{user_service_url}/v1/api/users/by-email/{email}"
-                    )
+                    user_response = await client.get(f"{user_service_url}/v1/api/users/by-email/{email}")
 
                     if user_response.status_code == 404:
                         # User doesn't exist, create and invite (direct call to user-service)
@@ -251,15 +246,11 @@ class TestSubmissionService:
                     submission_data = TestSubmissionCreate(
                         test_id=request.test_id,
                         user_id=user_id,
-                        assigned_by_id=current_user[
-                            "id"
-                        ],  # Use authenticated user's database ID from user-service
+                        assigned_by_id=current_user["id"],  # Use authenticated user's database ID from user-service
                         due_date=request.due_date,
                     )
 
-                    submission = await TestSubmissionRepository.create(
-                        db, submission_data
-                    )
+                    submission = await TestSubmissionRepository.create(db, submission_data)
                     submission_out = TestSubmissionOut.from_orm(submission)
                     created_submissions.append(submission_out)
                     submission_ids.append(submission.id)
@@ -274,9 +265,7 @@ class TestSubmissionService:
                     )
                     failure_count += 1
                 except Exception as e:
-                    errors.append(
-                        {"email": email, "error": f"Unexpected error: {str(e)}"}
-                    )
+                    errors.append({"email": email, "error": f"Unexpected error: {str(e)}"})
                     failure_count += 1
 
         return BulkAssignResult(
@@ -287,9 +276,7 @@ class TestSubmissionService:
         )
 
     @staticmethod
-    async def get_evaluated_submissions_for_trainer(
-        db: AsyncSession, trainer_id: int
-    ) -> list[TestSubmissionOut]:
+    async def get_evaluated_submissions_for_trainer(db: AsyncSession, trainer_id: int) -> list[TestSubmissionOut]:
         """
         Get list of EVALUATED submissions for any trainer to review.
 
@@ -308,9 +295,7 @@ class TestSubmissionService:
         # Get all EVALUATED submissions (any trainer can review any interview)
         query = (
             select(TestSubmission)
-            .options(
-                selectinload(TestSubmission.test)
-            )  # Eagerly load test relationship
+            .options(selectinload(TestSubmission.test))  # Eagerly load test relationship
             .join(Test, TestSubmission.test_id == Test.id)
             .where(TestSubmission.status == SubmissionStatus.EVALUATED)
             .order_by(TestSubmission.submitted_at.desc())
@@ -329,9 +314,7 @@ class TestSubmissionService:
 
                 # Fetch participant details
                 try:
-                    user_response = await client.get(
-                        f"{user_service_url}/v1/api/users/{submission.user_id}"
-                    )
+                    user_response = await client.get(f"{user_service_url}/v1/api/users/{submission.user_id}")
                     if user_response.status_code == 200:
                         user_data = user_response.json()
                         # Construct full name from first_name and last_name
@@ -372,9 +355,7 @@ class TestSubmissionService:
         # Get all GRADED submissions
         query = (
             select(TestSubmission)
-            .options(
-                selectinload(TestSubmission.test)
-            )  # Eagerly load test relationship
+            .options(selectinload(TestSubmission.test))  # Eagerly load test relationship
             .join(Test, TestSubmission.test_id == Test.id)
             .where(TestSubmission.status == SubmissionStatus.GRADED)
             .order_by(TestSubmission.reviewed_at.desc())
@@ -386,9 +367,7 @@ class TestSubmissionService:
         return [TestSubmissionOut.from_orm(s) for s in submissions]
 
     @staticmethod
-    async def get_all_submissions_for_trainer(
-        db: AsyncSession, trainer_id: int
-    ) -> list[TestSubmissionOut]:
+    async def get_all_submissions_for_trainer(db: AsyncSession, trainer_id: int) -> list[TestSubmissionOut]:
         """
         Get ALL submissions for tests created by this trainer across all statuses.
 
@@ -412,8 +391,7 @@ class TestSubmissionService:
             .options(selectinload(TestSubmission.test))  # Eager load test relationship
             .where(
                 Test.created_by_id == trainer_id,  # Filter by trainer
-                TestSubmission.status
-                != SubmissionStatus.EVALUATED,  # Exclude EVALUATED
+                TestSubmission.status != SubmissionStatus.EVALUATED,  # Exclude EVALUATED
             )
             .order_by(TestSubmission.created_at.desc())  # Most recent first
         )
@@ -431,9 +409,7 @@ class TestSubmissionService:
 
                 # Fetch participant details
                 try:
-                    user_response = await client.get(
-                        f"{user_service_url}/v1/api/users/{submission.user_id}"
-                    )
+                    user_response = await client.get(f"{user_service_url}/v1/api/users/{submission.user_id}")
                     if user_response.status_code == 200:
                         user_data = user_response.json()
                         # Construct full name from first_name and last_name
@@ -458,9 +434,7 @@ class TestSubmissionService:
         return submission_outs
 
     @staticmethod
-    async def get_submission_review_details(
-        db: AsyncSession, submission_id: int
-    ) -> dict[str, Any]:
+    async def get_submission_review_details(db: AsyncSession, submission_id: int) -> dict[str, Any]:
         """
         Get full review details for a submission including:
         - Submission metadata
@@ -497,9 +471,7 @@ class TestSubmissionService:
                         f"⚠️ Could not fetch transcript for submission {submission_id}: {response.status_code}"
                     )
         except Exception as e:
-            logger.error(
-                f"❌ Error fetching transcript for submission {submission_id}: {e}"
-            )
+            logger.error(f"❌ Error fetching transcript for submission {submission_id}: {e}")
 
         # Build response
         return {
@@ -511,10 +483,7 @@ class TestSubmissionService:
                 "role": test.role,
                 "curriculum": test.curriculum,
                 "duration_seconds": test.duration_seconds,
-                "skills": [
-                    {"id": s.id, "name": s.name, "description": s.description}
-                    for s in test.skills
-                ]
+                "skills": [{"id": s.id, "name": s.name, "description": s.description} for s in test.skills]
                 if test.skills
                 else [],
             },
@@ -547,8 +516,7 @@ class TestSubmissionService:
         # Validate that submission is in EVALUATED status
         if submission.status != SubmissionStatus.EVALUATED:
             raise ValueError(
-                f"Submission {submission_id} is not in EVALUATED status. "
-                f"Current status: {submission.status}"
+                f"Submission {submission_id} is not in EVALUATED status. " f"Current status: {submission.status}"
             )
 
         # Update submission with trainer review
@@ -566,9 +534,7 @@ class TestSubmissionService:
         submission.reviewed_by_id = trainer_id
 
         # Update using repository
-        updated_submission = await TestSubmissionRepository.update(
-            db, submission, update_data
-        )
+        updated_submission = await TestSubmissionRepository.update(db, submission, update_data)
 
         # Save comprehensive trainer evaluation to MongoDB (for interviews)
         # This stores the full evaluation structure alongside AI evaluation
@@ -586,7 +552,8 @@ class TestSubmissionService:
                     )
                     if mongo_response.status_code != 200:
                         logger.warning(
-                            f"Failed to save trainer evaluation to MongoDB: {mongo_response.status_code} - {mongo_response.text}"
+                            f"Failed to save trainer evaluation to MongoDB: "
+                            f"{mongo_response.status_code} - {mongo_response.text}"
                         )
             except Exception as e:
                 logger.error(f"Error saving trainer evaluation to MongoDB: {str(e)}")

@@ -17,9 +17,7 @@ router = APIRouter(prefix="/submissions", tags=["Test Submissions"])
 
 
 @router.post("/", response_model=TestSubmissionOut, status_code=status.HTTP_201_CREATED)
-async def create_submission(
-    submission_in: TestSubmissionCreate, db: AsyncSession = Depends(get_db)
-):
+async def create_submission(submission_in: TestSubmissionCreate, db: AsyncSession = Depends(get_db)):
     return await TestSubmissionService.create_submission(db, submission_in)
 
 
@@ -47,9 +45,7 @@ async def list_submissions(
 
         # Participants automatically see only their own submissions
         if user_role == "PARTICIPANT" and auth_user_id:
-            return await TestSubmissionService.list_submissions_by_user(
-                db, auth_user_id
-            )
+            return await TestSubmissionService.list_submissions_by_user(db, auth_user_id)
 
     # Trainers/admins or unauthenticated requests see all submissions
     return await TestSubmissionService.list_all_submissions(db)
@@ -70,9 +66,7 @@ async def update_submission(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        return await TestSubmissionService.update_submission(
-            db, submission_id, submission_in
-        )
+        return await TestSubmissionService.update_submission(db, submission_id, submission_in)
     except ValueError:
         raise HTTPException(status_code=404, detail="Submission not found") from None
 
@@ -85,9 +79,7 @@ async def delete_submission(submission_id: int, db: AsyncSession = Depends(get_d
         raise HTTPException(status_code=404, detail="Submission not found") from None
 
 
-@router.post(
-    "/bulk-assign", response_model=BulkAssignResult, status_code=status.HTTP_201_CREATED
-)
+@router.post("/bulk-assign", response_model=BulkAssignResult, status_code=status.HTTP_201_CREATED)
 async def bulk_assign_test(
     request: BulkAssignRequest,
     current_user: dict = Depends(get_current_user_from_headers),
@@ -121,9 +113,7 @@ async def get_evaluated_submissions_for_trainer(
     if not trainer_id:
         raise HTTPException(status_code=401, detail="Invalid user")
 
-    return await TestSubmissionService.get_evaluated_submissions_for_trainer(
-        db, trainer_id
-    )
+    return await TestSubmissionService.get_evaluated_submissions_for_trainer(db, trainer_id)
 
 
 @router.get("/trainer/all", response_model=list[TestSubmissionOut])
@@ -184,15 +174,11 @@ async def get_submission_review_details(
         raise HTTPException(status_code=401, detail="Authentication required")
 
     try:
-        return await TestSubmissionService.get_submission_review_details(
-            db, submission_id
-        )
+        return await TestSubmissionService.get_submission_review_details(db, submission_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error fetching review details: {str(e)}"
-        ) from e
+        raise HTTPException(status_code=500, detail=f"Error fetching review details: {str(e)}") from e
 
 
 @router.post("/{submission_id}/trainer-review", response_model=TrainerReviewResponse)
@@ -221,12 +207,8 @@ async def submit_trainer_review(
         raise HTTPException(status_code=401, detail="Invalid user")
 
     try:
-        return await TestSubmissionService.submit_trainer_review(
-            db, submission_id, review, trainer_id
-        )
+        return await TestSubmissionService.submit_trainer_review(db, submission_id, review, trainer_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error submitting review: {str(e)}"
-        ) from e
+        raise HTTPException(status_code=500, detail=f"Error submitting review: {str(e)}") from e
