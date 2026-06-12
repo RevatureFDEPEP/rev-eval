@@ -81,11 +81,11 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
         working-directory: frontend
-        run: pnpm lint
+        run: pnpm lint --no-cache
 
       - name: Build
         working-directory: frontend
