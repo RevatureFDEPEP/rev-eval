@@ -208,6 +208,9 @@ services:
       TMS_DB_USERNAME: ${POSTGRES_USER:-root}
       TMS_DB_PASSWORD: ${POSTGRES_PASSWORD:-root}
       TMS_DB_NAME: ${POSTGRES_DB:-eval_ai_dev}
+      # Shared signing key — require_trainer re-verifies the JWT here
+      # (defense-in-depth) instead of trusting the gateway's X-User-* headers.
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       SERVICE_NAME: reporting-and-analytics-service
       PORT: 8004
       SERVICE_HOSTNAME: reporting-and-analytics-service

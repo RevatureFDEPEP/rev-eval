@@ -1,20 +1,61 @@
-"""Candidate results reporting endpoints (W4-F1).
+"""Reporting endpoints: candidate results (W4-F1) and trainer-only
+aggregates (W4-F3).
 
 Read-only: every query runs against test-management-service's Postgres via
-the dedicated TMS engine (get_tms_db). The API gateway is the auth boundary
-(JWT verified there, like every downstream service); per-role enforcement
-(require_trainer / self-access) lands in W4-F3.
+the dedicated TMS engine (get_tms_db). The API gateway verifies the JWT
+platform-wide; the trainer endpoints additionally re-verify it themselves
+via require_trainer (defense-in-depth — see src/v1/dependencies/auth.py).
 """
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.session import get_tms_db
-from src.schemas.report_schema import AttemptsPage, AttemptsQuery, UserSummary
+from src.schemas.report_schema import (
+    AggregateQuery,
+    AggregateReport,
+    AttemptsPage,
+    AttemptsQuery,
+    QuestionDifficultyReport,
+    UserSummary,
+)
 from src.services.report_service import ReportService
+from src.v1.dependencies.auth import require_trainer
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
+
+
+@router.get(
+    "/aggregate",
+    response_model=AggregateReport,
+    dependencies=[Depends(require_trainer)],
+)
+async def get_aggregate_report(
+    query: Annotated[AggregateQuery, Query()],
+    db: AsyncSession = Depends(get_tms_db),
+):
+    """Trainer-only per-test aggregates: attempts, distinct candidates, avg
+    score, pass rate vs. the configured threshold, median time-to-complete.
+    Optional test/date filters; `min_attempts` drops thin groups (HAVING)."""
+    return await ReportService.aggregate_by_test(db, query)
+
+
+@router.get(
+    "/test/{test_id}/questions",
+    response_model=QuestionDifficultyReport,
+    dependencies=[Depends(require_trainer)],
+)
+async def get_question_difficulty(
+    test_id: int,
+    db: AsyncSession = Depends(get_tms_db),
+):
+    """Trainer-only per-question difficulty: correct-answer rate, hardest-first
+    RANK, and a score-distribution histogram. 404 for an unknown test."""
+    report = await ReportService.question_difficulty(db, test_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Test not found")
+    return report
 
 
 @router.get("/user/{user_id}", response_model=UserSummary)
