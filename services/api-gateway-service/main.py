@@ -48,6 +48,7 @@ ROUTES = [
     {"pattern": r"^/v1/api/submissions(/.*)?$", "service": "test-management-service"},
     {"pattern": r"^/v1/api/skills(/.*)?$", "service": "test-management-service"},
     {"pattern": r"^/v1/api/questions(/.*)?$", "service": "question-management-service"},
+    {"pattern": r"^/v1/api/test-sessions(/.*)?$", "service": "test-management-service"},
 ]
 
 # Paths that bypass JWT verification (login, register).

@@ -1,6 +1,7 @@
 from typing import List, Dict, Any
 import httpx
 import logging
+import uuid
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.repositories.test_submission_repository import TestSubmissionRepository
@@ -198,7 +199,8 @@ class TestSubmissionService:
         # Direct service-to-service communication (internal network)
         user_service_url = settings.USER_SERVICE_URL
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        request_id = str(uuid.uuid4())
+        async with httpx.AsyncClient(timeout=30.0, headers={"X-Request-Id": request_id}) as client:
             for email in request.participant_emails:
                 try:
                     # Check if user exists (direct call to user-service)
@@ -303,7 +305,8 @@ class TestSubmissionService:
         user_service_url = settings.USER_SERVICE_URL
         submission_outs = []
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        request_id = str(uuid.uuid4())
+        async with httpx.AsyncClient(timeout=30.0, headers={"X-Request-Id": request_id}) as client:
             for submission in submissions:
                 submission_out = TestSubmissionOut.from_orm(submission)
 
@@ -400,7 +403,8 @@ class TestSubmissionService:
         user_service_url = settings.USER_SERVICE_URL
         submission_outs = []
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        request_id = str(uuid.uuid4())
+        async with httpx.AsyncClient(timeout=30.0, headers={"X-Request-Id": request_id}) as client:
             for submission in submissions:
                 submission_out = TestSubmissionOut.from_orm(submission)
 
@@ -461,7 +465,7 @@ class TestSubmissionService:
             if not interview_service_url:  # pragma: no cover
                 logger.warning("⚠️ INTERVIEW_SERVICE_URL not configured — skipping transcript fetch")
                 raise ValueError("INTERVIEW_SERVICE_URL not set")
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0, headers={"X-Request-Id": str(uuid.uuid4())}) as client:
                 response = await client.get(
                     f"{interview_service_url}/v1/api/interview/submissions/{submission_id}/transcript"
                 )
@@ -542,7 +546,7 @@ class TestSubmissionService:
             try:
                 if not interview_service_url:  # pragma: no cover
                     raise ValueError("INTERVIEW_SERVICE_URL not set")
-                async with httpx.AsyncClient(timeout=30.0) as client:
+                async with httpx.AsyncClient(timeout=30.0, headers={"X-Request-Id": str(uuid.uuid4())}) as client:
                     mongo_response = await client.patch(
                         f"{interview_service_url}/v1/api/interview/submissions/{submission_id}/trainer-evaluation",
                         json={

@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from src.v1.routes.test_route import router as test_router
 from src.v1.routes.skill_route import router as skill_router
 from src.v1.routes.test_submission_route import router as test_submission_router
+from src.v1.routes.quiz_session_route import router as quiz_session_router
 from src.db.session import init_db
 from src.config.settings import settings
 
@@ -42,6 +43,7 @@ app.add_middleware(
 app.include_router(test_router, prefix="/v1/api")
 app.include_router(skill_router, prefix="/v1/api")
 app.include_router(test_submission_router, prefix="/v1/api")
+app.include_router(quiz_session_router, prefix="/v1/api")
 
 # ---- Health Endpoint ----
 @app.get("/health", tags=["health"])

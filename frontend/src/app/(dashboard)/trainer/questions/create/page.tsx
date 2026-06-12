@@ -42,6 +42,8 @@ import {
   getSkills,
   SkillInfo,
 } from "@/lib/api";
+import { ApiError } from "@/lib/api/client";
+import { api } from "@/lib/api/client";
 import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
@@ -122,6 +124,8 @@ export default function CreateQuestionPage() {
   const searchParams = useSearchParams();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
 
@@ -239,18 +243,56 @@ export default function CreateQuestionPage() {
     };
   };
 
+  const uploadImageToMinIO = async (questionId: string, file: File): Promise<void> => {
+    setUploadingImage(true);
+    try {
+      const { url } = await api.post<{ url: string; key: string; expires_in: number }>(
+        `/v1/api/questions/${questionId}/image/upload-url?content_type=${encodeURIComponent(file.type)}`
+      );
+      await fetch(url, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const mapValidationErrors = (err: unknown): boolean => {
+    if (!(err instanceof ApiError) || err.status !== 422) return false;
+    try {
+      const body = JSON.parse(err.body as string) as {
+        detail?: Array<{ loc: string[]; msg: string }>;
+      };
+      if (!Array.isArray(body?.detail)) return false;
+      for (const e of body.detail) {
+        // loc is ["body", "field_name"] — drop the "body" prefix
+        const field = e.loc.slice(1).join(".") as keyof QuestionFormValues;
+        if (field) form.setError(field, { message: e.msg });
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const onSubmit = async (values: QuestionFormValues) => {
     try {
       setSubmitting(true);
       setError(null);
       const data = transformFormData(values);
-      await createQuestion(data);
+      const question = await createQuestion(data);
+      if (imageFile && question.id) {
+        await uploadImageToMinIO(question.id, imageFile);
+      }
       toast.success("Question created successfully!", {
         description: `"${values.question_text.slice(0, 50)}..." has been added to your question bank.`,
       });
       router.push("/trainer/questions");
     } catch (err) {
       console.error("Failed to create question:", err);
+      if (mapValidationErrors(err)) return; // RHF setError handles display
       const errorMessage =
         err instanceof Error ? err.message : "Failed to create question";
       setError(errorMessage);
@@ -678,6 +720,32 @@ export default function CreateQuestionPage() {
                   </FormItem>
                 )}
               />
+            </CardContent>
+          </Card>
+
+          {/* Image Upload (optional) */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Question Image (Optional)</CardTitle>
+              <CardDescription>
+                Attach a diagram or image. Uploaded directly to object storage via presigned URL.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+                className="cursor-pointer"
+              />
+              {imageFile && (
+                <p className="mt-2 text-xs text-slate-500">
+                  Selected: {imageFile.name} ({(imageFile.size / 1024).toFixed(1)} KB)
+                </p>
+              )}
+              {uploadingImage && (
+                <p className="mt-2 text-xs text-orange-500">Uploading image...</p>
+              )}
             </CardContent>
           </Card>
 
