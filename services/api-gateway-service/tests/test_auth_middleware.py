@@ -3,7 +3,6 @@ import os
 
 import jwt
 import pytest
-
 from src.middleware.auth import add_user_context_headers, verify_jwt_token
 
 _SECRET = os.environ["JWT_SECRET"]

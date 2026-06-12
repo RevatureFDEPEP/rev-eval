@@ -22,8 +22,8 @@ _TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
 
 @pytest_asyncio.fixture
 async def db():
-    from src.db.session import Base  # noqa: PLC0415
     import src.models.skill  # noqa: F401, PLC0415
+    from src.db.session import Base  # noqa: PLC0415
 
     engine = create_async_engine(_TEST_DB_URL, echo=False)
     async with engine.begin() as conn:

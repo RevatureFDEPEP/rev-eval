@@ -2,7 +2,6 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-
 from src.db.init_db import Base
 from src.models.user import User, UserRole
 from src.schemas.auth_schema import RegisterRequest
@@ -11,7 +10,7 @@ from src.schemas.auth_schema import RegisterRequest
 @pytest.mark.parametrize(
     "password,should_pass",
     [
-        ("short1", False),   # 6 chars – below the 8-char minimum
+        ("short1", False),  # 6 chars – below the 8-char minimum
         ("1234567", False),  # 7 chars – one under the minimum
         ("exactly8", True),  # exactly 8 chars
         ("Secure#99!", True),  # strong password well above minimum

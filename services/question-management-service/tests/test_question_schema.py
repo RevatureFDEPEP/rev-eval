@@ -1,6 +1,5 @@
 import pytest
 from pydantic import ValidationError
-
 from src.models.question import OptionCreate, QuestionType
 from src.schemas.question import QuestionCreate
 

@@ -1,5 +1,4 @@
 import pytest
-
 from src.repositories.skill_repository import SkillRepository
 from src.schemas.skill_schema import SkillCreate, SkillUpdate
 
@@ -23,9 +22,7 @@ async def test_skill_create_persists_and_get_by_id_returns_match(name, descripti
 
 
 async def test_skill_update_modifies_name_and_leaves_description_unchanged(db):
-    original = await SkillRepository.create(
-        db, SkillCreate(name="Legacy Name", description="Keep this description")
-    )
+    original = await SkillRepository.create(db, SkillCreate(name="Legacy Name", description="Keep this description"))
     updated = await SkillRepository.update(db, original, SkillUpdate(name="Updated Name"))
     assert updated.name == "Updated Name"
     assert updated.description == "Keep this description"
