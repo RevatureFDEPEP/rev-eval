@@ -201,6 +201,52 @@ class TestFindServiceForPath:
 # get_service_url
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# X-Request-Id propagation
+# ---------------------------------------------------------------------------
+
+class TestXRequestId:
+    """
+    RequestIdMiddleware must:
+    1. Return X-Request-Id in every response.
+    2. Echo the caller's X-Request-Id when one is supplied.
+    3. Generate a UUID when the caller does not supply one.
+    """
+
+    def test_response_always_includes_x_request_id(self):
+        resp = client.get("/health")
+        assert resp.status_code == 200
+        # httpx lowercases header names
+        assert "x-request-id" in resp.headers, (
+            "RequestIdMiddleware must add X-Request-Id to every response"
+        )
+
+    def test_caller_supplied_request_id_echoed(self):
+        rid = "test-propagation-12345"
+        resp = client.get("/health", headers={"X-Request-Id": rid})
+        assert resp.headers.get("x-request-id") == rid, (
+            "Gateway must echo the caller's X-Request-Id unchanged"
+        )
+
+    def test_generated_request_id_is_uuid_format(self):
+        import uuid as _uuid
+        resp = client.get("/health")
+        generated = resp.headers.get("x-request-id", "")
+        try:
+            _uuid.UUID(generated)
+        except ValueError:
+            raise AssertionError(
+                f"Auto-generated X-Request-Id is not a valid UUID: {generated!r}"
+            )
+
+    def test_different_requests_get_different_ids(self):
+        r1 = client.get("/health")
+        r2 = client.get("/health")
+        assert r1.headers.get("x-request-id") != r2.headers.get("x-request-id"), (
+            "Each unauthenticated request must receive a unique X-Request-Id"
+        )
+
+
 class TestGetServiceUrl:
     def test_user_service_url(self):
         assert get_service_url("user-service") == "http://user-service:8002"

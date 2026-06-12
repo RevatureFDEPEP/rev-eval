@@ -5,6 +5,12 @@ on:
     branches: ['**']
   pull_request:
   workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: 'Run Playwright E2E tests against full stack'
+        required: false
+        default: 'false'
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -25,6 +31,20 @@ jobs:
       SERVICE_NAME: ${{ matrix.service }}
       PORT: "8004"
       SERVICE_HOSTNAME: "localhost"
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
     strategy:
       fail-fast: false
       matrix:
@@ -148,6 +168,50 @@ jobs:
       - name: Test
         working-directory: frontend
         run: pnpm test --if-present
+
+  playwright-e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    # Only run when explicitly triggered with run_e2e=true.
+    # Normal push/PR CI skips this job — it requires the full stack.
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_e2e == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright + dependencies
+        working-directory: e2e
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+
+      - name: Start full stack
+        run: docker compose up -d --build
+
+      - name: Wait for stack to be healthy
+        run: |
+          echo "Waiting for services..."
+          timeout 120 bash -c \
+            'until curl -sf http://localhost:8000/health; do sleep 5; done'
+
+      - name: Run Playwright tests
+        working-directory: e2e
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          API_BASE_URL: http://localhost:8000
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+
   ci-gate:
       name: CI Gate
       runs-on: ubuntu-latest
