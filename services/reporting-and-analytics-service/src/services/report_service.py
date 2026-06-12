@@ -1,0 +1,64 @@
+"""Business layer for the candidate results reports (W4-F1).
+
+Shapes repository rows into the response envelopes. Scores are rounded to two
+decimals for presentation — all aggregation already happened in SQL.
+"""
+from typing import Optional
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.repositories.report_repository import ReportRepository
+from src.schemas.report_schema import (
+    AttemptItem,
+    AttemptsPage,
+    AttemptsQuery,
+    MostRecentAttempt,
+    UserSummary,
+)
+
+
+def _round(value: Optional[float]) -> Optional[float]:
+    return None if value is None else round(float(value), 2)
+
+
+class ReportService:
+    @staticmethod
+    async def user_summary(db: AsyncSession, user_id: int) -> UserSummary:
+        row = await ReportRepository.user_summary(db, user_id)
+        most_recent = None
+        if row.recent_session_id is not None:
+            most_recent = MostRecentAttempt(
+                session_id=row.recent_session_id,
+                test_id=row.recent_test_id,
+                test_name=row.recent_test_name,
+                submitted_at=row.recent_submitted_at,
+                score=_round(row.recent_score),
+            )
+        return UserSummary(
+            user_id=user_id,
+            total_attempts=row.total_attempts,
+            avg_score=_round(row.avg_score),
+            best_score=_round(row.best_score),
+            total_time_seconds=_round(row.total_time_seconds),
+            most_recent=most_recent,
+        )
+
+    @staticmethod
+    async def user_attempts(
+        db: AsyncSession, user_id: int, query: AttemptsQuery
+    ) -> AttemptsPage:
+        rows, total = await ReportRepository.user_attempts(db, user_id, query)
+        items = [
+            AttemptItem(
+                session_id=row.session_id,
+                test_id=row.test_id,
+                test_name=row.test_name,
+                status=row.status,
+                started_at=row.started_at,
+                submitted_at=row.submitted_at,
+                duration_seconds=_round(row.duration_seconds),
+                score=_round(row.score),
+            )
+            for row in rows
+        ]
+        return AttemptsPage(items=items, total=total, page=query.page, size=query.size)
