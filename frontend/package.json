@@ -10,7 +10,8 @@
     "lint": "eslint --max-warnings=0",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:ci": "jest --ci --coverage"
+    "test:ci": "jest --ci --coverage",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -48,6 +49,7 @@
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

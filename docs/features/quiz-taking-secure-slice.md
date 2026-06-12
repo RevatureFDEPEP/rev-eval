@@ -108,11 +108,48 @@ Empty-vs-empty never scores full marks. Options are 1-indexed positions.
 Real DB integration tests run against in-memory SQLite via the `async_session`
 fixture (added `aiosqlite` to `services/requirements-dev.txt`).
 
+### End-to-end (Playwright)
+
+`frontend/e2e/quiz-happy-path.spec.ts` drives a real browser through the full
+slice: a participant logs in, the take page mints a server-backed session, the
+candidate answers every question under the server-driven countdown, submits, and
+lands on the locked result screen — exercising browser → BFF → gateway →
+test-management → question-management.
+
+Run it against the live Compose stack:
+
+```bash
+# 1. Bring up the stack
+docker compose up --build -d
+
+# 2. Seed Postgres (users/tests/submissions) and the question bank
+docker exec rev-eval-test-management python seed_db.py
+#    Ensure the Mongo question bank is non-empty (mcq / true_false / multi).
+
+# 3. Install the browser once, then run the test
+cd frontend
+pnpm exec playwright install chromium
+pnpm test:e2e
+```
+
+The spec is parameterized via env vars (`E2E_BASE_URL`, `E2E_EMAIL`,
+`E2E_PASSWORD`, `E2E_QUIZ_TEST_ID`, `E2E_CHANNEL`). It targets `http://localhost:3000`
+by default. Because the Compose frontend runs `next dev`, timeouts are generous to
+absorb first-hit route compilation. This flow was verified end-to-end against the
+local stack (login → session → answer → submit → locked result).
+
+A backend-only smoke of the same contract through the gateway also confirmed: no
+`correct_answers` in participant question reads, server `server_now`/`expires_at`,
+idempotent answer replay, `Idempotency-Key` conflict (409), no per-question
+correctness in answer responses, aggregate score on submit, and a 409 on any
+mutation after submission.
+
 ## Known Gaps
 
 - The legacy two-part adaptive quiz API (`lib/api/quiz-sessions.ts`,
   `take/mcq/[testId]`) is left intact for trainer/results views; it is not part of
   this slice's contract.
-- No Playwright happy-path yet — add once the stack is run locally end-to-end.
+- The Playwright happy-path runs against the live stack and is not yet wired into
+  CI (it needs the full Compose stack + seeded data running).
 - Scoring assumes auto-scorable types; `text` questions are flagged for manual
   grading and excluded from `max_score`.
