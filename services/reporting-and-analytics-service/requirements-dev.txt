@@ -2,5 +2,7 @@
 # and replaces an inline `pip install pytest pytest-cov ruff` step in CI.
 -r requirements.txt
 pytest>=8,<9
+pytest-asyncio>=0.23,<0.25
 pytest-cov>=5,<7
+aiosqlite>=0.19,<0.21
 ruff>=0.6,<1
