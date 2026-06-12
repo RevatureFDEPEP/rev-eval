@@ -8,7 +8,7 @@ via require_trainer (defense-in-depth — see src/v1/dependencies/auth.py).
 """
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.session import get_tms_db
@@ -17,6 +17,7 @@ from src.schemas.report_schema import (
     AggregateReport,
     AttemptsPage,
     AttemptsQuery,
+    QuestionDifficultyReport,
     UserSummary,
 )
 from src.services.report_service import ReportService
@@ -38,6 +39,23 @@ async def get_aggregate_report(
     score, pass rate vs. the configured threshold, median time-to-complete.
     Optional test/date filters; `min_attempts` drops thin groups (HAVING)."""
     return await ReportService.aggregate_by_test(db, query)
+
+
+@router.get(
+    "/test/{test_id}/questions",
+    response_model=QuestionDifficultyReport,
+    dependencies=[Depends(require_trainer)],
+)
+async def get_question_difficulty(
+    test_id: int,
+    db: AsyncSession = Depends(get_tms_db),
+):
+    """Trainer-only per-question difficulty: correct-answer rate, hardest-first
+    RANK, and a score-distribution histogram. 404 for an unknown test."""
+    report = await ReportService.question_difficulty(db, test_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Test not found")
+    return report
 
 
 @router.get("/user/{user_id}", response_model=UserSummary)

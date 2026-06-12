@@ -6,7 +6,7 @@ in SQL (func.avg/count/sum + subqueries), never re-computed client-side.
 """
 from typing import Tuple
 
-from sqlalchemy import Select, case, distinct, func, or_, select, true
+from sqlalchemy import Select, and_, case, distinct, func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.tms_readonly import SessionStatus, TmsAnswer, TmsSession, TmsTest
@@ -248,6 +248,71 @@ class ReportRepository:
             stmt = stmt.having(
                 func.count(sessions.c.session_id) >= query.min_attempts
             )
+        result = await db.execute(stmt)
+        return list(result.all())
+
+    @staticmethod
+    async def get_test(db: AsyncSession, test_id: int):
+        result = await db.execute(select(TmsTest).where(TmsTest.id == test_id))
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def question_difficulty(db: AsyncSession, test_id: int):
+        """Per-question difficulty for one test's SUBMITTED sessions.
+
+        Inner GROUP BY question_id (the stable Mongo id — question_index
+        varies per session): attempt count, correct-answer rate, and a
+        4-bucket histogram of the [0, 1] partial-credit scores via
+        sum(case(...)) — portable across both dialects. The outer select adds
+        RANK() OVER (ORDER BY correct_rate ASC), so rank 1 = hardest; ties
+        share a rank.
+        """
+        per_question = (
+            select(
+                TmsAnswer.question_id,
+                func.count(TmsAnswer.id).label("attempts"),
+                (
+                    func.avg(case((TmsAnswer.is_correct, 1.0), else_=0.0)) * 100
+                ).label("correct_rate"),
+                func.sum(case((TmsAnswer.score < 0.25, 1), else_=0)).label(
+                    "bucket_0_25"
+                ),
+                func.sum(
+                    case(
+                        (
+                            and_(TmsAnswer.score >= 0.25, TmsAnswer.score < 0.5),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("bucket_25_50"),
+                func.sum(
+                    case(
+                        (
+                            and_(TmsAnswer.score >= 0.5, TmsAnswer.score < 0.75),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("bucket_50_75"),
+                func.sum(case((TmsAnswer.score >= 0.75, 1), else_=0)).label(
+                    "bucket_75_100"
+                ),
+            )
+            .join(TmsSession, TmsSession.session_id == TmsAnswer.session_id)
+            .where(
+                TmsSession.test_id == test_id,
+                TmsSession.status == SessionStatus.SUBMITTED,
+            )
+            .group_by(TmsAnswer.question_id)
+            .subquery()
+        )
+        stmt = select(
+            per_question,
+            func.rank()
+            .over(order_by=per_question.c.correct_rate.asc())
+            .label("difficulty_rank"),
+        ).order_by(per_question.c.correct_rate.asc(), per_question.c.question_id)
         result = await db.execute(stmt)
         return list(result.all())
 
