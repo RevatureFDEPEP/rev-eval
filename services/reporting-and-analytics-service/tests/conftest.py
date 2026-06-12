@@ -5,12 +5,14 @@ Postgres: the TmsBase tables are created directly (these are read-only
 mappings — only tests ever write them) and `get_tms_db` is overridden so the
 app's report queries run against the seeded fixture data.
 """
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import main
 import pytest
 from httpx import ASGITransport, AsyncClient
+from jose import jwt as jose_jwt
+from src.config.settings import settings
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -99,6 +101,25 @@ async def tms_db():
     yield session_factory
 
     await engine.dispose()
+
+
+@pytest.fixture
+def make_token():
+    """Mint real HS256 tokens against the service's verification settings —
+    the require_trainer gate tests verify actual signatures, not mocks."""
+
+    def _make(role="TRAINER", *, secret=None, expires_in=3600, sub="9"):
+        payload = {
+            "sub": sub,
+            "email": "gate-test@example.com",
+            "role": role,
+            "exp": datetime.now(timezone.utc) + timedelta(seconds=expires_in),
+        }
+        return jose_jwt.encode(
+            payload, secret or settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM
+        )
+
+    return _make
 
 
 @pytest.fixture
