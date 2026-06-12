@@ -402,6 +402,9 @@ export interface ParticipantQuestion {
   index: number;
 }
 
+/** Quiz session lifecycle states (mirrors backend QuizSessionStatus). */
+export type QuizSessionStatusValue = "ACTIVE" | "SUBMITTED" | "EXPIRED";
+
 /**
  * Response of POST /v1/api/sessions. The backend returns only the current
  * question (server-advanced on answer-submit); timing is server-authoritative.
@@ -415,7 +418,57 @@ export interface SessionResponse {
   total_questions: number;
   current_index: number;
   question: ParticipantQuestion;
+  /**
+   * Advisory autosave snapshot (question_id -> selected option_ids), echoed on
+   * a resumed session so the client can rehydrate the in-progress selection
+   * (W3-F4). Absent/null on a fresh session or when nothing has been saved.
+   */
+  draft_answers?: Record<string, number[]> | null;
 }
+
+/** Request body for POST /v1/api/sessions/{id}/answer. */
+export interface AnswerSubmit {
+  question_id: string;
+  submitted_answers: number[];
+}
+
+/**
+ * Response of POST /v1/api/sessions/{id}/answer. Scores the current question,
+ * advances the session, and returns the next question (null when finished).
+ * `session_status` flips to SUBMITTED on the final question.
+ */
+export interface AnswerResult {
+  question_id: string;
+  question_index: number;
+  is_correct: boolean;
+  points_earned: number;
+  max_points: number;
+  requires_manual_review: boolean;
+  session_status: QuizSessionStatusValue;
+  current_index: number;
+  total_questions: number;
+  question: ParticipantQuestion | null;
+  submitted_at: string | null;
+}
+
+/** Request body for PATCH /v1/api/sessions/{id}/draft (advisory autosave). */
+export interface DraftSave {
+  answers: Record<string, number[]>;
+}
+
+/**
+ * Response of PATCH /v1/api/sessions/{id}/draft. Echoes the UNCHANGED
+ * current_index/status (autosave never scores or advances) + saved_at.
+ */
+export interface DraftSaveResult {
+  session_id: string;
+  status: QuizSessionStatusValue;
+  current_index: number;
+  saved_at: string;
+}
+
+/** How a fetch failure should be handled (W3-F4 error classification). */
+export type ExamErrorKind = "transient" | "semantic";
 
 // ===== TYPE ALIASES (for backwards compatibility) =====
 
