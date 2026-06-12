@@ -35,11 +35,12 @@ def require_trainer(authorization: str | None = Header(None)) -> dict:
             token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
         )
     except JWTError:
+        # `from None`: the jose internals are noise to an API caller (B904).
         raise HTTPException(
             status_code=401,
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from None
     if payload.get("role") != TRAINER_ROLE:
         raise HTTPException(status_code=403, detail="Trainer role required")
     return payload

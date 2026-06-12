@@ -12,10 +12,10 @@ import main
 import pytest
 from httpx import ASGITransport, AsyncClient
 from jose import jwt as jose_jwt
-from src.config.settings import settings
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from src.config.settings import settings
 from src.db.session import get_tms_db
 from src.models.tms_readonly import (
     SessionStatus,
