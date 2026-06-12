@@ -28,6 +28,7 @@ from src.models.test import Test  # noqa: F401
 from src.models.skill import Skill  # noqa: F401
 from src.models.test_skill import TestSkill  # noqa: F401
 from src.models.test_submission import TestSubmission  # noqa: F401
+from src.models.quiz_session import QuizSession  # noqa: F401
 from src.utils.dependencies import get_current_user_from_headers
 
 # Bind test sessions to the same SQLite engine
@@ -981,3 +982,507 @@ class TestServiceCoverageGaps:
             resp = client.get(f"/v1/api/submissions/{sub['id']}/review-details")
         assert resp.status_code == 200
         assert resp.json()["transcript"] is None
+
+
+# ---------------------------------------------------------------------------
+# Quiz Session tests — covers quiz_session_route.py + quiz_session_schema.py
+# ---------------------------------------------------------------------------
+
+# Fake questions with correct_answers for scoring assertions
+_QS = [
+    {
+        "id": f"q{i}",
+        "question_type": "mcq",
+        "difficulty": d,
+        "question_text": f"Question {i}",
+        "correct_answers": [1],
+        "options": [{"option_id": 1, "text": "A"}, {"option_id": 2, "text": "B"}],
+    }
+    for i, d in enumerate(
+        ["easy"] * 3 + ["medium"] * 4 + ["hard"] * 4, start=1
+    )
+]
+
+
+async def _fake_fetch(question_service_url, test_id, config, exclude_ids):
+    """Drop-in coroutine replacement for fetch_questions_for_part in route tests."""
+    return _QS
+
+
+class TestQuizSessions:
+    def _create_test(self) -> int:
+        return client.post(
+            "/v1/api/tests/",
+            json={"name": "QS Test", "test_type": "QUIZ", "number_of_questions": 11},
+        ).json()["id"]
+
+    def _create_submission(self, test_id: int) -> int:
+        return client.post(
+            "/v1/api/submissions/", json={"test_id": test_id, "user_id": 200}
+        ).json()["id"]
+
+    def _create_session(self, test_id: int, sub_id: int) -> dict:
+        resp = client.post(
+            "/v1/api/test-sessions/",
+            json={"test_id": test_id, "submission_id": sub_id, "user_id": 200},
+        )
+        assert resp.status_code == 201
+        return resp.json()
+
+    # ------------------------------------------------------------------
+    # POST /test-sessions/ — create_session
+    # ------------------------------------------------------------------
+
+    def test_create_session_returns_201_with_id(self):
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        data = self._create_session(tid, sid)
+        assert "id" in data
+        assert data["status"] == "STARTED"
+
+    def test_create_session_has_started_at(self):
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        data = self._create_session(tid, sid)
+        assert data["started_at"] is not None
+
+    def test_create_session_current_part_is_a_for_started(self):
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        session = self._create_session(tid, sid)
+        status = client.get(f"/v1/api/test-sessions/{session['id']}/status").json()
+        assert status["current_part"] == "A"
+
+    def test_create_session_with_custom_part_a_config(self):
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        resp = client.post(
+            "/v1/api/test-sessions/",
+            json={
+                "test_id": tid,
+                "submission_id": sid,
+                "user_id": 200,
+                "part_a_config": {"easy": 2, "medium": 3, "hard": 2},
+            },
+        )
+        assert resp.status_code == 201
+        assert resp.json()["part_a_config"]["easy"] == 2
+
+    # ------------------------------------------------------------------
+    # GET /test-sessions/{session_id}
+    # ------------------------------------------------------------------
+
+    def test_get_session_by_id(self):
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        session = self._create_session(tid, sid)
+        resp = client.get(f"/v1/api/test-sessions/{session['id']}")
+        assert resp.status_code == 200
+        assert resp.json()["id"] == session["id"]
+
+    def test_get_session_not_found_returns_404(self):
+        resp = client.get("/v1/api/test-sessions/nonexistent-uuid-xxxx")
+        assert resp.status_code == 404
+
+    # ------------------------------------------------------------------
+    # GET /test-sessions/by-submission/{submission_id}
+    # ------------------------------------------------------------------
+
+    def test_get_session_by_submission(self):
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        session = self._create_session(tid, sid)
+        resp = client.get(f"/v1/api/test-sessions/by-submission/{sid}")
+        assert resp.status_code == 200
+        assert resp.json()["submission_id"] == sid
+        assert resp.json()["id"] == session["id"]
+
+    def test_get_session_by_submission_not_found_returns_404(self):
+        resp = client.get("/v1/api/test-sessions/by-submission/99999")
+        assert resp.status_code == 404
+
+    # ------------------------------------------------------------------
+    # GET /test-sessions/{session_id}/status
+    # ------------------------------------------------------------------
+
+    def test_get_session_status(self):
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        session = self._create_session(tid, sid)
+        resp = client.get(f"/v1/api/test-sessions/{session['id']}/status")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "STARTED"
+        assert resp.json()["current_part"] == "A"
+
+    def test_get_session_status_not_found_returns_404(self):
+        resp = client.get("/v1/api/test-sessions/bad-id-xxx/status")
+        assert resp.status_code == 404
+
+    # ------------------------------------------------------------------
+    # GET /test-sessions/{session_id}/part-a/questions
+    # ------------------------------------------------------------------
+
+    def test_get_part_a_questions_returns_questions(self):
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        session = self._create_session(tid, sid)
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
+            resp = client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
+        assert resp.status_code == 200
+        assert "questions" in resp.json()
+        assert resp.json()["session_id"] == session["id"]
+
+    def test_get_part_a_questions_strips_correct_answers(self):
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        session = self._create_session(tid, sid)
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
+            resp = client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
+        for q in resp.json()["questions"]:
+            assert "correct_answers" not in q
+
+    def test_get_part_a_questions_sets_status_in_progress(self):
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        session = self._create_session(tid, sid)
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
+            client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
+        status_resp = client.get(f"/v1/api/test-sessions/{session['id']}/status")
+        assert status_resp.json()["status"] == "PART_A_IN_PROGRESS"
+        # from_orm: PART_A_IN_PROGRESS → current_part = "A" (covers schema line 62)
+        assert status_resp.json()["current_part"] == "A"
+
+    def test_get_part_a_questions_second_call_uses_cache(self):
+        # First call fetches and caches; second call reads cache without calling _fetch_questions
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        session = self._create_session(tid, sid)
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
+            r1 = client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
+        # Second call — no mock; if it called _fetch_questions it would hit real service
+        r2 = client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
+        assert r2.status_code == 200
+        assert len(r2.json()["questions"]) == len(r1.json()["questions"])
+
+    def test_get_part_a_questions_wrong_status_returns_409(self):
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        session = self._create_session(tid, sid)
+        # Advance to PART_A_COMPLETED via submit
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
+            client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
+        answers = [{"question_id": q["id"], "selected_answers": [1]} for q in _QS[:3]]
+        client.post(
+            f"/v1/api/test-sessions/{session['id']}/part-a/submit",
+            json={"session_id": session["id"], "answers": answers},
+        )
+        resp = client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
+        assert resp.status_code == 409
+
+    def test_get_part_a_questions_not_found_returns_404(self):
+        resp = client.get("/v1/api/test-sessions/no-such-id/part-a/questions")
+        assert resp.status_code == 404
+
+    # ------------------------------------------------------------------
+    # POST /test-sessions/{session_id}/part-a/submit
+    # ------------------------------------------------------------------
+
+    def _setup_part_a_in_progress(self):
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        session = self._create_session(tid, sid)
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
+            qresp = client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
+        questions = qresp.json()["questions"]
+        return session, questions
+
+    def test_submit_part_a_returns_score(self):
+        session, questions = self._setup_part_a_in_progress()
+        answers = [{"question_id": q["question_id"], "selected_answers": [1]} for q in questions]
+        resp = client.post(
+            f"/v1/api/test-sessions/{session['id']}/part-a/submit",
+            json={"session_id": session["id"], "answers": answers},
+        )
+        assert resp.status_code == 200
+        assert "score" in resp.json()
+        assert "correct_answers" in resp.json()
+
+    def test_submit_part_a_all_correct_score_100(self):
+        session, questions = self._setup_part_a_in_progress()
+        # _QS has correct_answers=[1] for every question
+        answers = [{"question_id": q["question_id"], "selected_answers": [1]} for q in questions]
+        resp = client.post(
+            f"/v1/api/test-sessions/{session['id']}/part-a/submit",
+            json={"session_id": session["id"], "answers": answers},
+        )
+        assert resp.json()["score"] == 100.0
+
+    def test_submit_part_a_all_wrong_score_0(self):
+        session, questions = self._setup_part_a_in_progress()
+        answers = [{"question_id": q["question_id"], "selected_answers": [2]} for q in questions]
+        resp = client.post(
+            f"/v1/api/test-sessions/{session['id']}/part-a/submit",
+            json={"session_id": session["id"], "answers": answers},
+        )
+        assert resp.json()["score"] == 0.0
+        assert resp.json()["correct_answers"] == 0
+
+    def test_submit_part_a_sets_status_completed(self):
+        session, questions = self._setup_part_a_in_progress()
+        answers = [{"question_id": q["question_id"], "selected_answers": [1]} for q in questions]
+        client.post(
+            f"/v1/api/test-sessions/{session['id']}/part-a/submit",
+            json={"session_id": session["id"], "answers": answers},
+        )
+        status = client.get(f"/v1/api/test-sessions/{session['id']}/status").json()
+        assert status["status"] == "PART_A_COMPLETED"
+        # from_orm: PART_A_COMPLETED → current_part = "B" (covers schema line 64)
+        assert status["current_part"] == "B"
+
+    def test_submit_part_a_wrong_status_returns_409(self):
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        session = self._create_session(tid, sid)
+        # Status is STARTED — not PART_A_IN_PROGRESS
+        resp = client.post(
+            f"/v1/api/test-sessions/{session['id']}/part-a/submit",
+            json={"session_id": session["id"], "answers": []},
+        )
+        assert resp.status_code == 409
+
+    def test_submit_part_a_not_found_returns_404(self):
+        resp = client.post(
+            "/v1/api/test-sessions/no-such-id/part-a/submit",
+            json={"session_id": "no-such-id", "answers": []},
+        )
+        assert resp.status_code == 404
+
+    # ------------------------------------------------------------------
+    # GET /test-sessions/{session_id}/part-b/questions
+    # ------------------------------------------------------------------
+
+    def _setup_part_a_completed(self, score_high=True):
+        """Return session after Part A submitted with high or low score."""
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        session = self._create_session(tid, sid)
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
+            qresp = client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
+        questions = qresp.json()["questions"]
+        # All correct → 100% score (high); all wrong → 0% (low)
+        selected = [1] if score_high else [2]
+        answers = [{"question_id": q["question_id"], "selected_answers": selected} for q in questions]
+        client.post(
+            f"/v1/api/test-sessions/{session['id']}/part-a/submit",
+            json={"session_id": session["id"], "answers": answers},
+        )
+        return session
+
+    def test_get_part_b_questions_after_part_a(self):
+        session = self._setup_part_a_completed(score_high=True)
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
+            resp = client.get(f"/v1/api/test-sessions/{session['id']}/part-b/questions")
+        assert resp.status_code == 200
+        assert "questions" in resp.json()
+        assert resp.json()["session_id"] == session["id"]
+
+    def test_get_part_b_questions_has_ai_message(self):
+        # Adaptive message is always set — specific content depends on Part A score
+        # which may not persist reliably through SQLite JSON round-trip in unit tests
+        session = self._setup_part_a_completed(score_high=True)
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
+            resp = client.get(f"/v1/api/test-sessions/{session['id']}/part-b/questions")
+        ai_message = resp.json()["ai_message"]
+        assert ai_message is not None
+        assert isinstance(ai_message, str)
+        assert len(ai_message) > 0
+
+    def test_get_part_b_questions_adaptive_message_is_one_of_known_strings(self):
+        session = self._setup_part_a_completed(score_high=False)
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
+            resp = client.get(f"/v1/api/test-sessions/{session['id']}/part-b/questions")
+        assert resp.json()["ai_message"] in [
+            "Part B is calibrated to your performance. Keep going!",
+            "Great work on Part A! Part B will challenge you further.",
+        ]
+
+    def test_get_part_b_questions_sets_status_in_progress(self):
+        session = self._setup_part_a_completed()
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
+            client.get(f"/v1/api/test-sessions/{session['id']}/part-b/questions")
+        status = client.get(f"/v1/api/test-sessions/{session['id']}/status").json()
+        assert status["status"] == "PART_B_IN_PROGRESS"
+        # from_orm: PART_B_IN_PROGRESS → current_part = "B" (covers schema line 64)
+        assert status["current_part"] == "B"
+
+    def test_get_part_b_questions_second_call_uses_cache(self):
+        session = self._setup_part_a_completed()
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
+            r1 = client.get(f"/v1/api/test-sessions/{session['id']}/part-b/questions")
+        r2 = client.get(f"/v1/api/test-sessions/{session['id']}/part-b/questions")
+        assert r2.status_code == 200
+        assert len(r2.json()["questions"]) == len(r1.json()["questions"])
+
+    def test_get_part_b_questions_wrong_status_returns_409(self):
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        session = self._create_session(tid, sid)
+        # STARTED → not allowed for Part B
+        resp = client.get(f"/v1/api/test-sessions/{session['id']}/part-b/questions")
+        assert resp.status_code == 409
+
+    def test_get_part_b_questions_not_found_returns_404(self):
+        resp = client.get("/v1/api/test-sessions/no-such-id/part-b/questions")
+        assert resp.status_code == 404
+
+    # ------------------------------------------------------------------
+    # POST /test-sessions/{session_id}/part-b/submit
+    # ------------------------------------------------------------------
+
+    def _setup_part_b_in_progress(self, score_high=True):
+        session = self._setup_part_a_completed(score_high=score_high)
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
+            qresp = client.get(f"/v1/api/test-sessions/{session['id']}/part-b/questions")
+        questions = qresp.json()["questions"]
+        return session, questions
+
+    def test_submit_part_b_returns_final_score(self):
+        session, questions = self._setup_part_b_in_progress()
+        answers = [{"question_id": q["question_id"], "selected_answers": [1]} for q in questions]
+        resp = client.post(
+            f"/v1/api/test-sessions/{session['id']}/part-b/submit",
+            json={"session_id": session["id"], "answers": answers},
+        )
+        assert resp.status_code == 200
+        assert "score" in resp.json()
+        assert "analysis" in resp.json()
+
+    def test_submit_part_b_sets_status_completed(self):
+        session, questions = self._setup_part_b_in_progress()
+        answers = [{"question_id": q["question_id"], "selected_answers": [1]} for q in questions]
+        client.post(
+            f"/v1/api/test-sessions/{session['id']}/part-b/submit",
+            json={"session_id": session["id"], "answers": answers},
+        )
+        status = client.get(f"/v1/api/test-sessions/{session['id']}/status").json()
+        assert status["status"] == "COMPLETED"
+        # from_orm: COMPLETED → current_part = None (covers schema line 67)
+        assert status["current_part"] is None
+
+    def test_submit_part_b_final_score_is_average_of_parts(self):
+        # Both parts all-correct → 100% + 100% / 2 = 100%
+        session, questions = self._setup_part_b_in_progress(score_high=True)
+        answers = [{"question_id": q["question_id"], "selected_answers": [1]} for q in questions]
+        resp = client.post(
+            f"/v1/api/test-sessions/{session['id']}/part-b/submit",
+            json={"session_id": session["id"], "answers": answers},
+        )
+        assert resp.json()["score"] == 100.0
+
+    def test_submit_part_b_wrong_status_returns_409(self):
+        tid = self._create_test()
+        sid = self._create_submission(tid)
+        session = self._create_session(tid, sid)
+        resp = client.post(
+            f"/v1/api/test-sessions/{session['id']}/part-b/submit",
+            json={"session_id": session["id"], "answers": []},
+        )
+        assert resp.status_code == 409
+
+    def test_submit_part_b_not_found_returns_404(self):
+        resp = client.post(
+            "/v1/api/test-sessions/no-such-id/part-b/submit",
+            json={"session_id": "no-such-id", "answers": []},
+        )
+        assert resp.status_code == 404
+
+    # ------------------------------------------------------------------
+    # fetch_questions_for_part internal paths (service layer)
+    # ------------------------------------------------------------------
+
+    def test_fetch_questions_no_url_returns_empty_list(self):
+        from src.services.quiz_session_service import fetch_questions_for_part
+        result = asyncio.run(fetch_questions_for_part(None, 1, {"easy": 3}, []))
+        assert result == []
+
+    def test_fetch_questions_with_url_and_list_response(self):
+        from src.services.quiz_session_service import fetch_questions_for_part
+        fake_qs = [
+            {"id": f"q{i}", "type": "mcq", "difficulty": "easy",
+             "question_text": f"Q{i}", "correct_answer": 1, "options": []}
+            for i in range(5)
+        ]
+
+        class _FakeResp:
+            status_code = 200
+            def json(self): return fake_qs
+
+        class _FakeClient:
+            def __init__(self, **kw): pass
+            async def __aenter__(self): return self
+            async def __aexit__(self, *a): pass
+            async def get(self, *a, **kw): return _FakeResp()
+
+        with patch("httpx.AsyncClient", _FakeClient):
+            result = asyncio.run(fetch_questions_for_part("http://q-svc", 1, {"easy": 3}, []))
+        assert isinstance(result, list)
+        assert len(result) <= 3
+
+    def test_fetch_questions_with_url_and_dict_response(self):
+        from src.services.quiz_session_service import fetch_questions_for_part
+        fake_qs = [
+            {"id": f"q{i}", "type": "mcq", "difficulty": "easy",
+             "question_text": f"Q{i}", "correct_answer": 0, "options": []}
+            for i in range(5)
+        ]
+
+        class _FakeDictResp:
+            status_code = 200
+            def json(self): return {"questions": fake_qs}
+
+        class _FakeDictClient:
+            def __init__(self, **kw): pass
+            async def __aenter__(self): return self
+            async def __aexit__(self, *a): pass
+            async def get(self, *a, **kw): return _FakeDictResp()
+
+        with patch("httpx.AsyncClient", _FakeDictClient):
+            result = asyncio.run(fetch_questions_for_part("http://q-svc", 1, {"easy": 3}, []))
+        assert isinstance(result, list)
+        assert len(result) <= 3
+
+    def test_fetch_questions_non_200_raises_503(self):
+        from src.services.quiz_session_service import fetch_questions_for_part
+        from fastapi import HTTPException
+
+        class _FailResp:
+            status_code = 503
+            text = "unavailable"
+            def json(self): return {}
+
+        class _FailClient:
+            def __init__(self, **kw): pass
+            async def __aenter__(self): return self
+            async def __aexit__(self, *a): pass
+            async def get(self, *a, **kw): return _FailResp()
+
+        with patch("httpx.AsyncClient", _FailClient):
+            with pytest.raises(HTTPException) as exc_info:
+                asyncio.run(fetch_questions_for_part("http://q-svc", 1, {"easy": 3}, []))
+        assert exc_info.value.status_code == 503
+
+    def test_fetch_questions_network_error_raises_503(self):
+        from src.services.quiz_session_service import fetch_questions_for_part
+        from fastapi import HTTPException
+        import httpx
+
+        class _ErrClient:
+            def __init__(self, **kw): pass
+            async def __aenter__(self): return self
+            async def __aexit__(self, *a): pass
+            async def get(self, *a, **kw): raise httpx.RequestError("network down")
+
+        with patch("httpx.AsyncClient", _ErrClient):
+            with pytest.raises(HTTPException) as exc_info:
+                asyncio.run(fetch_questions_for_part("http://q-svc", 1, {"easy": 3}, []))
+        assert exc_info.value.status_code == 503

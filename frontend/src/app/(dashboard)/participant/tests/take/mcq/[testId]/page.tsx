@@ -432,19 +432,13 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
 
   if (isNaN(submissionId)) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Card className="w-full max-w-md border-red-200">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center gap-4">
-              <AlertCircle className="size-12 text-red-600" />
-              <div className="text-center">
-                <h2 className="text-lg font-semibold text-slate-900">Invalid Submission ID</h2>
-                <p className="mt-2 text-sm text-slate-600">
-                  Missing or invalid submission ID in URL.
-                </p>
-              </div>
-              <Button onClick={() => router.push('/participant/tests')}>Back to Tests</Button>
-            </div>
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Card className="max-w-md">
+          <CardContent className="pt-6 text-center">
+            <AlertCircle className="mx-auto mb-4 h-12 w-12 text-amber-500" />
+            <h2 className="mb-2 text-lg font-semibold">Missing submission ID</h2>
+            <p className="mb-4 text-sm text-slate-600">No valid submission was linked to this quiz URL.</p>
+            <Button onClick={() => router.push('/participant/tests')}>Back to Tests</Button>
           </CardContent>
         </Card>
       </div>
