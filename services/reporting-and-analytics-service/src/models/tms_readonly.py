@@ -18,6 +18,7 @@ Containment rules:
 import enum
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Enum,
@@ -74,11 +75,19 @@ class TmsSession(TmsBase):
 
 
 class TmsAnswer(TmsBase):
-    """answers — one scored row per question slot; score is a [0, 1] fraction."""
+    """answers — one scored row per question slot; score is a [0, 1] fraction.
+
+    ``question_id`` is the Mongo ``_id`` of the scored question — the stable
+    identity for per-question difficulty grouping (``question_index`` varies
+    per session because questions are randomly sampled). ``is_correct`` is
+    True only for a perfect answer (W3-F2 scoring).
+    """
 
     __tablename__ = "answers"
 
     id = Column(Integer, primary_key=True)
     session_id = Column(Uuid, ForeignKey("sessions.session_id"), nullable=False)
+    question_id = Column(String, nullable=False)
     question_index = Column(Integer, nullable=False)
     score = Column(Float, nullable=False)
+    is_correct = Column(Boolean, nullable=False)

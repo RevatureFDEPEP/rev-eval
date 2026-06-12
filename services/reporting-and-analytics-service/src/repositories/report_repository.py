@@ -6,11 +6,11 @@ in SQL (func.avg/count/sum + subqueries), never re-computed client-side.
 """
 from typing import Tuple
 
-from sqlalchemy import Select, case, func, select, true
+from sqlalchemy import Select, case, distinct, func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.tms_readonly import SessionStatus, TmsAnswer, TmsSession, TmsTest
-from src.schemas.report_schema import AttemptsQuery
+from src.schemas.report_schema import AggregateQuery, AttemptsQuery
 
 
 def _session_score_subquery():
@@ -37,6 +37,54 @@ def _duration_seconds(db: AsyncSession):
             func.julianday(TmsSession.submitted_at) - func.julianday(TmsSession.started_at)
         ) * 86400
     return func.extract("epoch", TmsSession.submitted_at - TmsSession.started_at)
+
+
+def _median_duration_parts(db: AsyncSession, sessions):
+    """Median session duration per test over the ``sessions`` subquery.
+
+    Postgres: ``percentile_cont(0.5) WITHIN GROUP`` — the spec's ordered-set
+    aggregate, computed inline in the GROUP BY statement. The sqlite unit-test
+    fixture can't parse WITHIN GROUP, so it falls back to the classic
+    ROW_NUMBER/COUNT portable median in a joined subquery (same dialect-branch
+    precedent as ``_duration_seconds``); the live compose smoke exercises the
+    real percentile_cont path. Returns (join subquery or None, aggregate column).
+    """
+    if db.bind.dialect.name != "sqlite":
+        return None, func.percentile_cont(0.5).within_group(
+            sessions.c.duration_seconds
+        )
+    ranked = (
+        select(
+            sessions.c.test_id,
+            sessions.c.duration_seconds,
+            func.row_number()
+            .over(
+                partition_by=sessions.c.test_id,
+                order_by=sessions.c.duration_seconds,
+            )
+            .label("rn"),
+            func.count().over(partition_by=sessions.c.test_id).label("cnt"),
+        )
+        .where(sessions.c.duration_seconds.is_not(None))
+        .subquery()
+    )
+    median_sq = (
+        select(
+            ranked.c.test_id.label("test_id"),
+            func.avg(ranked.c.duration_seconds).label("median_duration"),
+        )
+        # Middle row (odd cnt) or the two middle rows averaged (even cnt);
+        # sqlite divides integers with integer division, so these are exact.
+        .where(
+            or_(
+                ranked.c.rn == (ranked.c.cnt + 1) / 2,
+                ranked.c.rn == (ranked.c.cnt + 2) / 2,
+            )
+        )
+        .group_by(ranked.c.test_id)
+        .subquery()
+    )
+    return median_sq, func.min(median_sq.c.median_duration)
 
 
 class ReportRepository:
@@ -146,10 +194,70 @@ class ReportRepository:
         return list(result.all()), int(total or 0)
 
     @staticmethod
-    def _apply_filters(stmt: Select, query: AttemptsQuery) -> Select:
+    async def aggregate_by_test(
+        db: AsyncSession, query: AggregateQuery, pass_threshold: float
+    ):
+        """Per-test aggregates over SUBMITTED sessions, GROUP BY test_id.
+
+        One statement: attempt count, distinct candidate count, avg score,
+        pass rate (share of attempts at/above ``pass_threshold``), median
+        time-to-complete (percentile_cont on Postgres — see
+        ``_median_duration_parts``). ``min_attempts`` becomes a HAVING clause.
+        """
+        score_sq = _session_score_subquery()
+        base = (
+            select(
+                TmsSession.session_id,
+                TmsSession.test_id,
+                TmsSession.user_id,
+                score_sq.c.score,
+                _duration_seconds(db).label("duration_seconds"),
+            )
+            .outerjoin(score_sq, score_sq.c.session_id == TmsSession.session_id)
+            .where(TmsSession.status == SessionStatus.SUBMITTED)
+        )
+        sessions = ReportRepository._apply_filters(base, query).subquery()
+
+        median_join, median_col = _median_duration_parts(db, sessions)
+        stmt = (
+            select(
+                sessions.c.test_id,
+                TmsTest.name.label("test_name"),
+                func.count(sessions.c.session_id).label("total_attempts"),
+                func.count(distinct(sessions.c.user_id)).label(
+                    "distinct_candidates"
+                ),
+                func.avg(sessions.c.score).label("avg_score"),
+                (
+                    func.avg(
+                        case((sessions.c.score >= pass_threshold, 1.0), else_=0.0)
+                    )
+                    * 100
+                ).label("pass_rate"),
+                median_col.label("median_duration_seconds"),
+            )
+            .join(TmsTest, TmsTest.id == sessions.c.test_id)
+            .group_by(sessions.c.test_id, TmsTest.name)
+            .order_by(sessions.c.test_id)
+        )
+        if median_join is not None:
+            stmt = stmt.outerjoin(
+                median_join, median_join.c.test_id == sessions.c.test_id
+            )
+        if query.min_attempts is not None:
+            stmt = stmt.having(
+                func.count(sessions.c.session_id) >= query.min_attempts
+            )
+        result = await db.execute(stmt)
+        return list(result.all())
+
+    @staticmethod
+    def _apply_filters(stmt: Select, query) -> Select:
+        """Shared filter semantics for AttemptsQuery and AggregateQuery
+        (the latter has no status filter — aggregates are SUBMITTED-only)."""
         if query.test_id is not None:
             stmt = stmt.where(TmsSession.test_id == query.test_id)
-        if query.status is not None:
+        if getattr(query, "status", None) is not None:
             stmt = stmt.where(TmsSession.status == query.status)
         # Date range bounds the attempt start (exists for every status);
         # `to` is inclusive of the full end date.

@@ -7,12 +7,16 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config.settings import settings
 from src.repositories.report_repository import ReportRepository
 from src.schemas.report_schema import (
+    AggregateQuery,
+    AggregateReport,
     AttemptItem,
     AttemptsPage,
     AttemptsQuery,
     MostRecentAttempt,
+    TestAggregateRow,
     UserSummary,
 )
 
@@ -62,3 +66,23 @@ class ReportService:
             for row in rows
         ]
         return AttemptsPage(items=items, total=total, page=query.page, size=query.size)
+
+    @staticmethod
+    async def aggregate_by_test(
+        db: AsyncSession, query: AggregateQuery
+    ) -> AggregateReport:
+        threshold = settings.REPORT_PASS_THRESHOLD
+        rows = await ReportRepository.aggregate_by_test(db, query, threshold)
+        items = [
+            TestAggregateRow(
+                test_id=row.test_id,
+                test_name=row.test_name,
+                total_attempts=row.total_attempts,
+                distinct_candidates=row.distinct_candidates,
+                avg_score=_round(row.avg_score),
+                pass_rate=_round(row.pass_rate),
+                median_duration_seconds=_round(row.median_duration_seconds),
+            )
+            for row in rows
+        ]
+        return AggregateReport(items=items, pass_threshold=threshold)

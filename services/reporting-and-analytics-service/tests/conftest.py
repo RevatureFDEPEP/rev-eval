@@ -75,17 +75,24 @@ async def tms_db():
             _session(S5, 1, OTHER_USER, SessionStatus.SUBMITTED,
                      datetime(2026, 6, 2, 10, 0), datetime(2026, 6, 2, 11, 0),
                      submitted=datetime(2026, 6, 2, 10, 15)),
-            # S1: 50% over three questions
-            TmsAnswer(id=1, session_id=S1, question_index=0, score=1.0),
-            TmsAnswer(id=2, session_id=S1, question_index=1, score=0.5),
-            TmsAnswer(id=3, session_id=S1, question_index=2, score=0.0),
+            # S1: 50% over three questions (qa perfect, qb partial, qc zero)
+            TmsAnswer(id=1, session_id=S1, question_id="qa", question_index=0,
+                      score=1.0, is_correct=True),
+            TmsAnswer(id=2, session_id=S1, question_id="qb", question_index=1,
+                      score=0.5, is_correct=False),
+            TmsAnswer(id=3, session_id=S1, question_id="qc", question_index=2,
+                      score=0.0, is_correct=False),
             # S2: 100% over two questions
-            TmsAnswer(id=4, session_id=S2, question_index=0, score=1.0),
-            TmsAnswer(id=5, session_id=S2, question_index=1, score=1.0),
+            TmsAnswer(id=4, session_id=S2, question_id="qd", question_index=0,
+                      score=1.0, is_correct=True),
+            TmsAnswer(id=5, session_id=S2, question_id="qe", question_index=1,
+                      score=1.0, is_correct=True),
             # S3 is ACTIVE with one partial answer — must never surface a score
-            TmsAnswer(id=6, session_id=S3, question_index=0, score=1.0),
-            # S5: other user's 80%
-            TmsAnswer(id=7, session_id=S5, question_index=0, score=0.8),
+            TmsAnswer(id=6, session_id=S3, question_id="qa", question_index=0,
+                      score=1.0, is_correct=True),
+            # S5: other user's 80% — qa again (different index: random sampling)
+            TmsAnswer(id=7, session_id=S5, question_id="qa", question_index=0,
+                      score=0.8, is_correct=False),
         ])
         await db.commit()
 
