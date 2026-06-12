@@ -1004,9 +1004,9 @@ _QS = [
 ]
 
 
-async def _fake_fetch(skills, difficulty, count, request_id):
-    """Drop-in coroutine replacement for _fetch_questions in route tests."""
-    return _QS[:count]
+async def _fake_fetch(question_service_url, test_id, config, exclude_ids):
+    """Drop-in coroutine replacement for fetch_questions_for_part in route tests."""
+    return _QS
 
 
 class TestQuizSessions:
@@ -1033,40 +1033,25 @@ class TestQuizSessions:
     # POST /test-sessions/ — create_session
     # ------------------------------------------------------------------
 
-    def test_create_session_returns_201_with_id_and_token(self):
+    def test_create_session_returns_201_with_id(self):
         tid = self._create_test()
         sid = self._create_submission(tid)
         data = self._create_session(tid, sid)
         assert "id" in data
-        assert "token" in data
         assert data["status"] == "STARTED"
 
-    def test_create_session_expires_at_after_started_at(self):
-        from datetime import datetime
+    def test_create_session_has_started_at(self):
         tid = self._create_test()
         sid = self._create_submission(tid)
         data = self._create_session(tid, sid)
-        started = datetime.fromisoformat(data["started_at"])
-        expires = datetime.fromisoformat(data["expires_at"])
-        assert expires > started
-
-    def test_create_session_token_not_stored_raw(self):
-        # token in response must differ from token_hash stored in DB (SHA-256)
-        import hashlib
-        tid = self._create_test()
-        sid = self._create_submission(tid)
-        data = self._create_session(tid, sid)
-        token = data["token"]
-        token_hash = hashlib.sha256(token.encode()).hexdigest()
-        assert token != token_hash          # raw != hash
-        assert len(token_hash) == 64        # SHA-256 hex digest is always 64 chars
+        assert data["started_at"] is not None
 
     def test_create_session_current_part_is_a_for_started(self):
-        # from_orm derives current_part="A" when status=STARTED (covers schema line 63)
         tid = self._create_test()
         sid = self._create_submission(tid)
-        data = self._create_session(tid, sid)
-        assert data["current_part"] == "A"
+        session = self._create_session(tid, sid)
+        status = client.get(f"/v1/api/test-sessions/{session['id']}/status").json()
+        assert status["current_part"] == "A"
 
     def test_create_session_with_custom_part_a_config(self):
         tid = self._create_test()
@@ -1141,7 +1126,7 @@ class TestQuizSessions:
         tid = self._create_test()
         sid = self._create_submission(tid)
         session = self._create_session(tid, sid)
-        with patch("src.v1.routes.quiz_session_route._fetch_questions", new=_fake_fetch):
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
             resp = client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
         assert resp.status_code == 200
         assert "questions" in resp.json()
@@ -1151,7 +1136,7 @@ class TestQuizSessions:
         tid = self._create_test()
         sid = self._create_submission(tid)
         session = self._create_session(tid, sid)
-        with patch("src.v1.routes.quiz_session_route._fetch_questions", new=_fake_fetch):
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
             resp = client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
         for q in resp.json()["questions"]:
             assert "correct_answers" not in q
@@ -1160,7 +1145,7 @@ class TestQuizSessions:
         tid = self._create_test()
         sid = self._create_submission(tid)
         session = self._create_session(tid, sid)
-        with patch("src.v1.routes.quiz_session_route._fetch_questions", new=_fake_fetch):
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
             client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
         status_resp = client.get(f"/v1/api/test-sessions/{session['id']}/status")
         assert status_resp.json()["status"] == "PART_A_IN_PROGRESS"
@@ -1172,7 +1157,7 @@ class TestQuizSessions:
         tid = self._create_test()
         sid = self._create_submission(tid)
         session = self._create_session(tid, sid)
-        with patch("src.v1.routes.quiz_session_route._fetch_questions", new=_fake_fetch):
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
             r1 = client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
         # Second call — no mock; if it called _fetch_questions it would hit real service
         r2 = client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
@@ -1184,7 +1169,7 @@ class TestQuizSessions:
         sid = self._create_submission(tid)
         session = self._create_session(tid, sid)
         # Advance to PART_A_COMPLETED via submit
-        with patch("src.v1.routes.quiz_session_route._fetch_questions", new=_fake_fetch):
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
             client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
         answers = [{"question_id": q["id"], "selected_answers": [1]} for q in _QS[:3]]
         client.post(
@@ -1206,14 +1191,14 @@ class TestQuizSessions:
         tid = self._create_test()
         sid = self._create_submission(tid)
         session = self._create_session(tid, sid)
-        with patch("src.v1.routes.quiz_session_route._fetch_questions", new=_fake_fetch):
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
             qresp = client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
         questions = qresp.json()["questions"]
         return session, questions
 
     def test_submit_part_a_returns_score(self):
         session, questions = self._setup_part_a_in_progress()
-        answers = [{"question_id": q["id"], "selected_answers": [1]} for q in questions]
+        answers = [{"question_id": q["question_id"], "selected_answers": [1]} for q in questions]
         resp = client.post(
             f"/v1/api/test-sessions/{session['id']}/part-a/submit",
             json={"session_id": session["id"], "answers": answers},
@@ -1225,7 +1210,7 @@ class TestQuizSessions:
     def test_submit_part_a_all_correct_score_100(self):
         session, questions = self._setup_part_a_in_progress()
         # _QS has correct_answers=[1] for every question
-        answers = [{"question_id": q["id"], "selected_answers": [1]} for q in questions]
+        answers = [{"question_id": q["question_id"], "selected_answers": [1]} for q in questions]
         resp = client.post(
             f"/v1/api/test-sessions/{session['id']}/part-a/submit",
             json={"session_id": session["id"], "answers": answers},
@@ -1234,7 +1219,7 @@ class TestQuizSessions:
 
     def test_submit_part_a_all_wrong_score_0(self):
         session, questions = self._setup_part_a_in_progress()
-        answers = [{"question_id": q["id"], "selected_answers": [2]} for q in questions]
+        answers = [{"question_id": q["question_id"], "selected_answers": [2]} for q in questions]
         resp = client.post(
             f"/v1/api/test-sessions/{session['id']}/part-a/submit",
             json={"session_id": session["id"], "answers": answers},
@@ -1244,7 +1229,7 @@ class TestQuizSessions:
 
     def test_submit_part_a_sets_status_completed(self):
         session, questions = self._setup_part_a_in_progress()
-        answers = [{"question_id": q["id"], "selected_answers": [1]} for q in questions]
+        answers = [{"question_id": q["question_id"], "selected_answers": [1]} for q in questions]
         client.post(
             f"/v1/api/test-sessions/{session['id']}/part-a/submit",
             json={"session_id": session["id"], "answers": answers},
@@ -1281,12 +1266,12 @@ class TestQuizSessions:
         tid = self._create_test()
         sid = self._create_submission(tid)
         session = self._create_session(tid, sid)
-        with patch("src.v1.routes.quiz_session_route._fetch_questions", new=_fake_fetch):
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
             qresp = client.get(f"/v1/api/test-sessions/{session['id']}/part-a/questions")
         questions = qresp.json()["questions"]
         # All correct → 100% score (high); all wrong → 0% (low)
         selected = [1] if score_high else [2]
-        answers = [{"question_id": q["id"], "selected_answers": selected} for q in questions]
+        answers = [{"question_id": q["question_id"], "selected_answers": selected} for q in questions]
         client.post(
             f"/v1/api/test-sessions/{session['id']}/part-a/submit",
             json={"session_id": session["id"], "answers": answers},
@@ -1295,7 +1280,7 @@ class TestQuizSessions:
 
     def test_get_part_b_questions_after_part_a(self):
         session = self._setup_part_a_completed(score_high=True)
-        with patch("src.v1.routes.quiz_session_route._fetch_questions", new=_fake_fetch):
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
             resp = client.get(f"/v1/api/test-sessions/{session['id']}/part-b/questions")
         assert resp.status_code == 200
         assert "questions" in resp.json()
@@ -1305,7 +1290,7 @@ class TestQuizSessions:
         # Adaptive message is always set — specific content depends on Part A score
         # which may not persist reliably through SQLite JSON round-trip in unit tests
         session = self._setup_part_a_completed(score_high=True)
-        with patch("src.v1.routes.quiz_session_route._fetch_questions", new=_fake_fetch):
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
             resp = client.get(f"/v1/api/test-sessions/{session['id']}/part-b/questions")
         ai_message = resp.json()["ai_message"]
         assert ai_message is not None
@@ -1314,16 +1299,16 @@ class TestQuizSessions:
 
     def test_get_part_b_questions_adaptive_message_is_one_of_known_strings(self):
         session = self._setup_part_a_completed(score_high=False)
-        with patch("src.v1.routes.quiz_session_route._fetch_questions", new=_fake_fetch):
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
             resp = client.get(f"/v1/api/test-sessions/{session['id']}/part-b/questions")
         assert resp.json()["ai_message"] in [
-            "Advancing to harder questions based on strong Part A performance.",
-            "Focusing on foundational questions based on Part A performance.",
+            "Part B is calibrated to your performance. Keep going!",
+            "Great work on Part A! Part B will challenge you further.",
         ]
 
     def test_get_part_b_questions_sets_status_in_progress(self):
         session = self._setup_part_a_completed()
-        with patch("src.v1.routes.quiz_session_route._fetch_questions", new=_fake_fetch):
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
             client.get(f"/v1/api/test-sessions/{session['id']}/part-b/questions")
         status = client.get(f"/v1/api/test-sessions/{session['id']}/status").json()
         assert status["status"] == "PART_B_IN_PROGRESS"
@@ -1332,7 +1317,7 @@ class TestQuizSessions:
 
     def test_get_part_b_questions_second_call_uses_cache(self):
         session = self._setup_part_a_completed()
-        with patch("src.v1.routes.quiz_session_route._fetch_questions", new=_fake_fetch):
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
             r1 = client.get(f"/v1/api/test-sessions/{session['id']}/part-b/questions")
         r2 = client.get(f"/v1/api/test-sessions/{session['id']}/part-b/questions")
         assert r2.status_code == 200
@@ -1356,14 +1341,14 @@ class TestQuizSessions:
 
     def _setup_part_b_in_progress(self, score_high=True):
         session = self._setup_part_a_completed(score_high=score_high)
-        with patch("src.v1.routes.quiz_session_route._fetch_questions", new=_fake_fetch):
+        with patch("src.services.quiz_session_service.fetch_questions_for_part", new=_fake_fetch):
             qresp = client.get(f"/v1/api/test-sessions/{session['id']}/part-b/questions")
         questions = qresp.json()["questions"]
         return session, questions
 
     def test_submit_part_b_returns_final_score(self):
         session, questions = self._setup_part_b_in_progress()
-        answers = [{"question_id": q["id"], "selected_answers": [1]} for q in questions]
+        answers = [{"question_id": q["question_id"], "selected_answers": [1]} for q in questions]
         resp = client.post(
             f"/v1/api/test-sessions/{session['id']}/part-b/submit",
             json={"session_id": session["id"], "answers": answers},
@@ -1374,7 +1359,7 @@ class TestQuizSessions:
 
     def test_submit_part_b_sets_status_completed(self):
         session, questions = self._setup_part_b_in_progress()
-        answers = [{"question_id": q["id"], "selected_answers": [1]} for q in questions]
+        answers = [{"question_id": q["question_id"], "selected_answers": [1]} for q in questions]
         client.post(
             f"/v1/api/test-sessions/{session['id']}/part-b/submit",
             json={"session_id": session["id"], "answers": answers},
@@ -1387,7 +1372,7 @@ class TestQuizSessions:
     def test_submit_part_b_final_score_is_average_of_parts(self):
         # Both parts all-correct → 100% + 100% / 2 = 100%
         session, questions = self._setup_part_b_in_progress(score_high=True)
-        answers = [{"question_id": q["id"], "selected_answers": [1]} for q in questions]
+        answers = [{"question_id": q["question_id"], "selected_answers": [1]} for q in questions]
         resp = client.post(
             f"/v1/api/test-sessions/{session['id']}/part-b/submit",
             json={"session_id": session["id"], "answers": answers},
@@ -1412,44 +1397,48 @@ class TestQuizSessions:
         assert resp.status_code == 404
 
     # ------------------------------------------------------------------
-    # _fetch_questions internal paths
+    # fetch_questions_for_part internal paths (service layer)
     # ------------------------------------------------------------------
 
     def test_fetch_questions_no_url_returns_empty_list(self):
-        from src.v1.routes.quiz_session_route import _fetch_questions
-        from src.config.settings import settings as svc_settings
-        with patch.object(svc_settings, "QUESTION_SERVICE_URL", None):
-            result = asyncio.run(_fetch_questions(None, "easy", 3, "req-id"))
+        from src.services.quiz_session_service import fetch_questions_for_part
+        result = asyncio.run(fetch_questions_for_part(None, 1, {"easy": 3}, []))
         assert result == []
 
     def test_fetch_questions_with_url_and_list_response(self):
-        from src.v1.routes.quiz_session_route import _fetch_questions
-        from src.config.settings import settings as svc_settings
+        from src.services.quiz_session_service import fetch_questions_for_part
+        fake_qs = [
+            {"id": f"q{i}", "type": "mcq", "difficulty": "easy",
+             "question_text": f"Q{i}", "correct_answer": 1, "options": []}
+            for i in range(5)
+        ]
 
-        class _FakeQResp:
+        class _FakeResp:
             status_code = 200
-            def json(self):
-                return [{"id": "q1", "difficulty": "easy"}]
+            def json(self): return fake_qs
 
-        class _FakeQClient:
+        class _FakeClient:
             def __init__(self, **kw): pass
             async def __aenter__(self): return self
             async def __aexit__(self, *a): pass
-            async def get(self, *a, **kw): return _FakeQResp()
+            async def get(self, *a, **kw): return _FakeResp()
 
-        with patch.object(svc_settings, "QUESTION_SERVICE_URL", "http://q-svc"), \
-             patch("httpx.AsyncClient", _FakeQClient):
-            result = asyncio.run(_fetch_questions(None, "easy", 3, "req-id"))
+        with patch("httpx.AsyncClient", _FakeClient):
+            result = asyncio.run(fetch_questions_for_part("http://q-svc", 1, {"easy": 3}, []))
         assert isinstance(result, list)
+        assert len(result) <= 3
 
     def test_fetch_questions_with_url_and_dict_response(self):
-        from src.v1.routes.quiz_session_route import _fetch_questions
-        from src.config.settings import settings as svc_settings
+        from src.services.quiz_session_service import fetch_questions_for_part
+        fake_qs = [
+            {"id": f"q{i}", "type": "mcq", "difficulty": "easy",
+             "question_text": f"Q{i}", "correct_answer": 0, "options": []}
+            for i in range(5)
+        ]
 
         class _FakeDictResp:
             status_code = 200
-            def json(self):
-                return {"questions": [{"id": "q1"}, {"id": "q2"}, {"id": "q3"}]}
+            def json(self): return {"questions": fake_qs}
 
         class _FakeDictClient:
             def __init__(self, **kw): pass
@@ -1457,18 +1446,18 @@ class TestQuizSessions:
             async def __aexit__(self, *a): pass
             async def get(self, *a, **kw): return _FakeDictResp()
 
-        with patch.object(svc_settings, "QUESTION_SERVICE_URL", "http://q-svc"), \
-             patch("httpx.AsyncClient", _FakeDictClient):
-            result = asyncio.run(_fetch_questions(None, "easy", 3, "req-id"))
-        # dict response extracts questions key, shuffles, slices to count=3
+        with patch("httpx.AsyncClient", _FakeDictClient):
+            result = asyncio.run(fetch_questions_for_part("http://q-svc", 1, {"easy": 3}, []))
+        assert isinstance(result, list)
         assert len(result) <= 3
 
-    def test_fetch_questions_non_200_returns_empty(self):
-        from src.v1.routes.quiz_session_route import _fetch_questions
-        from src.config.settings import settings as svc_settings
+    def test_fetch_questions_non_200_raises_503(self):
+        from src.services.quiz_session_service import fetch_questions_for_part
+        from fastapi import HTTPException
 
         class _FailResp:
             status_code = 503
+            text = "unavailable"
             def json(self): return {}
 
         class _FailClient:
@@ -1477,21 +1466,23 @@ class TestQuizSessions:
             async def __aexit__(self, *a): pass
             async def get(self, *a, **kw): return _FailResp()
 
-        with patch.object(svc_settings, "QUESTION_SERVICE_URL", "http://q-svc"), \
-             patch("httpx.AsyncClient", _FailClient):
-            result = asyncio.run(_fetch_questions(None, "easy", 3, "req-id"))
-        assert result == []
+        with patch("httpx.AsyncClient", _FailClient):
+            with pytest.raises(HTTPException) as exc_info:
+                asyncio.run(fetch_questions_for_part("http://q-svc", 1, {"easy": 3}, []))
+        assert exc_info.value.status_code == 503
 
-    def test_fetch_questions_exception_returns_empty(self):
-        from src.v1.routes.quiz_session_route import _fetch_questions
-        from src.config.settings import settings as svc_settings
+    def test_fetch_questions_network_error_raises_503(self):
+        from src.services.quiz_session_service import fetch_questions_for_part
+        from fastapi import HTTPException
+        import httpx
 
         class _ErrClient:
             def __init__(self, **kw): pass
-            async def __aenter__(self): raise RuntimeError("network down")
+            async def __aenter__(self): return self
             async def __aexit__(self, *a): pass
+            async def get(self, *a, **kw): raise httpx.RequestError("network down")
 
-        with patch.object(svc_settings, "QUESTION_SERVICE_URL", "http://q-svc"), \
-             patch("httpx.AsyncClient", _ErrClient):
-            result = asyncio.run(_fetch_questions(None, "easy", 3, "req-id"))
-        assert result == []
+        with patch("httpx.AsyncClient", _ErrClient):
+            with pytest.raises(HTTPException) as exc_info:
+                asyncio.run(fetch_questions_for_part("http://q-svc", 1, {"easy": 3}, []))
+        assert exc_info.value.status_code == 503

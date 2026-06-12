@@ -8,8 +8,8 @@ class Settings(BaseSettings):
     DB_USERNAME: str
     DB_PASSWORD: str
     DB_NAME: str
-    MONGO_USER: Optional[str] = None  # Optional - service uses PostgreSQL only
-    MONGODB_PASSWORD: Optional[str] = None  # Optional - service uses PostgreSQL only
+    MONGO_USER: Optional[str] = None
+    MONGODB_PASSWORD: Optional[str] = None
     ALLOW_ORIGINS: str
     SERVICE_NAME: str
     PORT: int
