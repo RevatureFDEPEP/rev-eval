@@ -186,6 +186,84 @@ class TestQuestionCrudMongo:
         assert resp.status_code == 404
 
     # ------------------------------------------------------------------
+    # TRUE_FALSE and TEXT question types
+    # ------------------------------------------------------------------
+
+    def test_15a_create_true_false_returns_201(self):
+        resp = self.client.post(
+            "/v1/api/questions/",
+            json={
+                "type": "true_false",
+                "question_text": "Is Python an interpreted programming language?",
+                "correct_answers": [True],
+                "difficulty": "easy",
+                "skills": ["Python"],
+                "tags": ["python", "basics"],
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        TestQuestionCrudMongo.tf_id = resp.json()["id"]
+
+    def test_15b_update_true_false_valid_correct_answers(self):
+        resp = self.client.put(
+            f"/v1/api/questions/{self.tf_id}",
+            json={"correct_answers": [False]},
+        )
+        assert resp.status_code == 200, resp.text
+
+    def test_15c_update_true_false_with_options_returns_400(self):
+        resp = self.client.put(
+            f"/v1/api/questions/{self.tf_id}",
+            json={"options": [{"text": "Option A"}, {"text": "Option B"}]},
+        )
+        assert resp.status_code == 400
+
+    def test_15d_create_text_returns_201(self):
+        resp = self.client.post(
+            "/v1/api/questions/",
+            json={
+                "type": "text",
+                "question_text": "Explain what object-oriented programming means.",
+                "sample_answer": "OOP is a paradigm based on objects that contain data and methods.",
+                "difficulty": "medium",
+                "skills": ["Programming"],
+                "tags": ["programming", "concepts"],
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        TestQuestionCrudMongo.text_id = resp.json()["id"]
+
+    def test_15e_update_text_with_options_returns_400(self):
+        resp = self.client.put(
+            f"/v1/api/questions/{self.text_id}",
+            json={"options": [{"text": "Option A"}, {"text": "Option B"}]},
+        )
+        assert resp.status_code == 400
+
+    def test_15f_update_text_with_correct_answers_returns_400(self):
+        resp = self.client.put(
+            f"/v1/api/questions/{self.text_id}",
+            json={"correct_answers": [1]},
+        )
+        assert resp.status_code == 400
+
+    # ------------------------------------------------------------------
+    # Service validation errors (400 paths)
+    # ------------------------------------------------------------------
+
+    def test_15g_filter_invalid_type_returns_400(self):
+        resp = self.client.get("/v1/api/questions/by-type/invalid_type")
+        assert resp.status_code == 400
+
+    def test_15h_filter_invalid_difficulty_returns_400(self):
+        resp = self.client.get("/v1/api/questions/by-difficulty/extreme")
+        assert resp.status_code == 400
+
+    def test_15i_filter_no_params_returns_400(self):
+        resp = self.client.get("/v1/api/questions/filter")
+        assert resp.status_code == 400
+
+    # ------------------------------------------------------------------
     # Delete
     # ------------------------------------------------------------------
 

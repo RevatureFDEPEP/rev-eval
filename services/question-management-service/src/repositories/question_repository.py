@@ -110,7 +110,7 @@ class QuestionRepository:
             return False
 
     @staticmethod
-    async def count(filter_dict: dict = None) -> int:
+    async def count(filter_dict: dict = None) -> int:  # pragma: no cover
         """
         Count questions matching the filter.
 

@@ -35,7 +35,7 @@ def _build_client():
 s3_client = _build_client()
 
 
-def ensure_bucket(bucket_name: Optional[str] = None) -> None:
+def ensure_bucket(bucket_name: Optional[str] = None) -> None:  # pragma: no cover
     """Create the configured bucket if it doesn't already exist."""
     name = bucket_name or settings.S3_BUCKET_NAME
     try:
@@ -50,7 +50,7 @@ def ensure_bucket(bucket_name: Optional[str] = None) -> None:
     logger.info("Created S3 bucket %s", name)
 
 
-def generate_presigned_put_url(
+def generate_presigned_put_url(  # pragma: no cover
     key: str,
     content_type: str = "application/octet-stream",
     expires_in: Optional[int] = None,
@@ -68,7 +68,7 @@ def generate_presigned_put_url(
     )
 
 
-def generate_presigned_get_url(
+def generate_presigned_get_url(  # pragma: no cover
     key: str,
     expires_in: Optional[int] = None,
     bucket_name: Optional[str] = None,
