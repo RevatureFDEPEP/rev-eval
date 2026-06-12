@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.quiz_session import QuizSession, SessionStatus
 from src.repositories.quiz_session_repository import QuizSessionRepository
+from src.repositories.test_repository import TestRepository
 from src.schemas.quiz_session_schema import (
     QuizSessionCreate,
     PartASubmitIn,
@@ -110,6 +111,9 @@ async def fetch_questions_for_part(
     Filters by difficulty, excludes already-seen question IDs, samples randomly.
     Raises HTTPException 503 if service is unreachable or questions lack answer fields.
     """
+    if not question_service_url:
+        logger.warning("QUESTION_SERVICE_URL not configured — returning empty question list")
+        return []
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
@@ -251,11 +255,17 @@ def _current_part_from_status(status: SessionStatus) -> Optional[str]:
 
 class QuizSessionService:
 
+    SESSION_TTL_DEFAULT = 7200  # 2-hour fallback when test has no duration
+
     @staticmethod
     async def create_session(db: AsyncSession, data: QuizSessionCreate) -> QuizSession:
-        """Create a new quiz session row."""
+        """Create a new quiz session row. TTL derived from test row, not client."""
+        test = await TestRepository.get_by_id(db, data.test_id)
+        if not test:
+            raise HTTPException(status_code=404, detail="Test not found")
         now = datetime.utcnow()
-        expires = now + timedelta(hours=3)
+        ttl = test.duration_seconds or QuizSessionService.SESSION_TTL_DEFAULT
+        expires = now + timedelta(seconds=ttl)
 
         # Default part_a config: 3 easy + 4 medium + 4 hard = 11 questions
         pa_cfg = data.part_a_config or PartAConfig()
