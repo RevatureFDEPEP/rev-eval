@@ -57,6 +57,25 @@ describe('useAutosave', () => {
     expect(saveDraft).toHaveBeenCalledTimes(1)
   })
 
+  it('does not re-arm the debounce when a rerender does not change content', async () => {
+    // Same content, different Map reference (and different array order) on each
+    // rerender. Keying on the serialized snapshot means the timer keeps running
+    // toward the original 30s deadline instead of resetting every render.
+    const { rerender } = renderHook(
+      ({ answers }) => useAutosave('s1', answers, true),
+      { initialProps: { answers: new Map([['q1', [1, 2]]]) } }
+    )
+    await act(async () => {
+      vi.advanceTimersByTime(20_000)
+    })
+    rerender({ answers: new Map([['q1', [2, 1]]]) }) // equal content, new ref
+    await act(async () => {
+      vi.advanceTimersByTime(10_000) // 30s since mount → original timer fires
+    })
+    expect(saveDraft).toHaveBeenCalledTimes(1)
+    expect(saveDraft).toHaveBeenCalledWith('s1', { q1: [2, 1] })
+  })
+
   it('does not save while disabled (locked)', () => {
     const answers = new Map([['q1', [1]]])
     renderHook(() => useAutosave('s1', answers, false))

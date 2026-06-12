@@ -1,10 +1,17 @@
 /**
  * Browser-side quiz session calls (W3-F4), routed through the BFF proxy.
  *
- * Both are wrapped in fetchWithRetry so a transient failure (network / 5xx)
- * backs off and retries while a semantic failure (409/410/422) surfaces at
- * once. The retried answer submit reuses the SAME Idempotency-Key, so the
+ * The answer submit is wrapped in fetchWithRetry so a transient failure
+ * (network / 5xx) backs off and retries while a semantic failure (409/410/422)
+ * surfaces at once. The retried submit reuses the SAME Idempotency-Key, so the
  * backend replays the original result instead of double-scoring.
+ *
+ * The draft save is deliberately NOT retried. A retry backs off for up to ~2s,
+ * during which a newer debounce can save fresher answers; the retried older
+ * snapshot could then land last and win last-write-wins with stale data. Since
+ * autosave is advisory and the next debounce re-saves anyway, a single attempt
+ * that fails fast (surfacing "error", self-healed on the next change) is both
+ * simpler and correct.
  */
 
 import { api } from './client';
@@ -30,12 +37,15 @@ export function submitAnswer(
   );
 }
 
-/** Autosave the in-progress answer map (advisory, last-write-wins). */
+/**
+ * Autosave the in-progress answer map (advisory, last-write-wins). Single
+ * attempt, no retry — see the module header for why retrying drafts is unsafe.
+ */
 export function saveDraft(
   sessionId: string,
   answers: Record<string, number[]>
 ): Promise<DraftSaveResult> {
-  return fetchWithRetry(() =>
-    api.patch<DraftSaveResult>(`/v1/api/sessions/${sessionId}/draft`, { answers })
-  );
+  return api.patch<DraftSaveResult>(`/v1/api/sessions/${sessionId}/draft`, {
+    answers,
+  });
 }

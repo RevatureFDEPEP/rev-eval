@@ -1,8 +1,10 @@
 /**
  * Debounced draft autosave with a max-wait cap (W3-F4, spec step 2).
  *
- * Trailing 30s debounce: each change to the answers map (re)arms the timer, so
- * a save fires 30s after the last change. A `maxWaitMs` cap bounds staleness so
+ * Trailing 30s debounce: each *content* change to the answers map (re)arms the
+ * timer, so a save fires 30s after the last change. Keying on a serialized
+ * snapshot (not the Map reference) means a keystroke that re-selects the same
+ * options won't churn the timer. A `maxWaitMs` cap bounds staleness so
  * a *continuously* interacting participant (who would otherwise keep resetting
  * the debounce and never save) still flushes at least every `maxWaitMs` — the
  * pending save is scheduled for `min(debounce, maxWait − sinceLastSave)`.
@@ -18,6 +20,20 @@ import { saveDraft } from '@/lib/api/sessions';
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 const DEBOUNCE_MS = 30_000;
+
+/**
+ * Canonical, order-independent serialization of the answer map, used purely as
+ * the effect's change key. Sorting keys and each selection array means two maps
+ * with identical content (regardless of insertion / click order) compare equal,
+ * so a keystroke that doesn't change the answers won't re-arm the debounce.
+ */
+function serializeAnswers(answers: Map<string, number[]>): string {
+  return JSON.stringify(
+    [...answers.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => [k, [...v].sort((x, y) => x - y)])
+  );
+}
 
 export function useAutosave(
   sessionId: string,
@@ -40,6 +56,14 @@ export function useAutosave(
     };
   }, []);
 
+  // Keep the latest map in a ref so the timer always saves current answers
+  // while the effect re-arms only on actual content change (serialized below).
+  const answersRef = useRef(answers);
+  useEffect(() => {
+    answersRef.current = answers;
+  });
+  const serialized = serializeAnswers(answers);
+
   useEffect(() => {
     if (!enabled) return;
     // Cap the wait so sustained interaction can't starve the save forever.
@@ -49,14 +73,14 @@ export function useAutosave(
       lastSaveRef.current = Date.now();
       if (mountedRef.current) setSaveStatus('saving');
       try {
-        await saveDraft(sessionId, Object.fromEntries(answers));
+        await saveDraft(sessionId, Object.fromEntries(answersRef.current));
         if (mountedRef.current) setSaveStatus('saved');
       } catch {
         if (mountedRef.current) setSaveStatus('error');
       }
     }, wait);
     return () => clearTimeout(id);
-  }, [answers, enabled, sessionId, debounceMs, maxWaitMs]);
+  }, [serialized, enabled, sessionId, debounceMs, maxWaitMs]);
 
   return saveStatus;
 }
