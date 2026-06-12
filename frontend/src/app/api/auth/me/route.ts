@@ -1,17 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
+import { mapUserServiceUser, type UserServiceUser } from '@/lib/auth/mapUser';
 
 const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://api-gateway:8000';
-
-interface UserServiceUser {
-  id: number;
-  email: string;
-  first_name?: string | null;
-  last_name?: string | null;
-  full_name?: string | null;
-  role: string;
-  organization_id?: string | null;
-}
 
 export async function GET() {
   const session = await getSession();
@@ -30,13 +21,5 @@ export async function GET() {
 
   const profile = (await response.json()) as UserServiceUser;
 
-  return NextResponse.json({
-    id: profile.id,
-    email: profile.email,
-    firstName: profile.first_name ?? undefined,
-    lastName: profile.last_name ?? undefined,
-    fullName: profile.full_name ?? undefined,
-    role: profile.role,
-    organizationId: profile.organization_id ?? undefined,
-  });
+  return NextResponse.json(mapUserServiceUser(profile));
 }

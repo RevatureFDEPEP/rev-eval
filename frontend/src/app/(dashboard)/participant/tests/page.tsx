@@ -160,7 +160,7 @@ export default function ParticipantTestsPage() {
     }
 
     const href = isQuiz
-      ? `/participant/tests/take/mcq/${test.test_id}?submission=${test.submission_id}`
+      ? `/take/${test.test_id}`
       : `/participant/tests/take/interview/${test.test_id}?submission=${test.submission_id}`;
 
     console.log('✅ Generated href:', href, 'for test:', test.test_name, 'test_id:', test.test_id, 'submission_id:', test.submission_id);

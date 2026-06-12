@@ -379,6 +379,44 @@ export interface QuizSubmitResponse {
   analysis?: string;
 }
 
+// ===== QUIZ SESSION (W3-F1 /sessions contract) =====
+// Live test-management-service session endpoints. Distinct from the legacy
+// "AI Quiz Service" block above (two-part adaptive, /test-sessions).
+
+/** A single option in a multiple-choice question (answer key stripped). */
+export interface ParticipantQuestionOption {
+  option_id: number;
+  text: string;
+}
+
+/**
+ * Answer-free view of a question, as returned by POST /v1/api/sessions.
+ * The backend strips correct_answers; only single/multi-select are rendered.
+ */
+export interface ParticipantQuestion {
+  id: string;
+  type: "mcq" | "multi";
+  question_text: string;
+  options?: ParticipantQuestionOption[];
+  difficulty?: string;
+  index: number;
+}
+
+/**
+ * Response of POST /v1/api/sessions. The backend returns only the current
+ * question (server-advanced on answer-submit); timing is server-authoritative.
+ */
+export interface SessionResponse {
+  session_id: string;
+  session_token: string;
+  status: string;
+  server_now: string;
+  expires_at: string;
+  total_questions: number;
+  current_index: number;
+  question: ParticipantQuestion;
+}
+
 // ===== TYPE ALIASES (for backwards compatibility) =====
 
 /** @deprecated Use SubmissionStatus instead */
