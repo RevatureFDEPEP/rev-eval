@@ -14,9 +14,7 @@ class Settings(BaseSettings):
     """
 
     # MongoDB Configuration
-    MONGO_URI: str | None = (
-        None  # If set, used directly (e.g. mongodb://mongo:27017/evalai)
-    )
+    MONGO_URI: str | None = None  # If set, used directly (e.g. mongodb://mongo:27017/evalai)
     MONGO_USER: str | None = None
     MONGODB_PASSWORD: str | None = None
     MONGO_CLUSTER: str | None = None
