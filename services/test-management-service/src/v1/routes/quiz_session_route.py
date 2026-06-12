@@ -15,6 +15,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from src.config.settings import settings
 from src.db.session import get_db
 from src.models.quiz_session import QuizSession, SessionStatus
+from src.repositories.test_repository import TestRepository
 from src.schemas.quiz_session_schema import (
     PartAQuestionsResponse,
     PartASubmit,
@@ -104,10 +105,14 @@ async def create_session(
     - Stores SHA-256 hash only — raw token returned once and never persisted
     - expires_at and server_now computed server-side
     """
+    test = await TestRepository.get_by_id(db, payload.test_id)
+    if not test:
+        raise HTTPException(status_code=404, detail="Test not found")
+
     raw_token = secrets.token_urlsafe(32)
     token_hash = _sha256(raw_token)
     server_now = datetime.utcnow()
-    ttl_seconds = payload.duration_seconds or SESSION_TTL_SECONDS_DEFAULT
+    ttl_seconds = test.duration_seconds or SESSION_TTL_SECONDS_DEFAULT
     expires_at = server_now + timedelta(seconds=ttl_seconds)
 
     part_a_cfg = payload.part_a_config.model_dump() if payload.part_a_config else {"easy": 3, "medium": 4, "hard": 4}
