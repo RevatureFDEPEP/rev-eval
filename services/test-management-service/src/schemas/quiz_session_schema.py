@@ -43,6 +43,10 @@ class SessionBaseResponse(BaseModel):
     total_questions: int
     current_index: int
     question: ParticipantQuestion
+    # Advisory autosave snapshot (question_id -> option_ids), echoed so a resumed
+    # session can rehydrate the client's in-progress selection. None on a fresh
+    # session or when nothing has been autosaved yet (W3-F4).
+    draft_answers: dict[str, list[int]] | None = None
 
 
 class SessionCreateResponse(SessionBaseResponse):
@@ -53,3 +57,25 @@ class SessionCreateResponse(SessionBaseResponse):
 
 class SessionStateResponse(SessionBaseResponse):
     pass
+
+
+class DraftSaveRequest(BaseModel):
+    """Advisory autosave payload: the full in-progress answer map.
+
+    Last-write-wins — no idempotency key. question_id -> selected option_ids.
+    """
+
+    answers: dict[str, list[int]]
+
+
+class DraftSaveResponse(BaseModel):
+    """Acknowledges an autosave without advancing the session.
+
+    Echoes the UNCHANGED current_index/status so the client can confirm the
+    draft did not score or advance, plus saved_at for the save-status UI.
+    """
+
+    session_id: str
+    status: QuizSessionStatus
+    current_index: int
+    saved_at: datetime
