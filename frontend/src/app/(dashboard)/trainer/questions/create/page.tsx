@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useFieldArray, type ControllerRenderProps } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -108,6 +108,14 @@ type TrueFalseFormValues = z.infer<typeof trueFalseSchema>;
 type TextFormValues = z.infer<typeof textSchema>;
 type QuestionFormValues = McqFormValues | TrueFalseFormValues | TextFormValues;
 
+const questionSchema = z.discriminatedUnion("questionType", [
+  mcqSchema.extend({ questionType: z.literal("mcq") }),
+  trueFalseSchema.extend({ questionType: z.literal("true_false") }),
+  textSchema.extend({ questionType: z.literal("text") }),
+]);
+
+type QuestionSchemaValues = z.infer<typeof questionSchema>;
+
 export default function CreateQuestionPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -119,7 +127,7 @@ export default function CreateQuestionPage() {
   const questionType = (searchParams.get("type") as QuestionType) || "mcq";
 
   // Get default values based on question type
-  const getDefaultValues = (): QuestionFormValues => {
+  const getDefaultValues = useCallback((): QuestionFormValues => {
   const base = {
     question_text: "",
     difficulty: undefined,
@@ -157,44 +165,17 @@ export default function CreateQuestionPage() {
         ],
       };
   }
-};
+  }, [questionType]);
 
-// Create a discriminated union schema that handles all question types
-/*
-const createQuestionSchema = (type: QuestionType) => {
-  switch (type) {
-    case "mcq":
-      return mcqSchema;
-    case "true_false":
-      return trueFalseSchema;
-    case "text":
-      return textSchema;
-    default:
-      return mcqSchema;
-  }
-};
-
-  const form = useForm<QuestionFormValues>({
-    resolver: zodResolver(createQuestionSchema(questionType)),
-    defaultValues: getDefaultValues(),
-  });
-  */
-
-const questionSchema = z.discriminatedUnion("questionType", [
-  mcqSchema.extend({ questionType: z.literal("mcq") }),
-  trueFalseSchema.extend({ questionType: z.literal("true_false") }),
-  textSchema.extend({ questionType: z.literal("text") }),
-]);
-
-  const form = useForm({
+  const form = useForm<QuestionSchemaValues>({
     resolver: zodResolver(questionSchema),
     defaultValues: { ...getDefaultValues(), questionType },
   });
 
   // Reset form when questionType changes
   useEffect(() => {
-    form.reset(getDefaultValues());
-  }, [questionType, form]);
+    form.reset({ ...getDefaultValues(), questionType });
+  }, [questionType, form, getDefaultValues]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -229,7 +210,7 @@ const questionSchema = z.discriminatedUnion("questionType", [
     loadSkills();
   }, []);
 
-  const transformFormData = (values: QuestionFormValues): QuestionCreate => {
+  const transformFormData = (values: QuestionSchemaValues): QuestionCreate => {
     // For MCQ type, determine if it's actually MCQ (single answer) or MULTI (multiple answers)
     let actualType: QuestionType = questionType;
     let correct_answers: (number | boolean | string)[] | undefined = undefined;
@@ -274,7 +255,7 @@ const questionSchema = z.discriminatedUnion("questionType", [
     };
   };
 
-  const onSubmit = async (values: QuestionFormValues) => {
+  const onSubmit = async (values: QuestionSchemaValues) => {
     try {
       setSubmitting(true);
       setError(null);
@@ -353,7 +334,7 @@ const questionSchema = z.discriminatedUnion("questionType", [
               <FormField
                 control={form.control}
                 name="question_text"
-                render={({ field }: { field: ControllerRenderProps<any, any> }) => (
+                render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, "question_text"> }) => (
                   <FormItem>
                     <FormControl>
                       <Textarea
@@ -390,7 +371,7 @@ const questionSchema = z.discriminatedUnion("questionType", [
                     <FormField
                       control={form.control}
                       name={`options.${index}.is_correct`}
-                      render={({ field }: { field: ControllerRenderProps<any, any> }) => (
+                      render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, `options.${number}.is_correct`> }) => (
                         <FormItem className="flex items-center space-y-0">
                           <FormControl>
                             <Checkbox
@@ -405,7 +386,7 @@ const questionSchema = z.discriminatedUnion("questionType", [
                     <FormField
                       control={form.control}
                       name={`options.${index}.text`}
-                      render={({ field }: { field: ControllerRenderProps<any, any> }) => (
+                      render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, `options.${number}.text`> }) => (
                         <FormItem className="flex-1">
                           <FormControl>
                             <Input
@@ -462,7 +443,7 @@ const questionSchema = z.discriminatedUnion("questionType", [
                 <FormField
                   control={form.control}
                   name="true_false_answer"
-                  render={({ field }: { field: ControllerRenderProps<any, any> }) => (
+                  render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, "true_false_answer"> }) => (
                     <FormItem className="space-y-3">
                       <FormControl>
                         <RadioGroup
@@ -509,7 +490,7 @@ const questionSchema = z.discriminatedUnion("questionType", [
                 <FormField
                   control={form.control}
                   name="sample_answer"
-                  render={({ field }: { field: ControllerRenderProps<any, any> }) => (
+                  render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, "sample_answer"> }) => (
                     <FormItem>
                       <FormControl>
                         <Textarea
@@ -538,7 +519,7 @@ const questionSchema = z.discriminatedUnion("questionType", [
               <FormField
                 control={form.control}
                 name="answer_explanation"
-                render={({ field }: { field: ControllerRenderProps<any, any> }) => (
+                render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, "answer_explanation"> }) => (
                   <FormItem>
                     <FormControl>
                       <Textarea
@@ -566,7 +547,7 @@ const questionSchema = z.discriminatedUnion("questionType", [
               <FormField
                 control={form.control}
                 name="difficulty"
-                render={({ field }: { field: ControllerRenderProps<any, any> }) => (
+                render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, "difficulty"> }) => (
                   <FormItem>
                     <Select
                       onValueChange={field.onChange}
@@ -659,7 +640,7 @@ const questionSchema = z.discriminatedUnion("questionType", [
                                 key={skill.id}
                                 control={form.control}
                                 name="skills"
-                                render={({ field }: { field: ControllerRenderProps<any, any> }) => {
+                                render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, "skills"> }) => {
                                   const current: string[] = field.value || [];
                                   const isChecked = current.includes(skill.name);
                                   return (
@@ -711,7 +692,7 @@ const questionSchema = z.discriminatedUnion("questionType", [
               <FormField
                 control={form.control}
                 name="tags"
-                render={({ field }: { field: ControllerRenderProps<any, any> }) => (
+                render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, "tags"> }) => (
                   <FormItem>
                     <FormControl>
                       <Input
