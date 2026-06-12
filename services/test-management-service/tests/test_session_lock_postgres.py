@@ -43,18 +43,6 @@ _PG_URL = "postgresql+asyncpg://test:test@localhost:5432/test"
 _IN_CI = os.environ.get("CI") == "true"
 
 
-def _postgres_reachable() -> bool:
-    import socket
-    try:
-        with socket.create_connection(("localhost", 5432), timeout=2):
-            return True
-    except OSError:
-        return False
-
-
-_PG_AVAILABLE = _IN_CI and _postgres_reachable()
-
-
 def _make_engine():
     return create_async_engine(_PG_URL, poolclass=NullPool)
 
@@ -96,7 +84,7 @@ async def _seed_session(factory, session_id: str):
         await db.commit()
 
 
-@pytest.mark.skipif(not _PG_AVAILABLE, reason="Requires reachable Postgres on localhost:5432")
+@pytest.mark.skipif(not _IN_CI, reason="Requires Postgres service container — CI only")
 def test_for_update_serializes_concurrent_writers():
     """
     Two transactions both call get_by_id_for_update on the same row.
