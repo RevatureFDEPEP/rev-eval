@@ -8,6 +8,7 @@ from src.config.settings import settings
 from src.services.quiz_session_service import QuizSessionService
 from src.schemas.quiz_session_schema import (
     QuizSessionCreate,
+    DraftSaveIn,
     QuizSessionOut,
     PartAQuestionsOut,
     PartBQuestionsOut,
@@ -107,6 +108,17 @@ async def get_part_b_questions(
     )
 
 
+@router.patch("/{session_id}/draft", response_model=QuizSessionOut)
+async def save_draft(
+    session_id: str,
+    body: DraftSaveIn,
+    db: AsyncSession = Depends(get_db),
+):
+    """Save draft answers last-write-wins. 409 if session not in active state."""
+    session = await QuizSessionService.save_draft(db, session_id, body)
+    return _session_to_out(session)
+
+
 @router.post("/{session_id}/part-b/submit", response_model=QuizSubmitOut)
 async def submit_part_b(
     session_id: str,
@@ -141,12 +153,14 @@ def _session_to_out(session) -> QuizSessionOut:
         user_id=session.user_id,
         status=session.status,
         started_at=session.server_now,
+        expires_at=session.expires_at,
         completed_at=session.completed_at,
         total_questions=session.total_questions,
         part_a_config=part_a_data.get("config") or session.part_a_config,
         part_b_config=part_b_data.get("config") or session.part_b_config,
         part_a=session.part_a,
         part_b=session.part_b,
+        draft_answers=session.draft_answers,
         total_score=session.total_score,
         percentage_score=session.percentage_score,
         created_at=session.created_at,

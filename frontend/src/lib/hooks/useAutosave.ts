@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { saveDraft } from '@/lib/api/quiz-sessions';
 
 export type AutosaveAnswerValue = number | number[] | boolean;
 
@@ -89,6 +90,9 @@ export function useAutosave({
       if (typeof window !== 'undefined') {
         localStorage.setItem(`quiz-draft-${sessionId}`, JSON.stringify(draft));
       }
+
+      // Fire-and-forget: persist to server; localStorage is the fallback if this fails
+      saveDraft(sessionId, draft).catch(() => {});
 
       prevAnswersRef.current = new Map(answers);
       setIsSaving(false);

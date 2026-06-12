@@ -130,6 +130,18 @@ export const api = {
   },
 
   /**
+   * PATCH request
+   */
+  async patch<T>(endpoint: string, data: unknown): Promise<T> {
+    const response = await fetchApi(endpoint, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+
+    return response.json();
+  },
+
+  /**
    * DELETE request
    */
   async delete<T>(endpoint: string): Promise<T> {

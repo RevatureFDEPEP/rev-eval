@@ -386,6 +386,17 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
 
         setPartAQuestions(partAData.questions);
         setQuestions(partAData.questions);
+
+        // Rehydrate draft answers from server if session has a saved draft
+        if (session.draft_answers && session.draft_answers.length > 0) {
+          const rehydrated = new Map<string, AnswerValue>();
+          for (const entry of session.draft_answers) {
+            const v = entry.answer;
+            rehydrated.set(entry.question_id, Array.isArray(v) ? v : (v as AnswerValue));
+          }
+          setAnswers(rehydrated);
+        }
+
         setState('part-a');
 
         toast.success('Quiz loaded successfully!');

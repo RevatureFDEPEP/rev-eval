@@ -9,6 +9,7 @@ import { api } from './client';
 import {
   TestSessionCreate,
   TestSession,
+  DraftAnswer,
   PartAQuestionsResponse,
   PartBQuestionsResponse,
   PartAAnswersSubmit,
@@ -169,4 +170,8 @@ export async function getSessionStatus(sessionId: string): Promise<{
   current_part: string | null;
 }> {
   return api.get(`/v1/api/test-sessions/${sessionId}/status`);
+}
+
+export async function saveDraft(sessionId: string, answers: DraftAnswer[]): Promise<void> {
+  await api.patch(`/v1/api/test-sessions/${sessionId}/draft`, { answers });
 }
