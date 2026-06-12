@@ -305,6 +305,30 @@ async def test_text_question_scores_zero_and_advances_not_500(session_factory):
 
 
 @pytest.mark.asyncio
+async def test_unreachable_next_question_does_not_block_current_answer(session_factory):
+    """A next question deleted mid-exam (or a transient question-mgmt failure)
+    must NOT abort the already-scored current answer: the answer commits and the
+    index advances; next_question just comes back null (no wedge)."""
+    # "q-gone" is not in the fake bank → _fetch_question 502s → best-effort null.
+    sid = await _seed_session(session_factory, question_ids=["q-mcq", "q-gone"])
+    async with _build_client(session_factory) as client:
+        resp = await client.post(
+            f"/v1/api/sessions/{sid}/answer", json={"submitted_answers": [2]}
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["current_index"] == 1       # advanced — not wedged
+    assert body["status"] == "ACTIVE"
+    assert body["next_question"] is None     # couldn't fetch, surfaced as null
+
+    # The valid answer was still persisted.
+    async with session_factory() as session:
+        rows = (await session.execute(select(QuizAnswer))).scalars().all()
+        assert len(rows) == 1
+        assert rows[0].question_id == "q-mcq"
+
+
+@pytest.mark.asyncio
 async def test_idempotency_key_is_scoped_per_session(session_factory):
     """The same Idempotency-Key on a DIFFERENT session must not replay the
     first session's response — each session scores its own answer."""
