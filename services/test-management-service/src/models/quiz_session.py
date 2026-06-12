@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from sqlalchemy import Column, String, Integer, Float, DateTime, JSON, Enum as SAEnum, ForeignKey
-from sqlalchemy.orm import relationship
+
 from src.db.session import Base
 import enum
 
