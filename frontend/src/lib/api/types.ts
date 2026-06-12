@@ -312,6 +312,7 @@ export interface TestSession {
   user_id: number;
   status: "STARTED" | "PART_A_IN_PROGRESS" | "PART_A_COMPLETED" | "PART_B_IN_PROGRESS" | "PART_B_COMPLETED" | "GRADED" | "COMPLETED";
   started_at: string;
+  expires_at: string;
   completed_at?: string;
   total_questions: number;
   part_a_config?: {

@@ -370,12 +370,12 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
         setSessionId(activeSessionId);
         setCurrentPart('A');
 
-        // Server-anchored timer: anchor to session.started_at (= server_now from backend).
-        // Clock offset = Date.now() - Date.parse(started_at) ≈ round-trip time (ms).
-        // expiresAtMs = server_now_ms + duration_seconds * 1000
-        // Remaining = expiresAtMs - Date.now() — accurate after page reload.
-        const expiresAtMs = session.started_at
-          ? Date.parse(session.started_at) + durationSeconds * 1000
+        // Use server-computed expires_at as the authoritative deadline.
+        // Append Z if missing — backend serializes naive utcnow() without timezone suffix,
+        // and Date.parse treats no-timezone strings as local time on most browsers.
+        const raw = session.expires_at;
+        const expiresAtMs = raw
+          ? Date.parse(raw.endsWith('Z') || raw.includes('+') ? raw : raw + 'Z')
           : undefined;
         resetTimer(durationSeconds, expiresAtMs);
 
