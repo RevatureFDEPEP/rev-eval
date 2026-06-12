@@ -1,8 +1,22 @@
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.models.quiz_session import QuizSessionStatus
+
+# Bounds for the advisory draft payload. A real quiz has a handful of questions,
+# each with a few selectable options — these caps keep an authenticated client
+# from persisting an unbounded JSON blob to its session row (the 10MB nginx body
+# limit exists for image uploads and is far too loose for an answer map).
+_MAX_DRAFT_QUESTIONS = 200
+_MAX_OPTIONS_PER_QUESTION = 50
+DraftOptionIds = Annotated[
+    list[Annotated[int, Field(ge=0)]], Field(max_length=_MAX_OPTIONS_PER_QUESTION)
+]
+DraftAnswers = Annotated[
+    dict[str, DraftOptionIds], Field(max_length=_MAX_DRAFT_QUESTIONS)
+]
 
 
 class SessionCreateRequest(BaseModel):
@@ -63,9 +77,11 @@ class DraftSaveRequest(BaseModel):
     """Advisory autosave payload: the full in-progress answer map.
 
     Last-write-wins — no idempotency key. question_id -> selected option_ids.
+    Bounded (see DraftAnswers) so an advisory autosave can't write an unbounded
+    blob; an over-cap payload is rejected with 422 (semantic — the client halts).
     """
 
-    answers: dict[str, list[int]]
+    answers: DraftAnswers
 
 
 class DraftSaveResponse(BaseModel):
