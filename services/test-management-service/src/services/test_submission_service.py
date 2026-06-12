@@ -516,7 +516,7 @@ class TestSubmissionService:
         # Validate that submission is in EVALUATED status
         if submission.status != SubmissionStatus.EVALUATED:
             raise ValueError(
-                f"Submission {submission_id} is not in EVALUATED status. " f"Current status: {submission.status}"
+                f"Submission {submission_id} is not in EVALUATED status. Current status: {submission.status}"
             )
 
         # Update submission with trainer review

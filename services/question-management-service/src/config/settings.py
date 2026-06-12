@@ -54,7 +54,7 @@ class Settings(BaseSettings):
 
         if not (self.MONGO_USER and self.MONGODB_PASSWORD and self.MONGO_CLUSTER):
             raise ValueError(
-                "MongoDB connection not configured: set MONGO_URI, " "or MONGO_USER + MONGODB_PASSWORD + MONGO_CLUSTER",
+                "MongoDB connection not configured: set MONGO_URI, or MONGO_USER + MONGODB_PASSWORD + MONGO_CLUSTER"
             )
 
         encoded_user = quote_plus(self.MONGO_USER)

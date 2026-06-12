@@ -2,7 +2,6 @@ import os
 
 import jwt
 import pytest
-import pytest_asyncio
 from src.middleware.auth import add_user_context_headers, verify_jwt_token
 
 _SECRET = os.environ.get("JWT_SECRET", "test-secret-for-gateway-tests")
