@@ -58,11 +58,22 @@ async function handleRequest(
     request.headers.get('x-correlation-id') ??
     crypto.randomUUID().replace(/-/g, '');
 
-  const response = await fetch(url.toString(), {
-    method: request.method,
-    headers,
-    body,
-  });
+  // A connection-level failure to the gateway (down/unreachable) must surface as
+  // 502, not a bare unhandled 500: the client classifies 502/503/504 as transient
+  // and retries, so a brief upstream blip self-heals instead of failing the call.
+  let response: Response;
+  try {
+    response = await fetch(url.toString(), {
+      method: request.method,
+      headers,
+      body,
+    });
+  } catch {
+    return NextResponse.json(
+      { error: 'Upstream service unavailable' },
+      { status: 502 }
+    );
+  }
 
   const text = await response.text();
   let payload: unknown;
