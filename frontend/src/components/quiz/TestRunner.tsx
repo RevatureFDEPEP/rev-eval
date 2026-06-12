@@ -86,11 +86,8 @@ export function TestRunner({ session, initialQuestions }: TestRunnerProps) {
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
-      <div className="flex items-center justify-between text-sm text-slate-500">
-        <span>
-          Question {currentIndex + 1} of {questions.length}
-        </span>
-        <span>{session.total_questions} total</span>
+      <div className="text-sm text-slate-500">
+        Question {currentIndex + 1} of {session.total_questions}
       </div>
 
       <Card>
@@ -102,14 +99,19 @@ export function TestRunner({ session, initialQuestions }: TestRunnerProps) {
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={goPrev} disabled={isFirst}>
-          Previous
-        </Button>
-        <Button onClick={goNext} disabled={isLast}>
-          Next
-        </Button>
-      </div>
+      {/* Local navigation appears once the buffer holds more than the single
+          W3-F1 question (multi-question fixtures today; W3-F4 answer-submit
+          will append the next question live). */}
+      {questions.length > 1 && (
+        <div className="flex items-center justify-between">
+          <Button variant="outline" onClick={goPrev} disabled={isFirst}>
+            Previous
+          </Button>
+          <Button onClick={goNext} disabled={isLast}>
+            Next
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

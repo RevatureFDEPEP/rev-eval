@@ -44,7 +44,7 @@ const SESSION: SessionResponse = {
   status: 'ACTIVE',
   server_now: '2026-06-11T10:00:00',
   expires_at: '2026-06-11T10:30:00',
-  total_questions: 3,
+  total_questions: 5,
   current_index: 0,
   question: QUESTIONS[0],
 }
@@ -57,7 +57,7 @@ describe('TestRunner', () => {
   it('renders the first question with progress', () => {
     renderRunner()
     expect(screen.getByText('Capital of France?')).toBeInTheDocument()
-    expect(screen.getByText('Question 1 of 3')).toBeInTheDocument()
+    expect(screen.getByText('Question 1 of 5')).toBeInTheDocument()
   })
 
   it('clamps navigation: Previous disabled first, Next disabled last', () => {
@@ -67,9 +67,18 @@ describe('TestRunner', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' })) // -> Q2
     fireEvent.click(screen.getByRole('button', { name: 'Next' })) // -> Q3
-    expect(screen.getByText('Question 3 of 3')).toBeInTheDocument()
+    expect(screen.getByText('Question 3 of 5')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Previous' })).toBeEnabled()
+  })
+
+  it('hides navigation and shows total-scoped progress with a single buffered question', () => {
+    // Production W3-F1 path: only the current question is seeded, while the
+    // session reports the full exam length. Nav must not render a dead-end.
+    render(<TestRunner session={SESSION} />)
+    expect(screen.getByText('Question 1 of 5')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Previous' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
   })
 
   it('dispatches on question.type: radios for mcq, checkboxes for multi', () => {

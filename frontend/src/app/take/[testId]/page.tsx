@@ -22,6 +22,14 @@ interface TakeTestPageProps {
   params: Promise<{ testId: string }>;
 }
 
+/** Gateway status → participant-facing copy for session-mint failures. */
+const SESSION_ERROR_MESSAGES: Record<number, string> = {
+  400: 'This test is not a quiz.',
+  403: 'This quiz is only available to participants.',
+  404: "We couldn't find that test.",
+  409: "This quiz doesn't have enough questions yet. Please contact your trainer.",
+};
+
 function TakeError({ title, message }: { title: string; message: string }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
@@ -52,6 +60,11 @@ export default async function TakeTestPage({ params }: TakeTestPageProps) {
     redirect('/');
   }
 
+  // Identity and session both hit the gateway and are independent — fetch
+  // concurrently. getCurrentUserServer resolves to null on failure (never
+  // rejects), so a floating promise on the error path below is harmless.
+  const userPromise = getCurrentUserServer();
+
   let quizSession: SessionResponse;
   try {
     quizSession = await createSessionServer(testId);
@@ -59,21 +72,14 @@ export default async function TakeTestPage({ params }: TakeTestPageProps) {
     if (e instanceof ServerApiError) {
       if (e.status === 401) redirect('/');
       const message =
-        e.status === 403
-          ? 'This quiz is only available to participants.'
-          : e.status === 404
-            ? "We couldn't find that test."
-            : e.status === 400
-              ? 'This test is not a quiz.'
-              : e.status === 409
-                ? "This quiz doesn't have enough questions yet. Please contact your trainer."
-                : 'The quiz service is temporarily unavailable. Please try again shortly.';
+        SESSION_ERROR_MESSAGES[e.status] ??
+        'The quiz service is temporarily unavailable. Please try again shortly.';
       return <TakeError title="Unable to start quiz" message={message} />;
     }
     throw e;
   }
 
-  const user = await getCurrentUserServer();
+  const user = await userPromise;
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">

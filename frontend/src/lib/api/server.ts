@@ -6,6 +6,7 @@
 import 'server-only';
 import { getSession } from '@/lib/session';
 import type { AuthUser } from '@/lib/auth/useAuth';
+import { mapUserServiceUser } from '@/lib/auth/mapUser';
 import { SessionResponse, TrainerDashboardStats, TrainerTestInfo } from './types';
 
 const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://api-gateway:8000';
@@ -43,7 +44,8 @@ async function authedFetch(
 export async function getTrainerDashboardStatsServer(): Promise<TrainerDashboardStats> {
   const response = await authedFetch('/v1/api/dashboard/trainer/stats');
   if (!response.ok) {
-    throw new ServerApiError(response.status, response.statusText, await response.text());
+    const detail = await response.text().catch(() => '');
+    throw new ServerApiError(response.status, response.statusText, detail);
   }
   return response.json();
 }
@@ -51,7 +53,8 @@ export async function getTrainerDashboardStatsServer(): Promise<TrainerDashboard
 export async function getTrainerTestsServer(): Promise<TrainerTestInfo[]> {
   const response = await authedFetch('/v1/api/dashboard/trainer/tests');
   if (!response.ok) {
-    throw new ServerApiError(response.status, response.statusText, await response.text());
+    const detail = await response.text().catch(() => '');
+    throw new ServerApiError(response.status, response.statusText, detail);
   }
   return response.json();
 }
@@ -62,23 +65,13 @@ export async function getTrainerTestsServer(): Promise<TrainerTestInfo[]> {
  * derived identity for server-seeding AuthContext; null if unauthenticated.
  */
 export async function getCurrentUserServer(): Promise<AuthUser | null> {
-  let response: Response;
   try {
-    response = await authedFetch('/v1/api/auth/me');
+    const response = await authedFetch('/v1/api/auth/me');
+    if (!response.ok) return null;
+    return mapUserServiceUser(await response.json());
   } catch {
     return null;
   }
-  if (!response.ok) return null;
-  const p = await response.json();
-  return {
-    id: p.id,
-    email: p.email,
-    firstName: p.first_name ?? undefined,
-    lastName: p.last_name ?? undefined,
-    fullName: p.full_name ?? undefined,
-    role: p.role,
-    organizationId: p.organization_id ?? undefined,
-  };
 }
 
 /**
@@ -91,7 +84,8 @@ export async function createSessionServer(testId: number): Promise<SessionRespon
     body: { test_id: testId },
   });
   if (!response.ok) {
-    throw new ServerApiError(response.status, response.statusText, await response.text());
+    const detail = await response.text().catch(() => '');
+    throw new ServerApiError(response.status, response.statusText, detail);
   }
   return response.json();
 }
