@@ -6,7 +6,7 @@ in SQL (func.avg/count/sum + subqueries), never re-computed client-side.
 """
 from typing import Tuple
 
-from sqlalchemy import Select, and_, case, distinct, func, or_, select, true
+from sqlalchemy import Select, and_, case, distinct, func, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.tms_readonly import SessionStatus, TmsAnswer, TmsSession, TmsTest
@@ -73,14 +73,11 @@ def _median_duration_parts(db: AsyncSession, sessions):
             ranked.c.test_id.label("test_id"),
             func.avg(ranked.c.duration_seconds).label("median_duration"),
         )
-        # Middle row (odd cnt) or the two middle rows averaged (even cnt);
-        # sqlite divides integers with integer division, so these are exact.
-        .where(
-            or_(
-                ranked.c.rn == (ranked.c.cnt + 1) / 2,
-                ranked.c.rn == (ranked.c.cnt + 2) / 2,
-            )
-        )
+        # Middle row (odd cnt: 2rn-cnt == 1) or the two middle rows averaged
+        # (even cnt: 2rn-cnt == 0 and 2). Pure integer arithmetic — SQLAlchemy
+        # renders `/ 2` as float division, which would skip the lower-middle
+        # row (rn == 1.5 never matches).
+        .where((2 * ranked.c.rn - ranked.c.cnt).between(0, 2))
         .group_by(ranked.c.test_id)
         .subquery()
     )
