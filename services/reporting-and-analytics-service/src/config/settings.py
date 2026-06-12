@@ -19,6 +19,16 @@ class Settings(BaseSettings):
     TMS_DB_PASSWORD: str = "root"
     TMS_DB_NAME: str = "eval_ai_dev"
 
+    # JWT verification (defense-in-depth, W4-F3). Must match user-service's
+    # signing key — the reporting service independently re-verifies the token
+    # the gateway forwards instead of trusting X-User-* headers.
+    JWT_SECRET: str = "change-me-in-production"
+    JWT_ALGORITHM: str = "HS256"
+
+    # Reporting (W4-F3): a session score (0–100) at or above this counts as a
+    # pass in GET /reports/aggregate's pass-rate column.
+    REPORT_PASS_THRESHOLD: float = 70.0
+
     # Service Configuration
     ALLOW_ORIGINS: str = "*"
     SERVICE_NAME: str = "reporting-and-analytics-service"
