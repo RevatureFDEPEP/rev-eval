@@ -157,6 +157,11 @@ class TestQuestionCrudMongo:
         assert resp.status_code == 200
         assert any(q["_id"] == self.mcq_id for q in resp.json())
 
+    def test_10b_filter_by_tags_whitespace_tag_returns_400(self):
+        # tag of only whitespace → service strips → empty list → HTTPException 400
+        resp = self.client.get("/v1/api/questions/by-tags?tags=%20%20%20")
+        assert resp.status_code == 400
+
     def test_11_filter_combined_type_and_difficulty(self):
         resp = self.client.get("/v1/api/questions/filter?type=multi&difficulty=medium")
         assert resp.status_code == 200
@@ -184,6 +189,19 @@ class TestQuestionCrudMongo:
             "/v1/api/questions/000000000000000000000000/image/upload-url"
         )
         assert resp.status_code == 404
+
+    def test_14b_image_download_url_200_for_valid_question(self):
+        # generate_presigned_get_url uses local signing — no MinIO required.
+        resp = self.client.get(f"/v1/api/questions/{self.mcq_id}/image/download-url")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "url" in body
+        assert body["key"] == f"questions/{self.mcq_id}/image"
+
+    def test_14c_image_upload_url_502_without_minio(self):
+        # ensure_bucket() tries to reach MinIO; 502 expected in CI without it.
+        resp = self.client.post(f"/v1/api/questions/{self.mcq_id}/image/upload-url")
+        assert resp.status_code in (200, 502)
 
     # ------------------------------------------------------------------
     # TRUE_FALSE and TEXT question types
