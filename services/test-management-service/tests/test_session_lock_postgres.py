@@ -32,7 +32,7 @@ os.environ.setdefault("SERVICE_HOSTNAME", "test-management-service")
 
 from src.db.session import Base
 from src.models.quiz_session import QuizSession, SessionStatus  # noqa: F401
-from src.models.test import Test  # noqa: F401
+from src.models.test import Test, TestType  # noqa: F401
 from src.models.skill import Skill  # noqa: F401
 from src.models.test_skill import TestSkill  # noqa: F401
 from src.models.test_submission import TestSubmission  # noqa: F401
@@ -54,8 +54,6 @@ async def _bootstrap_schema(engine):
 
 async def _seed_parents(factory):
     """Insert Test(id=1) and TestSubmission(id=1) so FK constraints are satisfied."""
-    from src.models.test import Test, TestType
-    from src.models.test_submission import TestSubmission
     async with factory() as db:
         test = Test(id=1, name="Lock Test", test_type=TestType.QUIZ)
         db.add(test)
