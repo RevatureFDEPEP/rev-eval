@@ -7,9 +7,11 @@ import 'server-only';
 import { getSession } from '@/lib/session';
 import {
   AuthIdentity,
+  ReportAttemptsPage,
   SessionOut,
   TrainerDashboardStats,
   TrainerTestInfo,
+  UserReportSummary,
 } from './types';
 
 const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://api-gateway:8000';
@@ -72,6 +74,38 @@ export async function mintSessionServer(testId: number): Promise<SessionOut> {
     method: 'POST',
     body: { test_id: testId },
   });
+  if (!response.ok) {
+    throw new ServerApiError(response.status, response.statusText, await response.text());
+  }
+  return response.json();
+}
+
+/**
+ * Fetch the W4-F1 results summary envelope (`GET /v1/api/reports/user/{id}`).
+ * Called server-side by the results page so the headline numbers land in the
+ * initial HTML. A user with no submitted attempts gets a zeroed envelope.
+ */
+export async function getUserReportSummaryServer(userId: number): Promise<UserReportSummary> {
+  const response = await authedFetch(`/v1/api/reports/user/${userId}`);
+  if (!response.ok) {
+    throw new ServerApiError(response.status, response.statusText, await response.text());
+  }
+  return response.json();
+}
+
+/**
+ * Fetch a page of the user's attempt history
+ * (`GET /v1/api/reports/user/{id}/attempts`), default sort `submitted_at:desc`.
+ */
+export async function getUserReportAttemptsServer(
+  userId: number,
+  opts: { page?: number; size?: number } = {},
+): Promise<ReportAttemptsPage> {
+  const params = new URLSearchParams();
+  if (opts.page !== undefined) params.set('page', String(opts.page));
+  if (opts.size !== undefined) params.set('size', String(opts.size));
+  const qs = params.size > 0 ? `?${params.toString()}` : '';
+  const response = await authedFetch(`/v1/api/reports/user/${userId}/attempts${qs}`);
   if (!response.ok) {
     throw new ServerApiError(response.status, response.statusText, await response.text());
   }
