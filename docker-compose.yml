@@ -224,6 +224,32 @@ services:
       retries: 10
       start_period: 30s
 
+  reporting-and-analytics-service:
+    build:
+      context: ./services/reporting-and-analytics-service
+      dockerfile: Dockerfile
+    container_name: rev-eval-reporting-analytics
+    restart: unless-stopped
+    environment:
+      SERVICE_NAME: reporting-and-analytics-service
+      PORT: 8004
+      TEST_MANAGEMENT_URL: http://test-management-service:8001
+      ALLOW_ORIGINS: http://localhost:3000
+    # Internal microservice — published to loopback ONLY. It trusts
+    # gateway-injected X-User-* role headers, so it must not be reachable off
+    # host where a caller could bypass the gateway. Reach it via Docker DNS.
+    ports:
+      - "127.0.0.1:8004:8004"
+    depends_on:
+      test-management-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
   api-gateway:
     build:
       context: ./services/api-gateway-service
@@ -244,6 +270,8 @@ services:
       test-management-service:
         condition: service_healthy
       question-management-service:
+        condition: service_healthy
+      reporting-and-analytics-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
