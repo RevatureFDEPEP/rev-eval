@@ -20,28 +20,37 @@ on this branch (`tianyac-feat-doc`): `docs/FEATURE_STATUS.md` +
 `docs/features/` detail files for all 21 features, replacing `docs/plans/`.
 
 **Progress summary:** W2-F1 (nginx TLS + basic routing), W2-F2 (frontend +
-backend unit tests), W2-F4 (Ruff/ESLint/coverage CI gates) are partially done
-(🟡); all other W2, all W3, and all W4 features not yet started on this branch.
+backend unit tests), W2-F4 (Ruff/ESLint CI gates), W2-F6 (question authoring
+schema + tests) are partially done (🟡); all other W2, all W3, and all W4
+features not yet started on this branch.
 
-**W2-F1** — nginx reverse proxy is live (:80→:443 redirect, TLS, basic
-path-based routing: `/api/v1/→gateway`, `/_next/→frontend`, `/→frontend`).
-Remaining: step 4 BFF bearer pattern (direct nginx→gateway route still present;
-must route all data calls through the Next.js BFF as the single auth-injection
-point), JSON access logs, request-time DNS resolver, X-Correlation-Id.
+**W2-F1** — nginx reverse proxy live: :80→:443 redirect, TLS, `/_next/` WebSocket
+routing, `/→frontend`. Remaining: step 4 BFF bearer pattern (direct
+`/api/v1/→gateway` block still present in `nginx.conf`; must route all data
+calls through the Next.js BFF as the single auth-injection point), JSON access
+logs, request-time DNS resolver (`127.0.0.11`), X-Correlation-Id header.
 
-**W2-F2** — frontend vitest/testing-library suite (quiz UI components, landing
-auth, Zod schemas) + backend parameterized pytest across all 4 services done.
-Remaining: step 3 multi-stage Dockerfiles (test stage not yet added — current
-Dockerfiles are single-stage).
+**W2-F2** — Jest 30 + `@testing-library/react` 16 frontend suite (102 tests:
+quiz UI components, landing auth, Zod schemas, lib utilities) + backend
+parameterized pytest for 3 services (test-management 121 tests, user-service
+83 tests, question-management). Remaining: step 3 multi-stage Dockerfiles
+(test stage not yet added — Dockerfiles are single-stage); api-gateway-service
+tests not yet scaffolded.
 
 **W2-F4** — Ruff linting and ESLint hard failure in CI, `pytest --cov` in the
-backend matrix. Remaining: step 3 Trivy container scan (not in
-`.github/workflows/ci-pipeline.yml`), per-service `.coveragerc` `fail_under`
-ratchets.
+backend matrix, path-filtered runs. Remaining: step 3 Trivy container scan
+(not in `.github/workflows/ci-pipeline.yml`), per-service `.coveragerc`
+`fail_under` ratchets (coverage runs but thresholds not enforced — no `.coveragerc`
+files exist).
 
-All W2-F3 (Loki/Grafana), W2-F5 (MinIO presigned), W2-F6 (question authoring),
-W2-F7 (Alembic/Category), W2-F8 (defect cleanup), W2-M10 (reporting scaffold),
-and the full W3 and W4 slices are not yet started on Tianya's branch.
+**W2-F6** — question create page (brownfield), question list page (brownfield),
+Zod schema (`lib/schemas/question-form.ts`), 135-line schema test suite.
+Remaining: extract `QuestionForm.tsx` shared component, wire gateway submit,
+add file-upload field (blocked on W2-F5), edit page.
+
+All W2-F3 (Loki/Grafana), W2-F5 (MinIO presigned), W2-F7 (Alembic/Category),
+W2-F8 (defect cleanup), W2-M10 (reporting scaffold), and the full W3 and W4
+slices are not yet started on Tianya's branch.
 
 ## Status values
 
@@ -66,11 +75,6 @@ Spec: `days_6_10_features.md`.
 | W2-F7 | Alembic migrations & Category domain | — | ❌ Not Started | [w2-f7-alembic-category-domain.md](features/w2-f7-alembic-category-domain.md) |
 | W2-F8 | Pre-existing defect cleanup (found during W2-F7) | — | ❌ Not Started | [w2-f8-pre-existing-defects.md](features/w2-f8-pre-existing-defects.md) |
 | W2-M10 | Day 10 milestone: reporting service scaffold | milestone | ❌ Not Started | [w2-m10-reporting-service-scaffold.md](features/w2-m10-reporting-service-scaffold.md) |
-
-**W2-F6 open items:** create page exists (`trainer/questions/create/page.tsx`)
-with inline react-hook-form + Zod (mcq/trueFalse/text schemas). Not yet done:
-extract into a shared `QuestionForm` component, file upload field (blocked on
-W2-F5), edit page.
 
 ## Days 11–15 (Week 3 — quiz-taking vertical slice)
 

@@ -1,71 +1,58 @@
 # W2-F2 — Unit Test Scaffolding (Frontend + Backend)
 
-**Status:** ✅ Completed
+**Status:** 🟡 In Progress
 **Spec:** `days_6_10_features.md` §2 (Days 5 & 7)
 **Unblocks:** W3-F2 (Scoring Engine — pytest must already be configured in test-management-service), W3-F5 (Integration Tests — builds on this scaffolding)
-**Last updated:** 2026-06-09
+**Last updated:** 2026-06-12
 
 Establish an automated unit testing foundation across the Next.js frontend and
 Python backend services.
 
 ## Steps
 
-- [x] **1. Frontend test scaffolding** — vitest + testing-library configured
-      (`frontend/vitest.config.ts`, `pnpm test` = `vitest run`). Unit tests for
-      question form utils (`frontend/src/components/trainer/question-form-utils`),
-      commit `908dcb6`.
-  - [x] Broaden coverage: presentation components, login layout, Zod client
-        utility schemas. Added `frontend/vitest.setup.ts` (jest-dom matchers +
-        afterEach cleanup, wired via `setupFiles`) and `@testing-library/react`
-        tests for the quiz UI: `Timer` (formatting + warning/critical styling),
-        `QuestionCard` (type dispatch + difficulty/number rendering),
-        `MCQQuestion` and `MultiQuestion` (selection logic). Then closed the two
-        spec-named gaps: `frontend/src/app/_components/landing-auth.test.tsx`
-        (login layout — tab switch, login/register POST body, success
-        navigation, error + network-error rendering, submit-disable) and
-        `frontend/src/components/trainer/__tests__/question-schemas.test.ts`
-        (dedicated Zod suite — `imageFileSchema` type/size, every
-        `buildQuestionSchema` branch's refine rules, `baseSchema` field rules).
-        70 frontend tests pass; `pnpm build` and `pnpm lint` stay green.
-- [x] **2. Backend pytest scaffolding** — `tests/` in all 4 services
-      (api-gateway-service, user-service, test-management-service,
-      question-management-service), PR #32. Smoke tests: 5–8 per service.
-  - [x] Deepen: parameterized unit tests targeting data models, repository CRUD
-        functions, and Pydantic request validation schemas.
-        - `test-management-service/tests/test_category_repository.py` — real
-          `CategoryRepository` CRUD, link/unlink idempotency, eager skill load.
-        - `question-management-service/tests/test_question_repository.py` —
-          `QuestionRepository` CRUD, pagination, count, `find_by_*`, type-aware
-          `QuestionCreate` validation.
-        - `user-service/tests/test_user_model.py` — `User` persistence,
-          unique-email constraint, role enum, schema validation.
-        - `api-gateway-service/tests/test_routing.py` — full `ROUTES` table,
-          `X-User-*` header injection, JWT auth boundary.
-  - [x] Create dedicated test databases for repository-level tests — **hermetic
-        in-memory**: aiosqlite `db_session` (test-management), mongomock-motor
-        `beanie_db` (question-management), sync sqlite `db_session` (user). All
-        backend tests pass with Postgres/Mongo down. Real Postgres/Mongo
-        integration is owned by [W3-F5](w3-f5-integration-tests-real-db.md).
-- [x] **3. Multi-stage Dockerfile test stages** — each backend Dockerfile is
-      `base → test → production`. The `test` stage installs
-      `requirements-dev.txt` and runs `pytest -q` (build fails if a test fails);
-      the default build target stays `production`, so `docker compose up --build`
-      is unchanged. CI now **runs** the stage: the backend matrix builds
-      `docker build --target test` per service (step "Build & run container test
-      stage" in `ci-pipeline.yml`) before the production build + Trivy scan, so
-      container-level pytest gates the pipeline. `docker-compose.yml` is left on
-      the `production` target — tests must not run on normal startup.
+- [x] **1. Frontend test scaffolding** — Jest 30 + `@testing-library/react` 16
+      configured (`frontend/jest.config.js`, `frontend/jest.setup.ts`;
+      `pnpm test` = `jest`). 102 tests across lib utilities, Zod schemas, and
+      presentation components (commit `e9c179a`):
+  - `src/__tests__/lib/utils.test.ts`, `src/__tests__/lib/date.test.ts` — `cn()` and date utils.
+  - `src/__tests__/lib/schemas/auth.test.ts`, `question-form.test.ts`,
+    `test-form.test.ts` — Zod schema validation for login/register, question
+    form types, and test creation rules.
+  - `src/__tests__/components/LandingAuth.test.tsx` — login layout: tab switch,
+    POST body, success navigation, error + network-error, submit-disable.
+  - `src/__tests__/components/quiz/MCQQuestion.test.tsx`,
+    `ProgressHeader.test.tsx`, `TrueFalseQuestion.test.tsx` — quiz UI
+    interaction and rendering.
+- [x] **2. Backend pytest scaffolding** — `tests/` in three services with
+      hermetic in-memory fixtures; `requirements-test.txt` + `pytest.ini` per
+      service (commit `b7b6506`; CI fix `b9df25b`, lint fix `e6e6287`):
+  - `test-management-service` (121 tests) — aiosqlite in-memory async DB;
+    `test_models.py`, `test_schemas.py`, `test_skill_repository.py`,
+    `test_submission_repository.py`, `test_test_repository.py`.
+  - `user-service` (83 tests) — sync SQLite in-memory; `test_models.py`,
+    `test_schemas.py`, `test_auth_service.py`.
+  - `question-management-service` — mongomock-motor in-memory Beanie DB;
+    `test_models.py`, `test_schemas.py`, `test_repository.py`.
+  - `api-gateway-service` — no `tests/` directory; not yet scaffolded.
+  - All backend tests pass with Postgres/Mongo down. Real DB integration owned
+    by [W3-F5](w3-f5-integration-tests-real-db.md).
+- [ ] **3. Multi-stage Dockerfile test stages** — add `base → test → production`
+      stages to all 4 backend Dockerfiles so `docker build --target test` runs
+      `pytest -q` and gates the CI pipeline at the container level. Current
+      Dockerfiles are single-stage (`FROM python:3.11-slim`).
 
 ## Evidence
 
-- New dev-deps manifests: `services/<svc>/requirements-dev.txt` (pytest,
-  pytest-cov, ruff + per-service test-DB drivers). CI installs these instead of
-  the old inline `pip install pytest pytest-cov ruff`.
-- Coverage (Postgres/Mongo down): test-management 77.6%, question-management
-  65.9%, user 68.1%, api-gateway 51.3% — each `.coveragerc` `fail_under` ratcheted
-  to the new baseline (75 / 63 / 66 / 50).
+- Frontend: `frontend/jest.config.js`, `frontend/jest.setup.ts`, 9 test files
+  under `frontend/src/__tests__/`.
+- Backend: `tests/` + `requirements-test.txt` + `pytest.ini` in
+  `test-management-service`, `user-service`, `question-management-service`.
+- CI (`ci-pipeline.yml`): backend matrix installs `requirements-test.txt` when
+  present and runs `pytest --cov --cov-report=xml`. Coverage reports generated
+  but **no `fail_under` threshold enforced** — `.coveragerc` files do not exist;
+  threshold gating is tracked under [W2-F4](w2-f4-ci-quality-gates.md).
 
 ## Notes
 
-CI runs `pytest --cov` only when `services/<svc>/tests/` exists — all 4 now
-qualify. Coverage *gating* belongs to [W2-F4](w2-f4-ci-quality-gates.md).
+`pnpm test --if-present` in the frontend CI job picks up Jest automatically.
+Coverage *gating* (fail-under thresholds) belongs to [W2-F4](w2-f4-ci-quality-gates.md).

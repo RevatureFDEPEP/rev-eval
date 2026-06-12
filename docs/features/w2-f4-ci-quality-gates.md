@@ -1,9 +1,9 @@
 # W2-F4 — CI Quality Gates (Ruff / ESLint / Trivy / Coverage)
 
-**Status:** ✅ Completed
+**Status:** 🟡 In Progress
 **Spec:** `days_6_10_features.md` §4 (Day 7) — priority REQUIRED
 **Unblocks:** W3-F5 (Integration Tests — CI Postgres/Mongo service-container steps extend this pipeline structure)
-**Last updated:** 2026-06-04 (PR #40 merged)
+**Last updated:** 2026-06-12
 
 Extend `.github/workflows/ci-pipeline.yml` with static analysis and security
 scanning quality gates — the intended completion of the seeded placeholder
@@ -13,48 +13,42 @@ comment ("Trivy + Ruff scans added in W2 D7 by candidates").
 
 - [x] **1. Ruff linting** — root `pyproject.toml` with Ruff config; `ruff
       check .` step in the backend matrix job after dependency install, before
-      pytest (PR #28). Line length kept at 120 (not spec's 88) — rationale
-      documented in `pyproject.toml`.
-- [x] **2. ESLint hard failure** — `|| echo` fallback removed; `pnpm lint`
-      failures now block the build (PR #40, `b13b928`). Also fixed the CI
-      pnpm/lockfile mismatch this exposed: the job pinned pnpm 8, which cannot
-      read the v9 lockfile, so CI silently re-resolved deps and linted with
-      different plugin versions than local dev. Now `pnpm/action-setup@v4`
-      reads the `packageManager` field (pnpm 9.15.0) (`8e5241b`).
-- [x] **3. Trivy container scan** — each backend matrix job builds its Docker
-      image and scans it with `aquasecurity/trivy-action@v0.36.0`: severity
-      CRITICAL/HIGH, `exit-code: 1`, `ignore-unfixed: true` (so unpatchable
-      base-image CVEs don't dead-lock the pipeline), SARIF uploaded as a
-      per-service artifact with `if: always()` (PR #40, `1dbbc37`, `0d550e2`).
-- [x] **4. Coverage threshold** — per-service `.coveragerc` (source/omit +
-      `fail_under`) as a measured-baseline ratchet instead of the spec's
-      aspirational 70 (smoke tests only; cohort decision). At PR #40 (smoke
-      tests only): api-gateway 47%→45, user 60%→58, question-mgmt 50%→48,
-      test-mgmt 45%→43. `coverage.xml` uploaded as per-service artifact
-      (PR #40, `7251a55`). **Subsequently raised by [W2-F2](w2-f2-unit-test-scaffolding.md)**
-      as repo/model test depth grew — current `.coveragerc` `fail_under`:
-      api-gateway **50**, question-mgmt **63**, user **66**, test-mgmt **75**.
+      pytest (commit `6272053`). Ruff errors resolved across all backend
+      services (`6507a63`, `f462bbf`, `21be2d9`).
+- [x] **2. ESLint hard failure** — `|| echo` fallback removed from the
+      frontend lint step; `pnpm lint` failures now block the build (commit
+      `b1da154`). ESLint errors and warnings resolved (`2c35942`, `2df7178`).
+      Also fixed the CI pnpm/lockfile mismatch: pinned `pnpm/action-setup@v4`
+      to read the `packageManager` field (pnpm 9.15.0) (commit `895ccb4`).
+- [ ] **3. Trivy container scan** — each backend matrix job should build its
+      Docker image and scan with `aquasecurity/trivy-action`: severity
+      CRITICAL/HIGH, `exit-code: 1`, `ignore-unfixed: true`. Not yet added to
+      `ci-pipeline.yml`.
+- [x] **4. pytest --cov** — backend matrix runs `pytest --cov --cov-report=xml`
+      when a `tests/` directory is present ([W2-F2](w2-f2-unit-test-scaffolding.md)
+      added tests to 3 services). Coverage XML uploaded as artifact.
+      **Threshold enforcement not yet active** — `.coveragerc` files with
+      `fail_under` do not exist; coverage runs but does not gate the build.
 
 ## Evidence
 
-- PR [#40](https://github.com/RevatureFDEPEP/rev-eval/pull/40) — merged
-  2026-06-04, all checks green (4 backend matrix jobs + frontend).
-- Plan: [`docs/plans/w2-f4-ci-quality-gates.md`](../plans/w2-f4-ci-quality-gates.md).
-- Gate proven live: first Trivy run failed on real fixable HIGH CVEs shipped
-  in `python:3.11-slim` tooling (`jaraco.context` 5.3.0 CVE-2026-23949,
-  `wheel` 0.45.1 CVE-2026-24049); fixed by upgrading
-  pip/setuptools/wheel/jaraco.context in all 4 Dockerfiles before
-  `pip install -r requirements.txt` (`88debe5`), verified clean locally with
-  the same Trivy flags as CI.
+- Commits: `6272053` (Ruff in CI), `b1da154` (remove ESLint skip), `895ccb4`
+  (pnpm v9 fix), `fd35635` (path-filtered CI runs).
+- `ci-pipeline.yml`: `ruff check .` step in backend matrix; `pnpm lint` in
+  frontend job; `pytest --cov --cov-report=xml` in backend matrix.
+- Path filtering: jobs run only when relevant paths change (commit `fd35635`).
 
 ## Beyond spec
 
-- Path filtering: jobs run only for changed paths (commit `52000ea`).
-- Backend `actions/checkout` bumped v3 → v4 to match the rest of the workflow.
-- Dockerfile base-image tooling CVE remediation (above) — spec only asked for
-  the scan; the scan's findings were fixed too.
+- Backend `actions/checkout` bumped v3 → v4 to match the frontend job.
+- Removed `actions/attest-build-provenance` which caused workflow failures
+  (commit `c1c062c`).
 
 ## Remaining
 
-- Nothing for the spec. Follow-ups live elsewhere: raise coverage ratchets as
-  W2-F2 adds tests; W3-F5 extends this job structure with service containers.
+- **Trivy container scan** — add `aquasecurity/trivy-action` step to each
+  backend matrix job (CRITICAL/HIGH, `exit-code: 1`, `ignore-unfixed: true`),
+  upload SARIF per service.
+- **Coverage fail-under thresholds** — create per-service `.coveragerc` with
+  `fail_under` ratcheted to measured baselines (e.g. 75 / 63 / 66 for
+  test-management / question-management / user).
