@@ -118,20 +118,6 @@ export default function CreateQuestionPage() {
 
   const questionType = (searchParams.get("type") as QuestionType) || "mcq";
 
-  // Select the appropriate schema based on question type
-  const getSchema = () => {
-    switch (questionType) {
-      case "mcq":
-        return mcqSchema;
-      case "true_false":
-        return trueFalseSchema;
-      case "text":
-        return textSchema;
-      default:
-        return mcqSchema;
-    }
-  };
-
   // Get default values based on question type
   const getDefaultValues = (): QuestionFormValues => {
   const base = {
@@ -187,12 +173,10 @@ const createQuestionSchema = (type: QuestionType) => {
   }
 };
 
-  const [form] = useState(() =>
-    useForm<QuestionFormValues>({
-      resolver: zodResolver(createQuestionSchema(questionType)),
-      defaultValues: getDefaultValues(),
-    })
-  );
+  const form = useForm<QuestionFormValues>({
+    resolver: zodResolver(createQuestionSchema(questionType)),
+    defaultValues: getDefaultValues(),
+  });
 
   // Reset form when questionType changes
   useEffect(() => {
