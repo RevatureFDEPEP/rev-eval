@@ -7,14 +7,14 @@ FROM python:3.11-slim AS base
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     gcc \
     postgresql-client \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY test-management-service/requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel "jaraco.context>=6.1.0" && \
     pip install --no-cache-dir -r requirements.txt
 
 
@@ -23,14 +23,14 @@ FROM base AS test
 COPY requirements-dev.txt ./requirements-dev.txt
 RUN pip install --no-cache-dir -r requirements-dev.txt
 
-COPY test-management-service/ .
+COPY . .
 
 RUN pytest tests/ --tb=short -q
 
 
 FROM base AS production
 
-COPY test-management-service/ .
+COPY . .
 
 RUN sed -i 's/\r$//' start.sh && chmod +x start.sh
 
