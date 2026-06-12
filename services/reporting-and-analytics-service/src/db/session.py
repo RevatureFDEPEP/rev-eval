@@ -36,15 +36,38 @@ async def get_db():
     async with AsyncSessionLocal() as db:
         yield db
 
+# ===== Read-only engine: test-management-service Postgres (eval_ai_dev) =====
+# Report queries SELECT from sessions/answers/tests, tables owned by the TMS
+# Alembic chain. This service never writes on this engine and never emits DDL
+# for these tables. See docs/adr/0001-reporting-cross-service-data-access.md.
+TMS_DATABASE_URL = os.getenv("TMS_DATABASE_URL") or settings.TMS_SQLALCHEMY_DATABASE_URL
+
+if TMS_DATABASE_URL.startswith("postgresql://"):
+    TMS_ASYNC_DATABASE_URL = TMS_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+elif TMS_DATABASE_URL.startswith("postgresql+psycopg2://"):
+    TMS_ASYNC_DATABASE_URL = TMS_DATABASE_URL.replace("postgresql+psycopg2://", "postgresql+asyncpg://")
+else:
+    TMS_ASYNC_DATABASE_URL = TMS_DATABASE_URL  # for sqlite or other DBs
+
+tms_engine = create_async_engine(TMS_ASYNC_DATABASE_URL, echo=False, future=True)
+
+TmsSessionLocal = sessionmaker(bind=tms_engine, class_=AsyncSession, expire_on_commit=False)
+
+async def get_tms_db():
+    async with TmsSessionLocal() as db:
+        yield db
+
 # ===== Initialize DB =====
 async def init_db():
     """
-    Test the connection on app startup.
+    Test both connections on app startup.
 
-    Schema creation/evolution is owned by Alembic (`alembic upgrade head`, run
-    by start.sh before the app boots) — there is no create_all here. Model
-    imports go here once W4-F1 adds reporting models, keeping them in sync with
-    alembic/env.py so relationship strings resolve.
+    Schema creation/evolution for the reporting datastore is owned by Alembic
+    (`alembic upgrade head`, run by start.sh before the app boots) — there is
+    no create_all here. Model imports go here once reporting-owned models
+    exist, keeping them in sync with alembic/env.py so relationship strings
+    resolve. The TMS engine is read-only; its schema is owned by
+    test-management-service's Alembic chain.
     """
     try:
         async with engine.connect() as conn:
@@ -52,3 +75,9 @@ async def init_db():
         logger.info("Async DB connected successfully.")
     except OperationalError:
         logger.error("Async DB connection failed!", exc_info=True)
+    try:
+        async with tms_engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        logger.info("TMS (read-only) DB connected successfully.")
+    except OperationalError:
+        logger.error("TMS (read-only) DB connection failed!", exc_info=True)

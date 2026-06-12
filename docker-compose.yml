@@ -201,6 +201,13 @@ services:
       DB_USERNAME: ${REPORTING_POSTGRES_USER:-root}
       DB_PASSWORD: ${REPORTING_POSTGRES_PASSWORD:-root}
       DB_NAME: ${REPORTING_POSTGRES_DB:-eval_ai_reporting}
+      # Read-only source for report queries (sessions/answers/tests) — the
+      # shared-DB pattern; see docs/adr/0001-reporting-cross-service-data-access.md.
+      TMS_DB_HOST: postgres
+      TMS_DB_PORT: 5432
+      TMS_DB_USERNAME: ${POSTGRES_USER:-root}
+      TMS_DB_PASSWORD: ${POSTGRES_PASSWORD:-root}
+      TMS_DB_NAME: ${POSTGRES_DB:-eval_ai_dev}
       SERVICE_NAME: reporting-and-analytics-service
       PORT: 8004
       SERVICE_HOSTNAME: reporting-and-analytics-service
@@ -210,6 +217,8 @@ services:
       - "8004:8004"
     depends_on:
       reporting-postgres:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8004/health"]

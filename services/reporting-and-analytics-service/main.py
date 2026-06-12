@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import settings
 from src.db.session import init_db
+from src.v1.routes.report_route import router as report_router
 
 load_dotenv()
 
@@ -27,11 +28,9 @@ app.add_middleware(
 )
 
 # ---- Routes ----
-# Business endpoints land in W4-F1 (Candidate Results Reporting Endpoints).
-# Routers are included here with the standard /v1/api prefix, e.g.:
-#     app.include_router(reports_router, prefix="/v1/api")
-# When they are added, register the matching pattern in the api-gateway
-# ROUTES table — services are not auto-discovered.
+# New routers take the standard /v1/api prefix and need a matching pattern in
+# the api-gateway ROUTES table — services are not auto-discovered.
+app.include_router(report_router, prefix="/v1/api")
 
 # ---- Health Endpoint ----
 @app.get("/health", tags=["health"])
