@@ -89,9 +89,9 @@ def test_for_update_serializes_concurrent_writers():
     """
     Two transactions both call get_by_id_for_update on the same row.
     tx1 acquires the lock, sleeps 100ms, updates status, then commits.
-    tx2 starts 50ms later and blocks on the lock until tx1 commits.
-    After tx2 unblocks it must observe the status written by tx1,
-    proving the lock serialized the two writers rather than interleaving them.
+    tx2 starts 50ms later and must block on the lock until tx1 commits.
+    If FOR UPDATE serializes correctly, tx2 must observe PART_A_COMPLETED;
+    if it doesn't, tx2 reads the original PART_A_IN_PROGRESS status and fails.
     """
 
     async def _run():
@@ -102,35 +102,26 @@ def test_for_update_serializes_concurrent_writers():
         session_id = str(uuid.uuid4())
         await _seed_session(factory, session_id)
 
-        order: list[str] = []
-
         async def tx1():
             async with factory() as db:
                 async with db.begin():
                     row = await QuizSessionRepository.get_by_id_for_update(db, session_id)
-                    order.append("tx1_locked")
                     await asyncio.sleep(0.1)  # hold the lock
                     row.status = SessionStatus.PART_A_COMPLETED
-                order.append("tx1_committed")
 
         async def tx2():
             await asyncio.sleep(0.05)  # ensure tx1 acquires the lock first
             async with factory() as db:
                 async with db.begin():
                     row = await QuizSessionRepository.get_by_id_for_update(db, session_id)
-                    # tx2 only reaches here after tx1 has committed
-                    order.append("tx2_locked")
-                    assert row.status == SessionStatus.PART_A_COMPLETED
+                    # tx2 blocks here until tx1 commits and releases the lock.
+                    # Reading PART_A_COMPLETED proves FOR UPDATE serialized the writers.
+                    assert row.status == SessionStatus.PART_A_COMPLETED, (
+                        f"Expected PART_A_COMPLETED but got {row.status} — "
+                        "FOR UPDATE did not serialize: tx2 read stale data"
+                    )
 
         await asyncio.gather(tx1(), tx2())
-
-        # tx1 must have committed before tx2 acquired the lock
-        assert "tx1_committed" in order
-        assert "tx2_locked" in order
-        assert order.index("tx1_committed") < order.index("tx2_locked"), (
-            "tx2 acquired the lock before tx1 committed — FOR UPDATE did not serialize"
-        )
-
         await engine.dispose()
 
     asyncio.run(_run())
