@@ -85,7 +85,7 @@ jobs:
 
       - name: Lint
         working-directory: frontend
-        run: pnpm lint -- --no-cache
+        run: pnpm lint --no-cache
 
       - name: Build
         working-directory: frontend
