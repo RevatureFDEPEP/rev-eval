@@ -106,20 +106,21 @@ def test_for_update_serializes_concurrent_writers():
 
         async def tx1():
             async with factory() as db:
-                row = await QuizSessionRepository.get_by_id_for_update(db, session_id)
-                order.append("tx1_locked")
-                await asyncio.sleep(0.1)  # hold the lock
-                row.status = SessionStatus.PART_A_COMPLETED
-                await db.commit()
+                async with db.begin():
+                    row = await QuizSessionRepository.get_by_id_for_update(db, session_id)
+                    order.append("tx1_locked")
+                    await asyncio.sleep(0.1)  # hold the lock
+                    row.status = SessionStatus.PART_A_COMPLETED
                 order.append("tx1_committed")
 
         async def tx2():
             await asyncio.sleep(0.05)  # ensure tx1 acquires the lock first
             async with factory() as db:
-                row = await QuizSessionRepository.get_by_id_for_update(db, session_id)
-                # tx2 only reaches here after tx1 has committed
-                order.append("tx2_locked")
-                assert row.status == SessionStatus.PART_A_COMPLETED
+                async with db.begin():
+                    row = await QuizSessionRepository.get_by_id_for_update(db, session_id)
+                    # tx2 only reaches here after tx1 has committed
+                    order.append("tx2_locked")
+                    assert row.status == SessionStatus.PART_A_COMPLETED
 
         await asyncio.gather(tx1(), tx2())
 
