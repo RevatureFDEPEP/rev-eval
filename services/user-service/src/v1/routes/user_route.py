@@ -6,7 +6,6 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-
 from src.db.session import get_db
 from src.models.user import User, UserRole
 from src.schemas.user_schema import (

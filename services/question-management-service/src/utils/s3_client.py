@@ -15,7 +15,6 @@ from typing import Optional
 import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
-
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)

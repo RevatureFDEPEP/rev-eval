@@ -1,0 +1,16 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "I", "B"]
+# B008: Depends() in FastAPI argument defaults is idiomatic
+# B904: HTTPException raises inside except blocks don't need exception chaining in FastAPI
+ignore = ["B008", "B904"]
+
+[tool.ruff.lint.per-file-ignores]
+# Pre-existing long lines (seed data, validation messages, commented-out code).
+# New code added to these services should still target 88 chars.
+"services/question-management-service/**" = ["E501"]
+"services/test-management-service/**" = ["E501"]
+"services/user-service/**" = ["E501"]

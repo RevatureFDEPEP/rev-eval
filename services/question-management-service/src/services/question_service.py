@@ -1,9 +1,10 @@
-from typing import List, Optional
-from src.schemas.question import QuestionCreate, QuestionUpdate
-from src.repositories.question_repository import QuestionRepository
-from src.models.question import Question, QuestionType, Option, OptionCreate
 from datetime import datetime, timezone
+from typing import List, Optional
+
 from fastapi import HTTPException
+from src.models.question import Option, OptionCreate, Question, QuestionType
+from src.repositories.question_repository import QuestionRepository
+from src.schemas.question import QuestionCreate, QuestionUpdate
 
 
 class QuestionService:
@@ -378,7 +379,8 @@ class QuestionService:
             )
 
         # Build query conditions for Beanie
-        from beanie.operators import And, In as BeanieIn
+        from beanie.operators import And
+        from beanie.operators import In as BeanieIn
 
         conditions = []
 

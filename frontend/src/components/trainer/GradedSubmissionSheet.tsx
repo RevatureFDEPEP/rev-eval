@@ -133,10 +133,6 @@ export function GradedSubmissionSheet({
     await audioPlayer.play(audioUrl);
   };
 
-  const handlePauseAudio = () => {
-    audioPlayer.pause();
-  };
-
   const handleRestartAudio = () => {
     audioPlayer.restart();
   };
@@ -154,7 +150,7 @@ export function GradedSubmissionSheet({
       audioPlayer.stop();
       setPlayingAudioIndex(null);
     };
-  }, [open]);
+  }, [open, audioPlayer]);
 
   if (!submission) return null;
 

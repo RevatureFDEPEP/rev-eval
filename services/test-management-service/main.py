@@ -1,15 +1,14 @@
 from os import getenv
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from dotenv import load_dotenv
-
-from src.v1.routes.test_route import router as test_router
-from src.v1.routes.skill_route import router as skill_router
-from src.v1.routes.test_submission_route import router as test_submission_router
-from src.db.session import init_db
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import settings
+from src.db.session import init_db
+from src.v1.routes.skill_route import router as skill_router
+from src.v1.routes.test_route import router as test_router
+from src.v1.routes.test_submission_route import router as test_submission_router
 
 load_dotenv()
 

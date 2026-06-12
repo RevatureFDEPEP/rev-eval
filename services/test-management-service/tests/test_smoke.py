@@ -4,11 +4,10 @@ Smoke tests for test-management-service — no database required.
 Covers: Pydantic schema validation for Test, TestSubmission, Skill, and
 BulkAssign payloads including parameterized timezone-stripping assertions.
 """
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from pydantic import ValidationError
-
 from src.schemas.skill_schema import SkillCreate, SkillOut, SkillUpdate
 from src.schemas.test_schema import TestCreate, TestUpdate
 from src.schemas.test_submission_schema import (
@@ -18,7 +17,6 @@ from src.schemas.test_submission_schema import (
     TestSubmissionUpdate,
     TrainerReviewRequest,
 )
-
 
 # ── TestCreate / TestUpdate ───────────────────────────────────────────────────
 

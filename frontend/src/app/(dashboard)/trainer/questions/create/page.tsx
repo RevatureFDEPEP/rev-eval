@@ -129,7 +129,7 @@ export default function CreateQuestionPage() {
   };
 
   // Get default values based on question type
-  const getDefaultValues = (): any => {
+  const getDefaultValues = () => {
     const base = {
       question_text: "",
       difficulty: undefined,
@@ -162,6 +162,7 @@ export default function CreateQuestionPage() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const form = useForm<any>({
     resolver: zodResolver(getSchema()),
     defaultValues: getDefaultValues(),
@@ -200,17 +201,18 @@ export default function CreateQuestionPage() {
     loadSkills();
   }, []);
 
-  const transformFormData = (values: any): QuestionCreate => {
+  const transformFormData = (values: QuestionFormValues): QuestionCreate => {
     // For MCQ type, determine if it's actually MCQ (single answer) or MULTI (multiple answers)
     let actualType: QuestionType = questionType;
     let correct_answers: (number | boolean | string)[] | undefined = undefined;
     let options: { text: string }[] | undefined = undefined;
 
     if (questionType === "mcq") {
+      const mcqValues = values as McqFormValues;
       // Get all correct answers
-      const correctAnswerIndices = values.options
-        .map((opt: any, idx: number) => (opt.is_correct ? idx + 1 : null))
-        .filter((id: any): id is number => id !== null);
+      const correctAnswerIndices = mcqValues.options
+        .map((opt, idx: number) => (opt.is_correct ? idx + 1 : null))
+        .filter((id): id is number => id !== null);
 
       // Determine if it's MCQ (1 answer) or MULTI (2+ answers)
       if (correctAnswerIndices.length === 1) {
@@ -220,10 +222,10 @@ export default function CreateQuestionPage() {
       }
 
       correct_answers = correctAnswerIndices;
-      options = values.options.map((opt: any) => ({ text: opt.text }));
+      options = mcqValues.options.map((opt) => ({ text: opt.text }));
     } else if (questionType === "true_false") {
       // For TRUE_FALSE, send boolean in correct_answers, no options
-      correct_answers = [values.true_false_answer];
+      correct_answers = [(values as TrueFalseFormValues).true_false_answer];
       options = undefined;
     } else if (questionType === "text") {
       // For TEXT, no options or correct_answers
@@ -236,10 +238,10 @@ export default function CreateQuestionPage() {
       question_text: values.question_text,
       difficulty: values.difficulty,
       skills: values.skills,
-      tags: typeof values.tags === "string" ? [] : values.tags || [],
+      tags: Array.isArray(values.tags) ? values.tags : [],
       options,
       correct_answers,
-      sample_answer: values.sample_answer || undefined,
+      sample_answer: "sample_answer" in values ? (values as TextFormValues).sample_answer || undefined : undefined,
       answer_explanation: values.answer_explanation || undefined,
     };
   };
@@ -254,9 +256,9 @@ export default function CreateQuestionPage() {
         description: `"${values.question_text.slice(0, 50)}..." has been added to your question bank.`,
       });
       router.push("/trainer/questions");
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to create question:", err);
-      const errorMessage = err.message || "Failed to create question";
+      const errorMessage = err instanceof Error ? err.message : "Failed to create question";
       setError(errorMessage);
       toast.error("Failed to create question", {
         description: errorMessage,

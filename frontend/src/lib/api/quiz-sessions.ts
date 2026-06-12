@@ -24,7 +24,7 @@ import {
  */
 export async function createTestSession(data: TestSessionCreate): Promise<TestSession> {
   // Backend returns TestSessionOut with 'id' field, we need to map to 'session_id'
-  const response = await api.post<any>('/v1/api/test-sessions/', data);
+  const response = await api.post<Record<string, unknown>>('/v1/api/test-sessions/', data);
 
   return {
     id: response.id,
@@ -113,7 +113,7 @@ export async function submitPartB(data: PartBAnswersSubmit): Promise<QuizSubmitR
  * @returns Complete session information
  */
 export async function getTestSession(sessionId: string): Promise<TestSession> {
-  const response = await api.get<any>(`/v1/api/test-sessions/${sessionId}`);
+  const response = await api.get<Record<string, unknown>>(`/v1/api/test-sessions/${sessionId}`);
   // Map 'id' to 'session_id' for backwards compatibility
   return {
     ...response,
@@ -128,7 +128,7 @@ export async function getTestSession(sessionId: string): Promise<TestSession> {
  * @returns Test session associated with the submission
  */
 export async function getTestSessionBySubmission(submissionId: number): Promise<TestSession> {
-  const response = await api.get<any>(`/v1/api/test-sessions/by-submission/${submissionId}`);
+  const response = await api.get<Record<string, unknown>>(`/v1/api/test-sessions/by-submission/${submissionId}`);
   // Map 'id' to 'session_id' for backwards compatibility and ensure all fields are properly mapped
   return {
     id: response.id,
