@@ -14,7 +14,9 @@ class Settings(BaseSettings):
     """
 
     # MongoDB Configuration
-    MONGO_URI: str | None = None  # If set, used directly (e.g. mongodb://mongo:27017/evalai)
+    MONGO_URI: str | None = (
+        None  # If set, used directly (e.g. mongodb://mongo:27017/evalai)
+    )
     MONGO_USER: str | None = None
     MONGODB_PASSWORD: str | None = None
     MONGO_CLUSTER: str | None = None
@@ -40,6 +42,7 @@ class Settings(BaseSettings):
     S3_REGION: str = "us-east-1"
     S3_PRESIGN_EXPIRY_SECONDS: int = 3600
 
+
     @property
     def mongo_url(self) -> str:
         """
@@ -64,6 +67,7 @@ class Settings(BaseSettings):
             f"@{self.MONGO_CLUSTER}/?appName={self.MONGO_APPNAME}"
             f"&retryWrites=true&w=majority&authSource=admin"
         )
+
 
     @property
     def cors_origins(self) -> list:

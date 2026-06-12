@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRY_MINUTES: int = 60
 
+
     @property
     def SQLALCHEMY_DATABASE_URL(self) -> str:
         return (

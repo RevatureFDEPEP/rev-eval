@@ -56,7 +56,7 @@ jobs:
         working-directory: services/${{ matrix.service }}
         run: |
           if [ -d tests ]; then
-            pytest --cov --cov-report=xml
+            PYTHONPATH=. pytest --cov --cov-report=xml
           else
             echo "No tests/ directory in services/${{ matrix.service }} — skipping pytest."
           fi
