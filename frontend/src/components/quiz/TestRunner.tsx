@@ -86,8 +86,12 @@ export function TestRunner({ session, initialQuestions }: TestRunnerProps) {
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
+      {/* Progress is keyed off the question's server-assigned index, not the
+          local buffer position. A resumed session returns the current question
+          already advanced (e.g. current_index: 2), so buffer-relative counting
+          would mislabel question 3 as "Question 1". */}
       <div className="text-sm text-slate-500">
-        Question {currentIndex + 1} of {session.total_questions}
+        Question {question.index + 1} of {session.total_questions}
       </div>
 
       <Card>

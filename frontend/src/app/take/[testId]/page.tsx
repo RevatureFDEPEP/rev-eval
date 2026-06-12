@@ -28,6 +28,7 @@ const SESSION_ERROR_MESSAGES: Record<number, string> = {
   403: 'This quiz is only available to participants.',
   404: "We couldn't find that test.",
   409: "This quiz doesn't have enough questions yet. Please contact your trainer.",
+  422: "This quiz isn't set up correctly yet. Please contact your trainer.",
 };
 
 function TakeError({ title, message }: { title: string; message: string }) {

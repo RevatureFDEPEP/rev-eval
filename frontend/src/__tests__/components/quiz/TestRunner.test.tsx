@@ -81,6 +81,21 @@ describe('TestRunner', () => {
     expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
   })
 
+  it('labels a resumed session by the server question index, not the buffer position', () => {
+    // Production resume path: create_session is idempotent and returns the
+    // current question already advanced (current_index: 2). Only that one
+    // question is buffered, so a buffer-relative counter would render
+    // "Question 1"; the label must follow question.index instead.
+    const resumed: SessionResponse = {
+      ...SESSION,
+      current_index: 2,
+      question: QUESTIONS[2],
+    }
+    render(<TestRunner session={resumed} />)
+    expect(screen.getByText('Largest planet?')).toBeInTheDocument()
+    expect(screen.getByText('Question 3 of 5')).toBeInTheDocument()
+  })
+
   it('dispatches on question.type: radios for mcq, checkboxes for multi', () => {
     renderRunner()
     // Q1 is mcq -> radios
