@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Column,
@@ -10,6 +10,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSON
 from src.db.session import Base
+
+
+def utc_now(_ctx=None):
+    return datetime.now(timezone.utc)
 
 
 class IdempotencyKey(Base):
@@ -26,7 +30,11 @@ class IdempotencyKey(Base):
     # (same hash -> replay) from key reuse with a different payload (-> 409).
     request_hash = Column(String(64), nullable=False)
     response_json = Column(JSON, nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
 
     __table_args__ = (
         UniqueConstraint("quiz_session_id", "key", name="uq_idempotency_session_key"),

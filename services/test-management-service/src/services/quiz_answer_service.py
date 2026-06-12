@@ -39,6 +39,14 @@ def _aware(dt: datetime) -> datetime:
     return dt
 
 
+def _session_tokens_match(expected: str, submitted: str) -> bool:
+    """Compare token bytes so malformed Unicode input still rejects cleanly."""
+    return hmac.compare_digest(
+        expected.encode("utf-8"),
+        submitted.encode("utf-8"),
+    )
+
+
 class QuizAnswerService:
 
     @staticmethod
@@ -64,7 +72,7 @@ class QuizAnswerService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Session does not belong to this user",
             )
-        if not hmac.compare_digest(session.session_token, payload.session_token):
+        if not _session_tokens_match(session.session_token, payload.session_token):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invalid session token",

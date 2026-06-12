@@ -73,7 +73,7 @@ Add deterministic, side-effect-free scoring for single-select, true/false, and m
 |---|---|---|
 | `src/scoring/types.py` | `ScoreResult` dataclass | Single immutable result shape; `details` keeps scoring auditable for later reporting. |
 | `src/scoring/exact_match.py` | Set-equality scorer | Single-select/true-false are all-or-nothing; set comparison handles extra/missing selections uniformly. |
-| `src/scoring/partial_credit.py` | `(tp-fp)/|correct|` clamped | Rewards correct picks, penalizes wrong ones so "select everything" scores 0, not full marks. Pure + deterministic = trivially unit-testable. |
+| `src/scoring/partial_credit.py` | `(tp-fp)/|correct|` clamped | Rewards correct picks, penalizes wrong ones so "select everything" scores 0, not full marks. This intentionally differs from Jaccard and is documented in `docs/adr/0001-multiselect-partial-credit-scoring.md`. Pure + deterministic = trivially unit-testable. |
 | `src/scoring/__init__.py` | `score_question` dispatch | One entry point; type→algorithm mapping isolated from the service. |
 | `src/models/quiz_answer.py` | `quiz_answers` table | Durable per-question score; unique (session,index) is a DB-level double-score guard independent of app logic. |
 | `src/models/idempotency_key.py` | `idempotency_keys` table | Stores the prior response keyed by (session,key); `request_hash` distinguishes a true retry from key reuse. |

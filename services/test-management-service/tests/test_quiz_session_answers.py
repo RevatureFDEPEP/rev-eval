@@ -19,6 +19,7 @@ import src.models.test  # noqa: F401
 import src.models.test_skill  # noqa: F401
 import src.models.test_submission  # noqa: F401
 from fastapi import HTTPException
+from src.models.idempotency_key import IdempotencyKey
 from src.models.quiz_session import SessionStatus
 from src.schemas.quiz_session_schema import AnswerSubmit
 from src.services.quiz_answer_service import QuizAnswerService, _request_hash
@@ -226,6 +227,18 @@ async def test_bad_session_token_rejected_403():
 
 
 @pytest.mark.asyncio
+async def test_non_ascii_session_token_rejected_403():
+    """Client-controlled non-ASCII tokens must reject, not crash compare_digest."""
+    session = _make_session()
+    questions = [_make_snapshot(0, "q0")]
+
+    with pytest.raises(HTTPException) as exc:
+        await _run(session, questions, _payload("q0", [2], token="wrong-non-ascii-\u00f1"))
+
+    assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
 async def test_out_of_order_answer_conflicts():
     session = _make_session(current_index=1)
     questions = [_make_snapshot(0, "q0"), _make_snapshot(1, "q1")]
@@ -235,6 +248,13 @@ async def test_out_of_order_answer_conflicts():
         await _run(session, questions, _payload("q0", [2]))
 
     assert exc.value.status_code == 409
+
+
+def test_idempotency_key_created_at_default_is_timezone_aware():
+    created_at = IdempotencyKey.__table__.c.created_at.default.arg(None)
+
+    assert created_at.tzinfo is not None
+    assert created_at.utcoffset() == timedelta(0)
 
 
 @pytest.mark.asyncio
