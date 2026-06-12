@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, type ControllerRenderProps } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { ArrowLeft, Check, Plus, Trash2, X } from "lucide-react";
@@ -57,7 +57,7 @@ const baseSchema = {
   tags: z
     .union([z.string(), z.array(z.string())])
     .optional()
-    .transform((val) => {
+    .transform((val: string | string[] | undefined) => {
       if (Array.isArray(val)) return val;
       if (typeof val === "string") return val ? val.split(",").map((t) => t.trim()) : [];
       return [];
@@ -77,11 +77,11 @@ const mcqSchema = z
     ),
   })
   .refine(
-    (data) => {
+    (data: { options: Array<{ text: string; is_correct: boolean }> }) => {
       if (data.options.length < 2 || data.options.length > 5) {
         return false;
       }
-      return data.options.some((opt) => opt.is_correct);
+      return data.options.some((opt: { text: string; is_correct: boolean }) => opt.is_correct);
     },
     {
       message: "MCQ questions require 2-5 options with at least one marked correct",
@@ -160,6 +160,7 @@ export default function CreateQuestionPage() {
 };
 
 // Create a discriminated union schema that handles all question types
+/*
 const createQuestionSchema = (type: QuestionType) => {
   switch (type) {
     case "mcq":
@@ -176,6 +177,18 @@ const createQuestionSchema = (type: QuestionType) => {
   const form = useForm<QuestionFormValues>({
     resolver: zodResolver(createQuestionSchema(questionType)),
     defaultValues: getDefaultValues(),
+  });
+  */
+
+const questionSchema = z.discriminatedUnion("questionType", [
+  mcqSchema.extend({ questionType: z.literal("mcq") }),
+  trueFalseSchema.extend({ questionType: z.literal("true_false") }),
+  textSchema.extend({ questionType: z.literal("text") }),
+]);
+
+  const form = useForm({
+    resolver: zodResolver(questionSchema),
+    defaultValues: { ...getDefaultValues(), questionType },
   });
 
   // Reset form when questionType changes
@@ -196,7 +209,7 @@ const createQuestionSchema = (type: QuestionType) => {
       return skills;
     }
     const query = searchQuery.toLowerCase();
-    return skills.filter((skill) => skill.name.toLowerCase().includes(query));
+    return skills.filter((skill: SkillInfo) => skill.name.toLowerCase().includes(query));
   }, [skills, searchQuery]);
   const skillListContainerClass =
     'max-h-[55vh] overflow-x-hidden overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-white';
@@ -226,7 +239,7 @@ const createQuestionSchema = (type: QuestionType) => {
       const mcqValues = values as McqFormValues;
       // Get all correct answers
       const correctAnswerIndices = mcqValues.options
-        .map((opt, idx: number) => (opt.is_correct ? idx + 1 : null))
+        .map((opt: { text: string; is_correct: boolean }, idx: number) => (opt.is_correct ? idx + 1 : null))
         .filter((id: number | null): id is number => id !== null);
 
       // Determine if it's MCQ (1 answer) or MULTI (2+ answers)
@@ -237,7 +250,7 @@ const createQuestionSchema = (type: QuestionType) => {
       }
 
       correct_answers = correctAnswerIndices;
-      options = mcqValues.options.map((opt) => ({ text: opt.text }));
+      options = mcqValues.options.map((opt: { text: string; is_correct: boolean }) => ({ text: opt.text }));
     } else if (questionType === "true_false") {
       // For TRUE_FALSE, send boolean in correct_answers, no options
       correct_answers = [(values as TrueFalseFormValues).true_false_answer];
@@ -340,7 +353,7 @@ const createQuestionSchema = (type: QuestionType) => {
               <FormField
                 control={form.control}
                 name="question_text"
-                render={({ field }) => (
+                render={({ field }: { field: ControllerRenderProps<any, any> }) => (
                   <FormItem>
                     <FormControl>
                       <Textarea
@@ -369,7 +382,7 @@ const createQuestionSchema = (type: QuestionType) => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {fields.map((field, index) => (
+                {fields.map((field: { id: string; text: string; is_correct: boolean }, index: number) => (
                   <div
                     key={field.id}
                     className="flex items-start gap-3 rounded-lg border p-4"
@@ -377,7 +390,7 @@ const createQuestionSchema = (type: QuestionType) => {
                     <FormField
                       control={form.control}
                       name={`options.${index}.is_correct`}
-                      render={({ field }) => (
+                      render={({ field }: { field: ControllerRenderProps<any, any> }) => (
                         <FormItem className="flex items-center space-y-0">
                           <FormControl>
                             <Checkbox
@@ -392,7 +405,7 @@ const createQuestionSchema = (type: QuestionType) => {
                     <FormField
                       control={form.control}
                       name={`options.${index}.text`}
-                      render={({ field }) => (
+                      render={({ field }: { field: ControllerRenderProps<any, any> }) => (
                         <FormItem className="flex-1">
                           <FormControl>
                             <Input
@@ -449,11 +462,11 @@ const createQuestionSchema = (type: QuestionType) => {
                 <FormField
                   control={form.control}
                   name="true_false_answer"
-                  render={({ field }) => (
+                  render={({ field }: { field: ControllerRenderProps<any, any> }) => (
                     <FormItem className="space-y-3">
                       <FormControl>
                         <RadioGroup
-                          onValueChange={(value) => field.onChange(value === "true")}
+                          onValueChange={(value: string) => field.onChange(value === "true")}
                           value={field.value === true ? "true" : field.value === false ? "false" : undefined}
                           className="flex flex-col space-y-2"
                         >
@@ -496,7 +509,7 @@ const createQuestionSchema = (type: QuestionType) => {
                 <FormField
                   control={form.control}
                   name="sample_answer"
-                  render={({ field }) => (
+                  render={({ field }: { field: ControllerRenderProps<any, any> }) => (
                     <FormItem>
                       <FormControl>
                         <Textarea
@@ -525,7 +538,7 @@ const createQuestionSchema = (type: QuestionType) => {
               <FormField
                 control={form.control}
                 name="answer_explanation"
-                render={({ field }) => (
+                render={({ field }: { field: ControllerRenderProps<any, any> }) => (
                   <FormItem>
                     <FormControl>
                       <Textarea
@@ -553,7 +566,7 @@ const createQuestionSchema = (type: QuestionType) => {
               <FormField
                 control={form.control}
                 name="difficulty"
-                render={({ field }) => (
+                render={({ field }: { field: ControllerRenderProps<any, any> }) => (
                   <FormItem>
                     <Select
                       onValueChange={field.onChange}
@@ -595,7 +608,7 @@ const createQuestionSchema = (type: QuestionType) => {
                       <Input
                         placeholder="Search skills..."
                         value={searchQuery}
-                        onChange={(event) => setSearchQuery(event.target.value)}
+                        onChange={(event: ChangeEvent<HTMLInputElement>) => setSearchQuery(event.target.value)}
                         className="max-w-md"
                       />
 
@@ -641,12 +654,12 @@ const createQuestionSchema = (type: QuestionType) => {
                       ) : (
                         <div className={skillListContainerClass}>
                           <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {filteredSkills.map((skill) => (
+                            {filteredSkills.map((skill: SkillInfo) => (
                               <FormField
                                 key={skill.id}
                                 control={form.control}
                                 name="skills"
-                                render={({ field }) => {
+                                render={({ field }: { field: ControllerRenderProps<any, any> }) => {
                                   const current: string[] = field.value || [];
                                   const isChecked = current.includes(skill.name);
                                   return (
@@ -654,7 +667,7 @@ const createQuestionSchema = (type: QuestionType) => {
                                       <FormControl>
                                         <Checkbox
                                           checked={isChecked}
-                                          onCheckedChange={(checked) => {
+                                          onCheckedChange={(checked: boolean | 'indeterminate') => {
                                             const updated = checked
                                               ? Array.from(new Set([...current, skill.name]))
                                               : current.filter((value) => value !== skill.name);
@@ -698,7 +711,7 @@ const createQuestionSchema = (type: QuestionType) => {
               <FormField
                 control={form.control}
                 name="tags"
-                render={({ field }) => (
+                render={({ field }: { field: ControllerRenderProps<any, any> }) => (
                   <FormItem>
                     <FormControl>
                       <Input
