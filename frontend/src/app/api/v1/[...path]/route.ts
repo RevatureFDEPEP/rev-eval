@@ -32,12 +32,20 @@ async function handleRequest(
     }
   }
 
+  const outboundHeaders: Record<string, string> = {
+    Authorization: `Bearer ${session.token}`,
+    'Content-Type': 'application/json',
+  };
+  // Forward client-supplied idempotency / correlation headers so the backend
+  // can dedupe retries and trace requests across services.
+  const idempotencyKey = request.headers.get('idempotency-key');
+  if (idempotencyKey) outboundHeaders['Idempotency-Key'] = idempotencyKey;
+  const correlationId = request.headers.get('x-correlation-id');
+  if (correlationId) outboundHeaders['X-Correlation-Id'] = correlationId;
+
   const response = await fetch(url.toString(), {
     method: request.method,
-    headers: {
-      Authorization: `Bearer ${session.token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: outboundHeaders,
     body,
   });
 

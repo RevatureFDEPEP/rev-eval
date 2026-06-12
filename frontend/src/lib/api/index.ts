@@ -10,4 +10,5 @@ export * from './submissions';
 export * from './skills';
 export * from './questions';
 export * from './quiz-sessions';
+export * from './quiz';
 export * from './users';

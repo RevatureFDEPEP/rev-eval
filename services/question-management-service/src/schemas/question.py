@@ -297,3 +297,30 @@ class QuestionResponse(BaseModel):
         json_encoders = {
             datetime: lambda v: v.isoformat()
         }
+
+
+class QuestionPublic(BaseModel):
+    """Participant-safe view of a question.
+
+    Deliberately omits answer keys (``correct_answers``), the reference answer
+    (``sample_answer``), and the explanation (``answer_explanation``) so that
+    list/detail/filter endpoints can never leak grading data to a test-taker.
+    Trainer/admin callers receive the full :class:`QuestionResponse` instead.
+    """
+
+    id: str = Field(..., description="MongoDB document ID", alias="_id")
+    type: str
+    question_text: str
+    options: Optional[List[dict]] = None
+    difficulty: Optional[str] = "medium"
+    skills: List[str] = []
+    tags: List[str] = []
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        """Pydantic configuration."""
+        populate_by_name = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }

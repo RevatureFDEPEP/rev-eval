@@ -74,9 +74,26 @@ async def verify_jwt_token(authorization: Optional[str] = Header(None)) -> Dict[
     }
 
 
+def strip_client_identity_headers(headers: dict) -> dict:
+    """Drop any client-supplied X-User-* headers.
+
+    Downstream services trust X-User-* as gateway-verified identity. A client
+    must never be able to set them directly, so we remove every casing of them
+    before the gateway injects the values derived from the verified JWT.
+    """
+    return {
+        k: v
+        for k, v in headers.items()
+        if not k.lower().startswith("x-user-")
+    }
+
+
 def add_user_context_headers(headers: dict, user_context: Dict[str, str]) -> dict:
-    """Inject X-User-* headers for downstream services."""
-    headers_copy = headers.copy()
+    """Inject gateway-verified X-User-* headers for downstream services.
+
+    Strips any inbound X-User-* first so a spoofed header can never survive.
+    """
+    headers_copy = strip_client_identity_headers(headers)
     headers_copy["X-User-Id"] = str(user_context.get("user_id") or "")
     headers_copy["X-User-Email"] = str(user_context.get("email") or "")
     headers_copy["X-User-Role"] = str(user_context.get("role") or "")

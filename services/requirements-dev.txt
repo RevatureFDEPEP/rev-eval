@@ -2,4 +2,5 @@ pytest
 pytest-cov
 httpx
 pytest-asyncio
+aiosqlite
 ruff

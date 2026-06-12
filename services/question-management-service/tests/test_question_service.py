@@ -434,16 +434,25 @@ async def test_question_routes_delegate_successfully():
         "get_all_questions",
         new=AsyncMock(return_value=[doc]),
     ):
-        listed = await question_routes.get_all_questions()
-    assert listed[0].id == "qid"
+        # Trainer sees full payload (answer keys included)...
+        listed = await question_routes.get_all_questions(x_user_role="TRAINER")
+        assert listed[0]["_id"] == "qid"
+        assert listed[0]["correct_answers"] == [1]
+        # ...participant gets the safe view with answer keys stripped.
+        listed_safe = await question_routes.get_all_questions(x_user_role="PARTICIPANT")
+        assert "correct_answers" not in listed_safe[0]
 
     with patch.object(
         question_routes.QuestionService,
         "get_question_by_id",
         new=AsyncMock(return_value=doc),
     ):
-        found = await question_routes.get_question_by_id("qid")
-    assert found.id == "qid"
+        found = await question_routes.get_question_by_id("qid", x_user_role="TRAINER")
+        assert found["_id"] == "qid"
+        found_safe = await question_routes.get_question_by_id(
+            "qid", x_user_role="PARTICIPANT"
+        )
+        assert "correct_answers" not in found_safe
 
     with patch.object(
         question_routes.QuestionService,
@@ -509,28 +518,28 @@ async def test_question_filter_routes_delegate_to_service():
         "find_by_type",
         new=AsyncMock(return_value=docs),
     ):
-        assert len(await question_routes.get_questions_by_type("mcq", 5)) == 1
+        assert len(await question_routes.get_questions_by_type("mcq", 5, "TRAINER")) == 1
 
     with patch.object(
         question_routes.QuestionService,
         "find_by_skill",
         new=AsyncMock(return_value=docs),
     ):
-        assert len(await question_routes.get_questions_by_skill("Python", 5)) == 1
+        assert len(await question_routes.get_questions_by_skill("Python", 5, "TRAINER")) == 1
 
     with patch.object(
         question_routes.QuestionService,
         "find_by_difficulty",
         new=AsyncMock(return_value=docs),
     ):
-        assert len(await question_routes.get_questions_by_difficulty("easy", 5)) == 1
+        assert len(await question_routes.get_questions_by_difficulty("easy", 5, "TRAINER")) == 1
 
     with patch.object(
         question_routes.QuestionService,
         "find_by_tags",
         new=AsyncMock(return_value=docs),
     ):
-        assert len(await question_routes.get_questions_by_tags(["api"], 5)) == 1
+        assert len(await question_routes.get_questions_by_tags(["api"], 5, "TRAINER")) == 1
 
     with patch.object(
         question_routes.QuestionService,
@@ -543,6 +552,7 @@ async def test_question_filter_routes_delegate_to_service():
             difficulty="easy",
             tags=["api"],
             limit=5,
+            x_user_role="TRAINER",
         )
     assert len(filtered) == 1
 

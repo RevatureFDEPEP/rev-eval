@@ -47,7 +47,14 @@ async def init_db():
     Call this on app startup.
     """
     try:
-        # Import all models here so they are registered with Base
+        # Import all models here so they are registered with Base before
+        # create_all runs (otherwise table creation depends on the fragile
+        # side effect of route modules importing models).
+        import src.models.quiz_session  # noqa: F401
+        import src.models.skill  # noqa: F401
+        import src.models.test  # noqa: F401
+        import src.models.test_skill  # noqa: F401
+        import src.models.test_submission  # noqa: F401
 
         # Create tables in async context
         async with engine.begin() as conn:
