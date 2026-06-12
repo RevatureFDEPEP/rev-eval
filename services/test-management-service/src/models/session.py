@@ -46,6 +46,10 @@ class QuizSession(Base):
     current_index = Column(Integer, nullable=False, default=0)
     question_ids = Column(JSON, nullable=False, default=list)
 
+    # Set when the final question is answered (status -> SUBMITTED). NULL while
+    # the session is still ACTIVE or was EXPIRED before completion (W3-F2).
+    submitted_at = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

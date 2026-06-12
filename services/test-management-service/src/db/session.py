@@ -53,6 +53,7 @@ async def init_db():
     """
     try:
         # Import all models here so they are registered with Base
+        from src.models.answer import QuizAnswer  # noqa: F401
         from src.models.category import Category  # noqa: F401
         from src.models.category_skill import CategorySkill  # noqa: F401
         from src.models.session import QuizSession  # noqa: F401

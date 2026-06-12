@@ -309,6 +309,38 @@ class QuestionResponse(BaseModel):
         }
 
 
+class QuestionPublic(BaseModel):
+    """Participant-safe view of a Question.
+
+    Identical to :class:`QuestionResponse` but omits the answer key
+    (``correct_answers``, ``sample_answer``, ``answer_explanation``) so a
+    question body can leave the service toward a test-taker without disclosing
+    how it is graded. Used by the ``/sample`` endpoint, whose output seeds a
+    quiz session (and surfaces to the participant as ``first_question``).
+    """
+    id: str = Field(..., description="MongoDB document ID", alias="_id")
+    type: str
+    question_text: str
+    options: list[dict] | None = None
+    difficulty: str | None = "medium"
+    skills: list[str] = []
+    tags: list[str] = []
+    image_object_key: str | None = None
+    image_url: str | None = Field(
+        None,
+        description="Pre-signed GET URL for the attached image (populated when image_object_key is set)",
+    )
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        """Pydantic configuration."""
+        populate_by_name = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
 class PresignedUploadResponse(BaseModel):
     """Response for a pre-signed question-image upload policy."""
     url: str = Field(..., description="MinIO endpoint the client POSTs the file to")
