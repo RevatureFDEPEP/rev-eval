@@ -14,7 +14,7 @@ from src.repositories.answer_repository import AnswerRepository
 from src.repositories.session_repository import SessionRepository
 from src.repositories.test_repository import TestRepository
 from src.schemas.answer_schema import AnswerCreate, AnswerResponse
-from src.schemas.session_schema import SessionResponse
+from src.schemas.session_schema import SanitizedQuestion, SessionResponse
 from src.scoring import partial_credit
 from src.scoring.result import ScoreResult
 from src.utils.http_client import get_http_client
@@ -54,7 +54,12 @@ class SessionService:
         question_ids = [
             qid for q in questions if (qid := q.get("_id") or q.get("id"))
         ]
-        first_question = questions[0] if questions else None
+        # Sequential reveal: only the current (first) question body leaves the
+        # service now; the rest are delivered one at a time by the answer
+        # endpoint. /sample already strips the answer key (QuestionPublic).
+        first_question = (
+            SessionService._sanitize_question(questions[0]) if questions else None
+        )
 
         server_now = datetime.utcnow()
         duration = test.duration or _DEFAULT_DURATION
@@ -80,7 +85,24 @@ class SessionService:
             session_token=saved.session_token,
             server_now=saved.server_now,
             expires_at=saved.expires_at,
-            first_question=first_question,
+            current_index=saved.current_index,
+            total_questions=len(question_ids),
+            question=first_question,
+            draft_answers=None,
+        )
+
+    @staticmethod
+    def _sanitize_question(q: dict) -> SanitizedQuestion:
+        """Project a question body (from ``/sample`` or ``/questions/{id}``) onto
+        the candidate-safe shape. Copies only display fields, so answer fields
+        (``correct_answers``/``sample_answer``/``answer_explanation``) can never
+        reach the client even when the source dict carries them."""
+        return SanitizedQuestion(
+            id=q.get("_id") or q.get("id"),
+            type=q.get("type"),
+            question_text=q.get("question_text"),
+            options=q.get("options"),
+            difficulty=q.get("difficulty"),
         )
 
     @staticmethod
@@ -218,13 +240,24 @@ class SessionService:
             session.status = SessionStatus.SUBMITTED
             session.submitted_at = now
 
+        # Sequential reveal: deliver the next question body (answer key stripped)
+        # so the client never holds unanswered questions ahead of the frontier.
+        next_question = None
+        if not finished:
+            next_raw = await SessionService._fetch_question(
+                question_ids[new_index], correlation_id
+            )
+            next_question = SessionService._sanitize_question(next_raw)
+
+        # Score-free response: is_correct/score are persisted below but never
+        # returned, so correctness stays hidden from the candidate mid-exam.
         response = AnswerResponse(
-            is_correct=result.is_correct,
-            score=result.score,
-            algorithm=result.algorithm,
+            question_id=current_qid,
             current_index=new_index,
+            total_questions=len(question_ids),
             status=session.status,
-            finished=finished,
+            submitted_at=session.submitted_at if finished else None,
+            next_question=next_question,
         )
 
         AnswerRepository.add(

@@ -117,9 +117,16 @@ async def test_create_session_happy_path(session_factory, monkeypatch):
 
     assert resp.status_code == 201
     body = resp.json()
-    # Response contract (spec line 50)
-    assert set(body) >= {"session_id", "session_token", "server_now", "expires_at", "first_question"}
-    assert body["first_question"]["_id"] == "q1"
+    # Sequential-reveal contract: current question only + progress counters.
+    assert set(body) >= {
+        "session_id", "session_token", "server_now", "expires_at",
+        "current_index", "total_questions", "question",
+    }
+    # SanitizedQuestion maps the Mongo "_id" alias onto "id" and strips the key.
+    assert body["question"]["id"] == "q1"
+    assert "correct_answers" not in body["question"]
+    assert body["current_index"] == 0
+    assert body["total_questions"] == 2
     assert len(body["session_token"]) == 64  # secrets.token_hex(32)
 
     # expires_at = server_now + test.duration (30 min)

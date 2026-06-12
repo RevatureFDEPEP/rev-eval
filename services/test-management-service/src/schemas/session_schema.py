@@ -9,18 +9,39 @@ class SessionCreate(BaseModel):
     test_id: int
 
 
-class SessionResponse(BaseModel):
-    """Response contract for a freshly created quiz session (W3-F1 spec line 50).
+class SanitizedQuestion(BaseModel):
+    """A question as exposed to the candidate — answer fields stripped.
 
-    ``first_question`` is the body of the first sampled question as returned by
-    question-management-service (kept as a raw dict so the contract is decoupled
-    from that service's response schema). It is ``None`` only if the bank is
-    empty.
+    Built from question-management-service's ``QuestionPublic`` (already
+    answer-free at the ``/sample`` endpoint) or by sanitizing a full question
+    body server-side before it crosses to the client. Never carries
+    ``correct_answers``/``sample_answer``/``answer_explanation``.
+    """
+    id: str
+    type: str
+    question_text: str
+    options: list[dict] | None = None
+    difficulty: str | None = None
+
+
+class SessionResponse(BaseModel):
+    """Response contract for a freshly created quiz session.
+
+    Sequential-reveal model: only the **current** question body is returned.
+    Subsequent questions are delivered one at a time by the answer endpoint
+    (``next_question``), so future question bodies never reach the client.
+    ``current_index``/``total_questions`` let the client render progress without
+    holding the whole bank; ``draft_answers`` seeds a resumed session (W3-F4).
     """
     session_id: str
     session_token: str
     server_now: datetime
     expires_at: datetime
-    first_question: dict | None = Field(
-        None, description="Body of the first sampled question (from question-management-service)"
+    current_index: int
+    total_questions: int
+    question: SanitizedQuestion | None = Field(
+        None, description="Body of the session's current question (answer key stripped)"
+    )
+    draft_answers: dict[str, list[int]] | None = Field(
+        None, description="Autosaved partial answers, present only on a resumed session"
     )
