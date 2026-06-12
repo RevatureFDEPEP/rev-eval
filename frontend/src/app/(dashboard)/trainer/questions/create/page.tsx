@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useFieldArray, type ControllerRenderProps } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -108,14 +108,6 @@ type TrueFalseFormValues = z.infer<typeof trueFalseSchema>;
 type TextFormValues = z.infer<typeof textSchema>;
 type QuestionFormValues = McqFormValues | TrueFalseFormValues | TextFormValues;
 
-const questionSchema = z.discriminatedUnion("questionType", [
-  mcqSchema.extend({ questionType: z.literal("mcq") }),
-  trueFalseSchema.extend({ questionType: z.literal("true_false") }),
-  textSchema.extend({ questionType: z.literal("text") }),
-]);
-
-type QuestionSchemaValues = z.infer<typeof questionSchema>;
-
 export default function CreateQuestionPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -127,7 +119,7 @@ export default function CreateQuestionPage() {
   const questionType = (searchParams.get("type") as QuestionType) || "mcq";
 
   // Get default values based on question type
-  const getDefaultValues = useCallback((): QuestionFormValues => {
+  const getDefaultValues = (): QuestionFormValues => {
   const base = {
     question_text: "",
     difficulty: undefined,
@@ -165,17 +157,44 @@ export default function CreateQuestionPage() {
         ],
       };
   }
-  }, [questionType]);
+};
 
-  const form = useForm<QuestionSchemaValues>({
+// Create a discriminated union schema that handles all question types
+/*
+const createQuestionSchema = (type: QuestionType) => {
+  switch (type) {
+    case "mcq":
+      return mcqSchema;
+    case "true_false":
+      return trueFalseSchema;
+    case "text":
+      return textSchema;
+    default:
+      return mcqSchema;
+  }
+};
+
+  const form = useForm<QuestionFormValues>({
+    resolver: zodResolver(createQuestionSchema(questionType)),
+    defaultValues: getDefaultValues(),
+  });
+  */
+
+const questionSchema = z.discriminatedUnion("questionType", [
+  mcqSchema.extend({ questionType: z.literal("mcq") }),
+  trueFalseSchema.extend({ questionType: z.literal("true_false") }),
+  textSchema.extend({ questionType: z.literal("text") }),
+]);
+
+  const form = useForm({
     resolver: zodResolver(questionSchema),
     defaultValues: { ...getDefaultValues(), questionType },
   });
 
   // Reset form when questionType changes
   useEffect(() => {
-    form.reset({ ...getDefaultValues(), questionType });
-  }, [questionType, form, getDefaultValues]);
+    form.reset(getDefaultValues());
+  }, [questionType, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -210,7 +229,7 @@ export default function CreateQuestionPage() {
     loadSkills();
   }, []);
 
-  const transformFormData = (values: QuestionSchemaValues): QuestionCreate => {
+  const transformFormData = (values: QuestionFormValues): QuestionCreate => {
     // For MCQ type, determine if it's actually MCQ (single answer) or MULTI (multiple answers)
     let actualType: QuestionType = questionType;
     let correct_answers: (number | boolean | string)[] | undefined = undefined;
@@ -255,7 +274,7 @@ export default function CreateQuestionPage() {
     };
   };
 
-  const onSubmit = async (values: QuestionSchemaValues) => {
+  const onSubmit = async (values: QuestionFormValues) => {
     try {
       setSubmitting(true);
       setError(null);
@@ -334,7 +353,7 @@ export default function CreateQuestionPage() {
               <FormField
                 control={form.control}
                 name="question_text"
-                render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, "question_text"> }) => (
+                render={({ field }: { field: ControllerRenderProps<any, any> }) => (
                   <FormItem>
                     <FormControl>
                       <Textarea
@@ -371,7 +390,7 @@ export default function CreateQuestionPage() {
                     <FormField
                       control={form.control}
                       name={`options.${index}.is_correct`}
-                      render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, `options.${number}.is_correct`> }) => (
+                      render={({ field }: { field: ControllerRenderProps<any, any> }) => (
                         <FormItem className="flex items-center space-y-0">
                           <FormControl>
                             <Checkbox
@@ -386,7 +405,7 @@ export default function CreateQuestionPage() {
                     <FormField
                       control={form.control}
                       name={`options.${index}.text`}
-                      render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, `options.${number}.text`> }) => (
+                      render={({ field }: { field: ControllerRenderProps<any, any> }) => (
                         <FormItem className="flex-1">
                           <FormControl>
                             <Input
@@ -443,7 +462,7 @@ export default function CreateQuestionPage() {
                 <FormField
                   control={form.control}
                   name="true_false_answer"
-                  render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, "true_false_answer"> }) => (
+                  render={({ field }: { field: ControllerRenderProps<any, any> }) => (
                     <FormItem className="space-y-3">
                       <FormControl>
                         <RadioGroup
@@ -490,7 +509,7 @@ export default function CreateQuestionPage() {
                 <FormField
                   control={form.control}
                   name="sample_answer"
-                  render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, "sample_answer"> }) => (
+                  render={({ field }: { field: ControllerRenderProps<any, any> }) => (
                     <FormItem>
                       <FormControl>
                         <Textarea
@@ -519,7 +538,7 @@ export default function CreateQuestionPage() {
               <FormField
                 control={form.control}
                 name="answer_explanation"
-                render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, "answer_explanation"> }) => (
+                render={({ field }: { field: ControllerRenderProps<any, any> }) => (
                   <FormItem>
                     <FormControl>
                       <Textarea
@@ -547,7 +566,7 @@ export default function CreateQuestionPage() {
               <FormField
                 control={form.control}
                 name="difficulty"
-                render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, "difficulty"> }) => (
+                render={({ field }: { field: ControllerRenderProps<any, any> }) => (
                   <FormItem>
                     <Select
                       onValueChange={field.onChange}
@@ -640,7 +659,7 @@ export default function CreateQuestionPage() {
                                 key={skill.id}
                                 control={form.control}
                                 name="skills"
-                                render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, "skills"> }) => {
+                                render={({ field }: { field: ControllerRenderProps<any, any> }) => {
                                   const current: string[] = field.value || [];
                                   const isChecked = current.includes(skill.name);
                                   return (
@@ -692,7 +711,7 @@ export default function CreateQuestionPage() {
               <FormField
                 control={form.control}
                 name="tags"
-                render={({ field }: { field: ControllerRenderProps<QuestionSchemaValues, "tags"> }) => (
+                render={({ field }: { field: ControllerRenderProps<any, any> }) => (
                   <FormItem>
                     <FormControl>
                       <Input
