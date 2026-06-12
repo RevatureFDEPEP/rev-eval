@@ -82,6 +82,14 @@ export function TestRunner({ session, initialQuestions }: TestRunnerProps) {
   // result instead of double-scoring; regenerated when the frontier advances.
   const idemRef = useRef<{ id: string; key: string } | null>(null);
 
+  // Synchronous in-flight latch. The status guard below reads `exam.status` from
+  // the render closure, which doesn't update until React commits — so two entries
+  // in one batch (rapid double-click, or a timer onExpire coinciding with a click)
+  // would both pass it and fire two submits / double-append the next question.
+  // A ref set before the await closes that same-stack window; the status guard
+  // still covers the cross-render cases.
+  const inFlightRef = useRef(false);
+
   const setAnswer = useCallback((questionId: string, optionIds: number[]) => {
     setAnswers((prev) => {
       const next = new Map(prev);
@@ -94,7 +102,9 @@ export function TestRunner({ session, initialQuestions }: TestRunnerProps) {
   // and advance. Optimistic lock via SUBMIT_START; the server ack confirms.
   // Re-runnable from the 'error' state (retry); blocked only mid-flight/finished.
   const handleSubmit = useCallback(async () => {
+    if (inFlightRef.current) return;
     if (exam.status === 'submitting' || exam.status === 'submitted') return;
+    inFlightRef.current = true;
     const qs = questionsRef.current;
     const frontier = qs[qs.length - 1];
     const selected = answersRef.current.get(frontier.id) ?? [];
@@ -109,6 +119,15 @@ export function TestRunner({ session, initialQuestions }: TestRunnerProps) {
         frontier.id,
         idemRef.current.key
       );
+      // Defensive: a non-final answer must return the next question. A null
+      // question that isn't accompanied by a SUBMITTED status is a broken
+      // contract that would otherwise soft-lock the shell (no Submit, a disabled
+      // Next, no error) — and the timer's re-submit can't escape it. Surface it
+      // as a recoverable error instead of stranding the participant.
+      if (!result.question && result.session_status !== 'SUBMITTED') {
+        dispatch({ type: 'SUBMIT_FAILED', error: submitErrorMessage(undefined) });
+        return;
+      }
       if (result.question) {
         const next = result.question;
         setQuestions((prev) => [...prev, next]);
@@ -117,6 +136,8 @@ export function TestRunner({ session, initialQuestions }: TestRunnerProps) {
       dispatch({ type: 'SUBMIT_CONFIRMED', result });
     } catch (err) {
       dispatch({ type: 'SUBMIT_FAILED', error: submitErrorMessage(err) });
+    } finally {
+      inFlightRef.current = false;
     }
   }, [exam.status, session.session_id]);
 

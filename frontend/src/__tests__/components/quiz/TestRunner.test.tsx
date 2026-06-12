@@ -213,6 +213,59 @@ describe('TestRunner', () => {
     expect(retryKey).toBe(firstKey)
   })
 
+  // C1 probe: two synchronous entries into handleSubmit (rapid double-click)
+  // must not fire two submits / append the next question twice.
+  it('does not double-submit on a rapid double Submit click', async () => {
+    vi.mocked(submitAnswer).mockResolvedValue(answerResult())
+    render(<TestRunner session={session()} />)
+    const btn = screen.getByRole('button', { name: 'Submit' })
+    await act(async () => {
+      fireEvent.click(btn)
+      fireEvent.click(btn)
+    })
+    expect(submitAnswer).toHaveBeenCalledTimes(1)
+    // Q2 must appear exactly once (no duplicate append).
+    expect(screen.getAllByText('Which are prime?')).toHaveLength(1)
+  })
+
+  // C1 probe (the sharper trigger): a still-pending submit, then a second click
+  // landing before the optimistic lock commits.
+  it('ignores a second Submit click while the first is still in flight', async () => {
+    let resolve: (r: AnswerResult) => void = () => {}
+    vi.mocked(submitAnswer).mockReturnValue(
+      new Promise<AnswerResult>((res) => {
+        resolve = res
+      })
+    )
+    render(<TestRunner session={session()} />)
+    const btn = screen.getByRole('button', { name: 'Submit' })
+    await act(async () => {
+      fireEvent.click(btn)
+      fireEvent.click(btn)
+    })
+    expect(submitAnswer).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      resolve(answerResult())
+    })
+  })
+
+  // C3: a null next question without a SUBMITTED status is a broken contract.
+  // It must surface as a recoverable error, not silently soft-lock the shell.
+  it('surfaces a recoverable error when a non-final answer returns no next question', async () => {
+    vi.mocked(submitAnswer).mockResolvedValue(
+      answerResult({ question: null, session_status: 'ACTIVE' })
+    )
+    render(<TestRunner session={session()} />)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+    })
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    // Recoverable, not stuck: a Try again control exists and is enabled.
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled()
+    // Did not falsely show the submitted confirmation.
+    expect(screen.queryByText('Quiz submitted')).not.toBeInTheDocument()
+  })
+
   it('lets the participant review a prior answer read-only and return forward', async () => {
     vi.mocked(submitAnswer).mockResolvedValue(answerResult())
     render(<TestRunner session={session()} />)
