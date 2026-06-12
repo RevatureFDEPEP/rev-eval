@@ -52,7 +52,21 @@ async def _bootstrap_schema(engine):
         await conn.run_sync(Base.metadata.create_all)
 
 
+async def _seed_parents(factory):
+    """Insert Test(id=1) and TestSubmission(id=1) so FK constraints are satisfied."""
+    from src.models.test import Test, TestType
+    from src.models.test_submission import TestSubmission
+    async with factory() as db:
+        test = Test(id=1, name="Lock Test", test_type=TestType.QUIZ)
+        db.add(test)
+        await db.flush()
+        sub = TestSubmission(id=1, test_id=1, user_id=1)
+        db.add(sub)
+        await db.commit()
+
+
 async def _seed_session(factory, session_id: str):
+    await _seed_parents(factory)
     async with factory() as db:
         row = QuizSession(
             id=session_id,
