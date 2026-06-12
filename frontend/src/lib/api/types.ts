@@ -467,6 +467,49 @@ export interface DraftSaveResult {
  */
 export type ExamErrorKind = 'transient' | 'semantic';
 
+// ===== W4-F2 CANDIDATE RESULTS (W4-F1 reporting contract) =====
+// Mirrors reporting-and-analytics-service src/schemas/report_schema.py.
+// Scores are 0–100 percentages; non-SUBMITTED attempts carry score: null.
+
+export type ReportSessionStatus = 'ACTIVE' | 'SUBMITTED' | 'EXPIRED';
+
+export interface ReportMostRecentAttempt {
+  session_id: string; // UUID
+  test_id: number;
+  test_name: string;
+  submitted_at: string; // ISO datetime
+  score: number | null;
+}
+
+/** Response contract for GET /v1/api/reports/user/{user_id}. */
+export interface UserReportSummary {
+  user_id: number;
+  total_attempts: number;
+  avg_score: number | null;
+  best_score: number | null;
+  total_time_seconds: number | null;
+  most_recent: ReportMostRecentAttempt | null;
+}
+
+export interface ReportAttemptItem {
+  session_id: string; // UUID
+  test_id: number;
+  test_name: string;
+  status: ReportSessionStatus;
+  started_at: string; // ISO datetime
+  submitted_at: string | null;
+  duration_seconds: number | null;
+  score: number | null;
+}
+
+/** Response contract for GET /v1/api/reports/user/{user_id}/attempts. */
+export interface ReportAttemptsPage {
+  items: ReportAttemptItem[];
+  total: number;
+  page: number;
+  size: number;
+}
+
 // ===== TYPE ALIASES (for backwards compatibility) =====
 
 /** @deprecated Use SubmissionStatus instead */
