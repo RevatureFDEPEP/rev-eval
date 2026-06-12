@@ -12,7 +12,22 @@ This file stays at summary level only.
 > start, advance, or finish a feature, update its detail file (check off steps,
 > add evidence) **and** its status row here, in the same PR as the code change.
 
-**Last assessed:** 2026-06-11 (**W3-F6 completed** — Week 3 slice closed on
+**Last assessed:** 2026-06-12 (**W4-F1 completed** — candidate results
+reporting endpoints on `richardh-feat-W4F1`: the reporting service reads
+test-management's `sessions`/`answers`/`tests` directly over a second
+read-only async engine (the shared-DB pattern, recorded with its alternatives
+in `docs/adr/0001-reporting-cross-service-data-access.md` — one of W4-F5's two
+required ADRs; no reporting-side tables, Alembic `0001` stays head).
+`GET /reports/user/{id}` aggregates total/avg/best/time + most-recent attempt
+in one SQL round trip; `GET /reports/user/{id}/attempts` paginates with
+`AttemptsQuery` (test/date/status filters, whitelisted `field:direction` sort,
+NULLs last) returning `{items,total,page,size}`; gateway routes
+`/v1/api/reports` → :8004. This resolves W3-F6's rolled-in gap: scores become
+user-visible via these endpoints (W4-F2 renders them), not by bridging
+finalize → `test_submissions`. Reporting 20 tests (17 new over an aiosqlite
+TmsBase fixture), gateway 51, TMS 100+6 unchanged; live compose smoke returned
+a real attempt (33.33%, 26.81s) through the gateway with filters/422/401
+verified. Prior: **W3-F6 completed** — Week 3 slice closed on
 `richardh-feat-W3F6`: Playwright happy path drives login → dashboard → Start →
 count-agnostic answer loop → locked confirmation through the W3-F4 TestRunner
 (dashboard quiz links rewired from the legacy mcq page to `/take/[testId]`),
@@ -103,7 +118,7 @@ Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 
 | # | Feature | Day | Status | Detail |
 |---|---|---|---|---|
-| W4-F1 | Candidate results reporting endpoints (filtering + pagination) | 16 | ❌ Not Started | [w4-f1-results-reporting-endpoints.md](features/w4-f1-results-reporting-endpoints.md) |
+| W4-F1 | Candidate results reporting endpoints (filtering + pagination) | 16 | ✅ Completed | [w4-f1-results-reporting-endpoints.md](features/w4-f1-results-reporting-endpoints.md) |
 | W4-F2 | Candidate results page (Suspense, error boundaries, chart) | 17 | ❌ Not Started | [w4-f2-candidate-results-page.md](features/w4-f2-candidate-results-page.md) |
 | W4-F3 | Role-based authz (API) + aggregate reporting queries | 18 | ❌ Not Started | [w4-f3-rbac-aggregate-queries.md](features/w4-f3-rbac-aggregate-queries.md) |
 | W4-F4 | Trainer dashboard frontend (server RBAC, URL-synced filters) | 19 | ❌ Not Started | [w4-f4-trainer-dashboard-frontend.md](features/w4-f4-trainer-dashboard-frontend.md) |
@@ -121,6 +136,6 @@ Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 8. **W3-F2 → W3-F3 → W3-F4** — the quiz-taking slice in dependency order; W3-F2 backend before the W3-F3/W3-F4 frontend that consumes it.
 9. ~~**W3-F5 + W3-F6**~~ — verification layer, done. (W3-F5 — PR #79; W3-F6 — branch `richardh-feat-W3F6`.)
 9a. ~~**W3-F7 review remediation before W3-F6**~~ — done (branch `richardh-feat-W3F7`): timer fix + reuse semantics landed before the Playwright happy path; the `/questions/sample` role gate previews W4-F3.
-10. **W2-M10 (if not already) → W4-F1 → W4-F3** — reporting backend then its RBAC gate; both extend the scaffolded reporting service.
+10. **W2-M10 ~~(if not already)~~ → ~~W4-F1~~ → W4-F3** — reporting backend done (branch `richardh-feat-W4F1`); next its RBAC gate, extending the same service.
 11. **W4-F2 → W4-F4** — results page first (builds `<ChartWrapper>`), then the trainer dashboard that reuses it; both need their W4 backends live.
 12. **W4-F5 last** — debt audit + ADRs need a substantially complete codebase; capture the W4-F1 and W3-F2 ADR decisions as those features land.
