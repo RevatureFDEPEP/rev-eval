@@ -3,7 +3,6 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 import pytest
-
 from src.config.settings import settings
 from src.services.auth_service import KNOWN_ROLES, AuthService, validate_jwt_secret
 

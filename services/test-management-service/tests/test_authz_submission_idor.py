@@ -7,10 +7,9 @@ that authorization passed before the service was reached.
 """
 from datetime import datetime
 
+import main
 import pytest
 from fastapi.testclient import TestClient
-
-import main
 from src.db.session import get_db
 from src.schemas.test_submission_schema import SubmissionStatus, TestSubmissionOut
 from src.services.test_service import TestService

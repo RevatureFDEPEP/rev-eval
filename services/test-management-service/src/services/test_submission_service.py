@@ -6,7 +6,6 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.config import settings
 from src.repositories.test_submission_repository import TestSubmissionRepository
-from src.utils.dependencies import internal_auth_headers
 from src.schemas.test_submission_schema import (
     BulkAssignRequest,
     BulkAssignResult,
@@ -18,6 +17,7 @@ from src.schemas.test_submission_schema import (
     TrainerReviewResponse,
 )
 from src.services.test_service import TestService
+from src.utils.dependencies import internal_auth_headers
 
 logger = logging.getLogger(__name__)
 

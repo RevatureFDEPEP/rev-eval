@@ -6,10 +6,9 @@ route authorization logic is exercised without a live database or real JWTs.
 """
 from datetime import datetime
 
+import main
 import pytest
 from fastapi.testclient import TestClient
-
-import main
 from src.db.session import get_db
 from src.models.user import User, UserRole
 from src.services.user_service import UserService
