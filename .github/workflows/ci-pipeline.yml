@@ -68,6 +68,34 @@ jobs:
           name: coverage-${{ matrix.service }}
           path: services/${{ matrix.service }}/coverage.xml
 
+      # W3-F5: integration tests against real Postgres + Mongo, ahead of the
+      # Docker build so a lock/idempotency regression fails the pipeline before
+      # any image is produced. The compose file is the source of truth for the
+      # containers (images, env, healthchecks); --wait blocks until every
+      # started service is healthy. question-management-service rides along
+      # because session creation exercises the real $sample cross-service call.
+      # The hermetic pytest step above runs without --integration, so this
+      # suite is skipped there and the coverage gate is unaffected. Only
+      # test-management-service has an integration suite today.
+      - name: Start integration containers (Postgres, Mongo, question-service)
+        if: matrix.service == 'test-management-service'
+        run: |
+          cp .env.example .env
+          docker compose up -d --wait postgres mongo question-management-service
+
+      - name: Run integration tests
+        if: matrix.service == 'test-management-service'
+        working-directory: services/test-management-service
+        run: pytest --integration -m integration -v
+
+      - name: Dump integration container logs
+        if: failure() && matrix.service == 'test-management-service'
+        run: docker compose logs --no-color
+
+      - name: Stop integration containers
+        if: always() && matrix.service == 'test-management-service'
+        run: docker compose down -v --remove-orphans
+
       - name: Build production image
         working-directory: services/${{ matrix.service }}
         run: docker build --target production -t ${{ matrix.service }}:ci .

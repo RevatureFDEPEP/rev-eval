@@ -4,3 +4,7 @@ pytest
 pytest-asyncio
 pytest-cov
 aiosqlite
+# W3-F5 integration suite (tests/integration/, gated behind --integration):
+# seeds the question bank directly in Mongo before exercising the real
+# cross-service $sample call. asyncpg + httpx are already in requirements.txt.
+pymongo
