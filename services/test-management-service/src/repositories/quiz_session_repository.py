@@ -76,12 +76,18 @@ class QuizSessionRepository:
 
     @staticmethod
     async def save_draft(
-        db: AsyncSession, session: QuizSession, answers: dict[str, list[int]]
+        db: AsyncSession,
+        session: QuizSession,
+        answers: dict[str, list[int]],
+        client_version: int,
     ) -> QuizSession:
-        """Persist an advisory autosave snapshot (last-write-wins). Does not
-        touch current_index or status, so no refresh is needed — the caller only
-        reads the unchanged status/current_index it already holds."""
+        """Persist an advisory autosave snapshot and its monotonic version.
+
+        The caller has already row-locked the session and gated on the version
+        (only the winning, strictly-fresher snapshot reaches here), so this just
+        writes. Does not touch current_index or status."""
         session.draft_answers = answers
+        session.draft_version = client_version
         await db.commit()
         return session
 

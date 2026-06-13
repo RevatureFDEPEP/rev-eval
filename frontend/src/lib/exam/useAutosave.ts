@@ -39,10 +39,19 @@ export function useAutosave(
   sessionId: string,
   answers: Map<string, number[]>,
   enabled = true,
+  initialVersion = 0,
   debounceMs = DEBOUNCE_MS,
   maxWaitMs = DEBOUNCE_MS
 ): SaveStatus {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+
+  // Monotonic per-save stamp for the server's draft guard. Seeded from the
+  // session's stored draft_version (0 on a fresh session) so a resumed session
+  // keeps increasing past the last persisted version instead of restarting at 1
+  // and having every save rejected as stale. Incremented at fire time, so a
+  // later-firing timer (which read a fresher-or-equal snapshot) always carries a
+  // higher version — the invariant the server relies on.
+  const versionRef = useRef(initialVersion);
 
   // Wall-clock of the last save start, used for the max-wait cap. Seeded at
   // mount so the first change waits a full debounce window, not 0.
@@ -71,9 +80,14 @@ export function useAutosave(
     const wait = Math.max(0, Math.min(debounceMs, maxWaitMs - sinceLastSave));
     const id = setTimeout(async () => {
       lastSaveRef.current = Date.now();
+      const version = ++versionRef.current;
       if (mountedRef.current) setSaveStatus('saving');
       try {
-        await saveDraft(sessionId, Object.fromEntries(answersRef.current));
+        await saveDraft(
+          sessionId,
+          Object.fromEntries(answersRef.current),
+          version
+        );
         if (mountedRef.current) setSaveStatus('saved');
       } catch {
         if (mountedRef.current) setSaveStatus('error');

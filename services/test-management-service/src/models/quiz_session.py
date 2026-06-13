@@ -45,9 +45,16 @@ class QuizSession(Base):
     current_index = Column(Integer, nullable=False, default=0)
 
     # Advisory autosave snapshot of in-progress selections (question_id -> option_ids).
-    # Last-write-wins, never scored, does not advance current_index or change status.
+    # Never scored, does not advance current_index or change status.
     # Read back on resume to rehydrate the client's answer map (W3-F4).
     draft_answers = Column(JSON, nullable=True)
+
+    # Monotonic guard for the draft write (W3-F4). The client stamps each autosave
+    # with a strictly increasing version (seeded from this value on resume); the
+    # server only overwrites draft_answers when the incoming version exceeds the
+    # stored one, so a late-arriving stale snapshot can't clobber a fresher one
+    # under out-of-order delivery. Starts at 0 (no draft saved yet).
+    draft_version = Column(Integer, nullable=False, default=0, server_default="0")
 
     status = Column(
         Enum(QuizSessionStatus), nullable=False, default=QuizSessionStatus.ACTIVE

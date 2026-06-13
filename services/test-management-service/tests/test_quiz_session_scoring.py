@@ -136,6 +136,9 @@ async def test_final_answer_submits_session(db_session):
     assert result.session_status == QuizSessionStatus.SUBMITTED
     assert result.question is None
     assert result.submitted_at is not None
+    # submitted_at is naive-UTC; it must serialize with an explicit UTC offset
+    # so the client doesn't read it as local time (shared UtcDatetime serializer).
+    assert result.model_dump(mode="json")["submitted_at"].endswith("+00:00")
     # Finalize advances current_index to total so a completed quiz reports all
     # questions consumed (not total-1).
     assert result.current_index == 1
