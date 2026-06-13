@@ -1,4 +1,6 @@
 # src/config/settings.py
+from typing import Optional
+
 from pydantic_settings import BaseSettings
 
 
@@ -20,6 +22,16 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRY_MINUTES: int = 60
+    JWT_ISSUER: str = "rev-eval-user-service"
+    JWT_AUDIENCE: str = "rev-eval-clients"
+    JWT_MIN_SECRET_LENGTH: int = 32
+    ALLOW_INSECURE_DEV_SECRETS: bool = False
+
+    # Shared secret for trusted internal service-to-service calls. The gateway
+    # strips any client-supplied X-Internal-Key, so only in-network callers
+    # (e.g. test-management resolving a user) can present it. When unset,
+    # internal bypass is disabled and all access requires a JWT.
+    INTERNAL_API_KEY: Optional[str] = None
 
     @property
     def SQLALCHEMY_DATABASE_URL(self) -> str:

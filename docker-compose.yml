@@ -138,6 +138,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_EXPIRY_MINUTES: ${JWT_EXPIRY_MINUTES:-60}
+      JWT_ISSUER: ${JWT_ISSUER:-rev-eval-user-service}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-rev-eval-clients}
+      ALLOW_INSECURE_DEV_SECRETS: ${ALLOW_INSECURE_DEV_SECRETS:-true}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-local-dev-internal-key}
       ALLOW_ORIGINS: http://localhost:3000
     # Internal microservice — published to loopback ONLY (127.0.0.1) for local
     # debugging. It trusts gateway-injected X-User-* identity headers, so it
@@ -208,6 +212,7 @@ services:
       SERVICE_HOSTNAME: test-management-service
       USER_SERVICE_URL: http://user-service:8002
       QUESTION_SERVICE_URL: http://question-management-service:8003
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-local-dev-internal-key}
       ALLOW_ORIGINS: http://localhost:3000
     # Internal microservice — loopback-only publish (see user-service note).
     ports:

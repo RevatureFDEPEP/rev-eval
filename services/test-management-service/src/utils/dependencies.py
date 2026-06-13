@@ -11,6 +11,16 @@ import httpx
 from fastapi import Depends, Header, HTTPException, status
 
 
+def internal_auth_headers() -> Dict[str, str]:
+    """Headers identifying this service as a trusted internal caller.
+
+    Presents X-Internal-Key so user-service's admin-guarded read endpoints
+    accept the server-to-server call. Empty when no key is configured.
+    """
+    key = os.getenv("INTERNAL_API_KEY")
+    return {"X-Internal-Key": key} if key else {}
+
+
 async def get_current_user_from_headers(
     x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
     x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
@@ -37,7 +47,7 @@ async def get_current_user_from_headers(
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(endpoint)
+            response = await client.get(endpoint, headers=internal_auth_headers())
     except httpx.RequestError as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

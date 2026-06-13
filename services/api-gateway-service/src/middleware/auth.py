@@ -75,16 +75,19 @@ async def verify_jwt_token(authorization: Optional[str] = Header(None)) -> Dict[
 
 
 def strip_client_identity_headers(headers: dict) -> dict:
-    """Drop any client-supplied X-User-* headers.
+    """Drop any client-supplied identity / internal-trust headers.
 
-    Downstream services trust X-User-* as gateway-verified identity. A client
-    must never be able to set them directly, so we remove every casing of them
-    before the gateway injects the values derived from the verified JWT.
+    Downstream services trust X-User-* as gateway-verified identity and
+    X-Internal-Key as proof of a trusted in-network caller. A client must never
+    be able to set either directly, so we remove every casing of them before the
+    gateway injects the values derived from the verified JWT. The internal key
+    is only ever presented on direct service-to-service calls that never
+    traverse the gateway.
     """
     return {
         k: v
         for k, v in headers.items()
-        if not k.lower().startswith("x-user-")
+        if not k.lower().startswith("x-user-") and k.lower() != "x-internal-key"
     }
 
 

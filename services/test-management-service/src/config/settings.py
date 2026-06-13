@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     USER_SERVICE_URL: str = "http://localhost:8003"
     QUESTION_SERVICE_URL: str = "http://question-management-service:8003"
 
+    # Shared secret presented to user-service on internal calls so they pass
+    # its admin-guarded read endpoints without a user JWT. Must match
+    # user-service's INTERNAL_API_KEY.
+    INTERNAL_API_KEY: Optional[str] = None
+
     @property
     def SQLALCHEMY_DATABASE_URL(self) -> str:
         return (
