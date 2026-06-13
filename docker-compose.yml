@@ -266,6 +266,9 @@ services:
       PORT: 8000
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_ISSUER: ${JWT_ISSUER:-rev-eval-user-service}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-rev-eval-clients}
+      ALLOW_INSECURE_DEV_SECRETS: ${ALLOW_INSECURE_DEV_SECRETS:-true}
       ALLOW_ORIGINS: http://localhost:3000
     ports:
       - "8000:8000"

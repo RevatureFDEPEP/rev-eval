@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, Response
 from src.logging_config import configure_json_logging, install_request_logging
 from src.middleware.auth import (
     add_user_context_headers,
+    validate_jwt_secret,
     verify_jwt_token,
 )
 
@@ -90,7 +91,9 @@ def get_service_url(service_name: str) -> str:
 # ===== STARTUP/SHUTDOWN =====
 @app.on_event("startup")
 def on_startup():
-    """Log startup information"""
+    """Validate secrets and log startup information"""
+    # Fail fast on unsafe JWT secrets before accepting any traffic.
+    validate_jwt_secret()
     service_name = getenv('SERVICE_NAME', 'api-gateway')
     service_port = int(getenv('PORT', '8000'))
     logger.info(f"✅ {service_name} starting on port {service_port}")

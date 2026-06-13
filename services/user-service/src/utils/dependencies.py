@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from src.config.settings import settings
 from src.db.session import get_db
 from src.models.user import User, UserRole
-from src.services.auth_service import AuthService
+from src.services.auth_service import KNOWN_ROLES, AuthService
 
 bearer_scheme = HTTPBearer(auto_error=True)
 # auto_error=False so internal-key callers without a Bearer token are allowed
@@ -58,6 +58,13 @@ def _resolve_user_from_credentials(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token missing subject",
+        )
+
+    role = (payload.get("role") or "").upper()
+    if role not in KNOWN_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token missing or has an unknown role claim",
         )
 
     user = AuthService.get_user_by_id(db, int(sub))

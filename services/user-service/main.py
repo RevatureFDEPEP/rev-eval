@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import settings
 from src.db.session import init_db
 from src.logging_config import configure_json_logging, install_request_logging
+from src.services.auth_service import validate_jwt_secret
 from src.v1.routes.auth_route import router as auth_router
 from src.v1.routes.user_route import router as user_router
 
@@ -40,9 +41,15 @@ app.include_router(user_router, prefix="/v1/api")
 def health_check():
     return {"status": "ok"}
 
-# ---- DB Init ----
+# ---- Startup ----
 @app.on_event("startup")
 def on_startup():
+    # Fail fast on unsafe JWT secrets before serving any auth traffic.
+    validate_jwt_secret(
+        settings.JWT_SECRET,
+        min_length=settings.JWT_MIN_SECRET_LENGTH,
+        allow_insecure=settings.ALLOW_INSECURE_DEV_SECRETS,
+    )
     init_db()
 
 # ---- Run server ----
