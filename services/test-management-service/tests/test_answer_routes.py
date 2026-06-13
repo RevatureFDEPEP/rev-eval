@@ -24,12 +24,14 @@ from src.utils.dependencies import get_current_user_from_headers
 from src.v1.routes.session_route import router as session_router
 
 # Question bank the fake question-management-service serves, keyed by _id.
+# question_text is present so the server can sanitize a fetched body into the
+# candidate-facing next_question (SanitizedQuestion requires it).
 _QUESTIONS = {
-    "q-mcq": {"_id": "q-mcq", "type": "mcq", "correct_answers": [2]},
-    "q-multi": {"_id": "q-multi", "type": "multi", "correct_answers": [1, 2, 3]},
-    "q-tf": {"_id": "q-tf", "type": "true_false", "correct_answers": [True]},
+    "q-mcq": {"_id": "q-mcq", "type": "mcq", "question_text": "2+2?", "correct_answers": [2]},
+    "q-multi": {"_id": "q-multi", "type": "multi", "question_text": "pick", "correct_answers": [1, 2, 3]},
+    "q-tf": {"_id": "q-tf", "type": "true_false", "question_text": "sky blue?", "correct_answers": [True]},
     # Not auto-scorable — graded against a sample answer, no key.
-    "q-text": {"_id": "q-text", "type": "text", "sample_answer": "anything"},
+    "q-text": {"_id": "q-text", "type": "text", "question_text": "essay", "sample_answer": "anything"},
 }
 
 _USER_ID = 42
@@ -140,18 +142,23 @@ async def test_correct_answer_advances_index(session_factory):
         )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["is_correct"] is True
-    assert body["score"] == 1.0
+    # Response is score-free; forward motion via next_question.
+    assert "is_correct" not in body and "score" not in body
+    assert body["question_id"] == "q-mcq"
     assert body["current_index"] == 1
+    assert body["total_questions"] == 2
     assert body["status"] == "ACTIVE"
-    assert body["finished"] is False
+    assert body["next_question"]["id"] == "q-tf"
+    assert "correct_answers" not in body["next_question"]
 
-    # One answer row recorded with the answered question's index.
+    # Scoring still happens server-side and is persisted (just not returned).
     async with session_factory() as session:
         rows = (await session.execute(select(QuizAnswer))).scalars().all()
         assert len(rows) == 1
         assert rows[0].question_id == "q-mcq"
         assert rows[0].question_index == 0
+        assert rows[0].is_correct is True
+        assert rows[0].score == 1.0
 
 
 @pytest.mark.asyncio
@@ -161,10 +168,13 @@ async def test_partial_credit_multi_scores_jaccard(session_factory):
         resp = await client.post(
             f"/v1/api/sessions/{sid}/answer", json={"submitted_answers": [1, 2]}
         )
-    body = resp.json()
-    assert body["is_correct"] is False
-    assert body["score"] == pytest.approx(2 / 3)
-    assert body["algorithm"] == "partial_credit"
+    assert resp.status_code == 200
+    # Score isn't disclosed in the response; assert it on the persisted row.
+    async with session_factory() as session:
+        row = (await session.execute(select(QuizAnswer))).scalars().first()
+        assert row.is_correct is False
+        assert row.score == pytest.approx(2 / 3)
+        assert row.algorithm == "partial_credit"
 
 
 @pytest.mark.asyncio
@@ -175,9 +185,10 @@ async def test_final_question_finalizes_session(session_factory):
             f"/v1/api/sessions/{sid}/answer", json={"submitted_answers": [2]}
         )
     body = resp.json()
-    assert body["finished"] is True
     assert body["status"] == "SUBMITTED"
     assert body["current_index"] == 1
+    assert body["next_question"] is None  # nothing left to reveal
+    assert body["submitted_at"] is not None
 
     async with session_factory() as session:
         row = (await session.execute(
@@ -282,11 +293,39 @@ async def test_text_question_scores_zero_and_advances_not_500(session_factory):
         )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["is_correct"] is False
-    assert body["score"] == 0.0
-    assert body["algorithm"] == "manual_grading_required"
     assert body["current_index"] == 1  # advanced — not stuck on the text question
     assert body["status"] == "ACTIVE"
+    assert body["next_question"]["id"] == "q-tf"
+    # Manual-grading fallback is recorded server-side, not surfaced.
+    async with session_factory() as session:
+        row = (await session.execute(select(QuizAnswer))).scalars().first()
+        assert row.is_correct is False
+        assert row.score == 0.0
+        assert row.algorithm == "manual_grading_required"
+
+
+@pytest.mark.asyncio
+async def test_unreachable_next_question_does_not_block_current_answer(session_factory):
+    """A next question deleted mid-exam (or a transient question-mgmt failure)
+    must NOT abort the already-scored current answer: the answer commits and the
+    index advances; next_question just comes back null (no wedge)."""
+    # "q-gone" is not in the fake bank → _fetch_question 502s → best-effort null.
+    sid = await _seed_session(session_factory, question_ids=["q-mcq", "q-gone"])
+    async with _build_client(session_factory) as client:
+        resp = await client.post(
+            f"/v1/api/sessions/{sid}/answer", json={"submitted_answers": [2]}
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["current_index"] == 1       # advanced — not wedged
+    assert body["status"] == "ACTIVE"
+    assert body["next_question"] is None     # couldn't fetch, surfaced as null
+
+    # The valid answer was still persisted.
+    async with session_factory() as session:
+        rows = (await session.execute(select(QuizAnswer))).scalars().all()
+        assert len(rows) == 1
+        assert rows[0].question_id == "q-mcq"
 
 
 @pytest.mark.asyncio
@@ -314,7 +353,7 @@ async def test_idempotency_key_is_scoped_per_session(session_factory):
     assert a.status_code == 200 and b.status_code == 200
     # Session B was scored independently, NOT replayed from A.
     assert b.json()["status"] == "SUBMITTED"  # q-tf was B's only question
-    assert b.json()["finished"] is True
+    assert b.json()["next_question"] is None
 
     async with session_factory() as session:
         rows = (await session.execute(select(QuizAnswer))).scalars().all()

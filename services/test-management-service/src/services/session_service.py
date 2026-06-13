@@ -14,7 +14,7 @@ from src.repositories.answer_repository import AnswerRepository
 from src.repositories.session_repository import SessionRepository
 from src.repositories.test_repository import TestRepository
 from src.schemas.answer_schema import AnswerCreate, AnswerResponse
-from src.schemas.session_schema import SessionResponse
+from src.schemas.session_schema import SanitizedQuestion, SessionResponse
 from src.scoring import partial_credit
 from src.scoring.result import ScoreResult
 from src.utils.http_client import get_http_client
@@ -50,11 +50,19 @@ class SessionService:
         questions = await SessionService._fetch_sample(limit, correlation_id)
 
         # question-management-service serializes by alias, so the id arrives as
-        # "_id" (Mongo ObjectId string); fall back to "id" for resilience.
-        question_ids = [
-            qid for q in questions if (qid := q.get("_id") or q.get("id"))
-        ]
-        first_question = questions[0] if questions else None
+        # "_id" (Mongo ObjectId string); fall back to "id" for resilience. Keep
+        # only questions with a usable id and derive BOTH question_ids and the
+        # displayed first question from that same filtered list, so the body the
+        # client sees always matches question_ids[0] — the question the server
+        # will score at current_index 0.
+        sampled = [q for q in questions if q.get("_id") or q.get("id")]
+        question_ids = [q.get("_id") or q.get("id") for q in sampled]
+        # Sequential reveal: only the current (first) question body leaves the
+        # service now; the rest are delivered one at a time by the answer
+        # endpoint. /sample already strips the answer key (QuestionPublic).
+        first_question = (
+            SessionService._sanitize_question(sampled[0]) if sampled else None
+        )
 
         server_now = datetime.utcnow()
         duration = test.duration or _DEFAULT_DURATION
@@ -80,8 +88,45 @@ class SessionService:
             session_token=saved.session_token,
             server_now=saved.server_now,
             expires_at=saved.expires_at,
-            first_question=first_question,
+            current_index=saved.current_index,
+            total_questions=len(question_ids),
+            question=first_question,
+            draft_answers=None,
         )
+
+    @staticmethod
+    def _sanitize_question(q: dict) -> SanitizedQuestion:
+        """Project a question body (from ``/sample`` or ``/questions/{id}``) onto
+        the candidate-safe shape. Copies only display fields, so answer fields
+        (``correct_answers``/``sample_answer``/``answer_explanation``) can never
+        reach the client even when the source dict carries them."""
+        return SanitizedQuestion(
+            id=q.get("_id") or q.get("id"),
+            type=q.get("type"),
+            question_text=q.get("question_text"),
+            options=q.get("options"),
+            difficulty=q.get("difficulty"),
+        )
+
+    @staticmethod
+    async def _next_question(
+        question_ids: list, index: int, correlation_id: str | None
+    ) -> SanitizedQuestion | None:
+        """Best-effort fetch + sanitize of the question at ``index`` for the
+        sequential-reveal response. Returns ``None`` when there is no further
+        question or when its body can't be fetched — it NEVER raises. A question
+        deleted mid-exam (or a transient question-management-service failure)
+        must not abort an already-recorded answer and wedge the session on a
+        question the candidate already answered. The body is a convenience that
+        is re-derivable on the next call, so it is deliberately not persisted in
+        the idempotency payload (attached live on every response/replay)."""
+        if index >= len(question_ids):
+            return None
+        try:
+            raw = await SessionService._fetch_question(question_ids[index], correlation_id)
+        except HTTPException:
+            return None
+        return SessionService._sanitize_question(raw)
 
     @staticmethod
     async def _fetch_sample(limit: int, correlation_id: str | None) -> list[dict]:
@@ -155,8 +200,16 @@ class SessionService:
             )
             if prior is not None:
                 payload = prior.response_payload
+                # Capture before rollback — it expires loaded ORM instances.
+                qids = session.question_ids or []
                 await db.rollback()
-                return AnswerResponse(**payload)
+                resp = AnswerResponse(**payload)
+                # next_question isn't persisted; re-derive it live (best-effort)
+                # at the stored frontier so replays match the original response.
+                resp.next_question = await SessionService._next_question(
+                    qids, resp.current_index, correlation_id
+                )
+                return resp
 
         now = datetime.utcnow()
 
@@ -218,13 +271,18 @@ class SessionService:
             session.status = SessionStatus.SUBMITTED
             session.submitted_at = now
 
+        # Score-free response: is_correct/score are persisted below but never
+        # returned, so correctness stays hidden from the candidate mid-exam.
+        # next_question is left None here and attached AFTER commit (best-effort,
+        # outside the row lock) — see below. It is intentionally not part of the
+        # persisted payload.
         response = AnswerResponse(
-            is_correct=result.is_correct,
-            score=result.score,
-            algorithm=result.algorithm,
+            question_id=current_qid,
             current_index=new_index,
+            total_questions=len(question_ids),
             status=session.status,
-            finished=finished,
+            submitted_at=session.submitted_at if finished else None,
+            next_question=None,
         )
 
         AnswerRepository.add(
@@ -253,8 +311,19 @@ class SessionService:
                     db, session_id, idempotency_key
                 )
                 if prior is not None:
-                    return AnswerResponse(**prior.response_payload)
+                    resp = AnswerResponse(**prior.response_payload)
+                    resp.next_question = await SessionService._next_question(
+                        question_ids, resp.current_index, correlation_id
+                    )
+                    return resp
             raise
+
+        # Answer is durable and the row lock is released; reveal the next
+        # question best-effort. A fetch failure here leaves a consistent,
+        # non-wedged session — the client just gets next_question=None.
+        response.next_question = await SessionService._next_question(
+            question_ids, new_index, correlation_id
+        )
         return response
 
     @staticmethod
