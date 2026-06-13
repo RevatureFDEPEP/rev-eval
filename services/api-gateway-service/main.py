@@ -12,7 +12,6 @@ from fastapi.responses import JSONResponse, Response
 from src.logging_config import configure_json_logging, install_request_logging
 from src.middleware.auth import (
     add_user_context_headers,
-    strip_client_identity_headers,
     verify_jwt_token,
 )
 
@@ -258,67 +257,11 @@ async def smart_gateway(
             detail=f"Gateway error: {str(e)}"
         )
 
-# ===== LEGACY ROUTE (WITH SERVICE NAME) =====
-@app.api_route("/{service_name}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
-async def legacy_gateway(service_name: str, path: str, request: Request):
-    """
-    Legacy routing with service name in URL.
-    Example: GET /test-management-service/v1/api/tests
-    """
-    logger.info("=" * 80)
-    logger.info(f"🔍 Legacy route: {request.method} /{service_name}/{path}")
-    logger.info("=" * 80)
-
-    try:
-        service_base_url = get_service_url(service_name)
-        target_url = f"{service_base_url}/{path}"
-
-        if request.url.query:
-            target_url = f"{target_url}?{request.url.query}"
-
-        logger.info(f"📤 Forwarding: {request.method} -> {target_url}")
-
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            method = request.method
-            body = await request.body()
-            headers = dict(request.headers)
-
-            headers.pop('host', None)
-            headers.pop('content-length', None)
-            headers.pop('x-forwarded-proto', None)
-            headers.pop('x-forwarded-scheme', None)
-
-            # This route performs no JWT verification, so a client must not be
-            # able to smuggle gateway-trusted identity headers through it.
-            headers = strip_client_identity_headers(headers)
-
-            resp = await client.request(
-                method,
-                target_url,
-                content=body if body else None,
-                headers=headers,
-                timeout=30.0
-            )
-
-        logger.info("Legacy response", extra={"status_code": resp.status_code})
-
-        if resp.headers.get("content-type", "").startswith("application/json"):
-            return JSONResponse(content=resp.json(), status_code=resp.status_code)
-        else:
-            return Response(
-                content=resp.content,
-                status_code=resp.status_code,
-                media_type=resp.headers.get("content-type")
-            )
-
-    except HTTPException:
-        raise
-    except httpx.ConnectError as e:
-        logger.exception("Legacy connection error")
-        raise HTTPException(status_code=503, detail=f"Cannot connect to service: {str(e)}")
-    except Exception as e:
-        logger.exception("Legacy gateway error")
-        raise HTTPException(status_code=500, detail=f"Gateway error: {str(e)}")
+# The legacy `/{service_name}/{path}` route was removed: it performed no JWT
+# verification and let callers reach downstream services by name, enabling
+# unauthenticated user enumeration. All traffic now goes through the
+# JWT-authenticated smart_gateway above; a `/{service}/...` request falls
+# through to it and is rejected with 401 when unauthenticated.
 
 if __name__ == "__main__":
     port = int(getenv("PORT", "8000"))

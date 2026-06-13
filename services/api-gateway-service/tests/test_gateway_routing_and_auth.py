@@ -192,3 +192,48 @@ def test_routes_endpoint_lists_configured_patterns(client):
 
     assert response.status_code == 200
     assert any(route["service"] == "user-service" for route in response.json()["routes"])
+
+
+def test_legacy_service_name_route_requires_auth(client):
+    """The removed legacy route now falls through to the JWT-guarded smart
+    route, so an unauthenticated /{service}/... request is rejected."""
+    response = client.get("/user-service/v1/api/users/")
+
+    assert response.status_code == 401
+    # Request must never reach a downstream service.
+    assert FakeAsyncClient.requests == []
+
+
+def test_spoofed_user_role_is_replaced_with_verified_claim(client):
+    response = client.get(
+        "/v1/api/tests",
+        headers={
+            **bearer({"sub": "99", "email": "p@example.com", "role": "PARTICIPANT"}),
+            "X-User-Role": "ADMIN",
+            "X-User-Id": "1",
+        },
+    )
+
+    assert response.status_code == 200
+    _, _, kwargs = FakeAsyncClient.requests[0]
+    forwarded = kwargs["headers"]
+    # Forwarded identity comes from the verified token, not the spoofed header.
+    assert forwarded["X-User-Role"] == "PARTICIPANT"
+    assert forwarded["X-User-Id"] == "99"
+    # No lowercase spoofed copy survives.
+    assert "x-user-role" not in forwarded
+
+
+def test_spoofed_internal_key_is_stripped(client):
+    response = client.get(
+        "/v1/api/tests",
+        headers={
+            **bearer({"sub": "99", "email": "p@example.com", "role": "TRAINER"}),
+            "X-Internal-Key": "attacker-supplied",
+        },
+    )
+
+    assert response.status_code == 200
+    _, _, kwargs = FakeAsyncClient.requests[0]
+    forwarded = {k.lower(): v for k, v in kwargs["headers"].items()}
+    assert "x-internal-key" not in forwarded
