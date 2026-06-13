@@ -16,12 +16,14 @@ interface SingleSelectQuestionProps {
   question: ParticipantQuestion;
   selected: number[]; // zero or one option_id
   onChange: (optionIds: number[]) => void;
+  disabled?: boolean; // locked (submitting/submitted) or reviewing an answered question
 }
 
 export function SingleSelectQuestion({
   question,
   selected,
   onChange,
+  disabled = false,
 }: SingleSelectQuestionProps) {
   if (!question.options || question.options.length === 0) {
     return <div className="text-sm text-red-600">Error: No options available</div>;
@@ -39,6 +41,7 @@ export function SingleSelectQuestion({
           onChange([parsed]);
         }
       }}
+      disabled={disabled}
       className="space-y-3"
     >
       {question.options.map((option) => (

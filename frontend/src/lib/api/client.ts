@@ -87,6 +87,23 @@ async function fetchApi(
   }
 }
 
+/** Shared body-carrying request (POST/PUT/PATCH) — one place to evolve body
+ *  serialization, headers, and response parsing. */
+async function bodyRequest<T>(
+  method: 'POST' | 'PUT' | 'PATCH',
+  endpoint: string,
+  data?: unknown,
+  init?: { headers?: Record<string, string> }
+): Promise<T> {
+  const response = await fetchApi(endpoint, {
+    method,
+    body: data ? JSON.stringify(data) : undefined,
+    headers: init?.headers,
+  });
+
+  return response.json();
+}
+
 /**
  * Generic API client methods
  *
@@ -106,27 +123,32 @@ export const api = {
   },
 
   /**
-   * POST request
+   * POST request. `headers` allows per-call extras (e.g. an Idempotency-Key).
    */
-  async post<T>(endpoint: string, data?: unknown): Promise<T> {
-    const response = await fetchApi(endpoint, {
-      method: 'POST',
-      body: data ? JSON.stringify(data) : undefined,
-    });
+  post<T>(
+    endpoint: string,
+    data?: unknown,
+    init?: { headers?: Record<string, string> }
+  ): Promise<T> {
+    return bodyRequest<T>('POST', endpoint, data, init);
+  },
 
-    return response.json();
+  /**
+   * PATCH request.
+   */
+  patch<T>(
+    endpoint: string,
+    data?: unknown,
+    init?: { headers?: Record<string, string> }
+  ): Promise<T> {
+    return bodyRequest<T>('PATCH', endpoint, data, init);
   },
 
   /**
    * PUT request
    */
-  async put<T>(endpoint: string, data: unknown): Promise<T> {
-    const response = await fetchApi(endpoint, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-
-    return response.json();
+  put<T>(endpoint: string, data: unknown): Promise<T> {
+    return bodyRequest<T>('PUT', endpoint, data);
   },
 
   /**

@@ -44,6 +44,11 @@ class QuizSession(Base):
     question_ids = Column(JSON, nullable=False)
     current_index = Column(Integer, nullable=False, default=0)
 
+    # Advisory autosave snapshot of in-progress selections (question_id -> option_ids).
+    # Last-write-wins, never scored, does not advance current_index or change status.
+    # Read back on resume to rehydrate the client's answer map (W3-F4).
+    draft_answers = Column(JSON, nullable=True)
+
     status = Column(
         Enum(QuizSessionStatus), nullable=False, default=QuizSessionStatus.ACTIVE
     )

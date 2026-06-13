@@ -16,12 +16,14 @@ interface MultiSelectQuestionProps {
   question: ParticipantQuestion;
   selected: number[]; // option_ids
   onChange: (optionIds: number[]) => void;
+  disabled?: boolean; // locked (submitting/submitted) or reviewing an answered question
 }
 
 export function MultiSelectQuestion({
   question,
   selected,
   onChange,
+  disabled = false,
 }: MultiSelectQuestionProps) {
   if (!question.options || question.options.length === 0) {
     return <div className="text-sm text-red-600">Error: No options available</div>;
@@ -52,6 +54,7 @@ export function MultiSelectQuestion({
               id={`option-${option.option_id}`}
               checked={isChecked}
               onCheckedChange={() => toggleOption(option.option_id)}
+              disabled={disabled}
               className="size-5 border-2"
             />
             <Label
