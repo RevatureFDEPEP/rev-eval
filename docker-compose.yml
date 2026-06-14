@@ -208,6 +208,9 @@ services:
       SERVICE_HOSTNAME: test-management-service
       USER_SERVICE_URL: http://user-service:8002
       QUESTION_SERVICE_URL: http://question-management-service:8003
+      # Optional interview integration; unset by default (no interview service
+      # in this compose). Review flows degrade gracefully when empty.
+      INTERVIEW_SERVICE_URL: ${INTERVIEW_SERVICE_URL:-}
       ALLOW_ORIGINS: http://localhost:3000
     # Internal microservice — loopback-only publish (see user-service note).
     ports:

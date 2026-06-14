@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class SubmissionStatus(str, Enum):
@@ -40,9 +40,10 @@ class TestSubmissionUpdate(BaseModel):
     status: Optional[SubmissionStatus] = None
     started_at: Optional[datetime] = None
     submitted_at: Optional[datetime] = None
-    ai_score: Optional[int] = None
-    trainer_score: Optional[int] = None
-    final_score: Optional[int] = None
+    # Float scores: preserve fractional partial-credit / percentage values.
+    ai_score: Optional[float] = None
+    trainer_score: Optional[float] = None
+    final_score: Optional[float] = None
     feedback: Optional[str] = None
 
     @field_validator('due_date', mode='before')
@@ -86,9 +87,9 @@ class TestSubmissionOut(TestSubmissionBase):
     started_at: Optional[datetime] = None
     submitted_at: Optional[datetime] = None
     status: SubmissionStatus
-    ai_score: Optional[int] = None
-    trainer_score: Optional[int] = None
-    final_score: Optional[int] = None
+    ai_score: Optional[float] = None
+    trainer_score: Optional[float] = None
+    final_score: Optional[float] = None
     feedback: Optional[str] = None
     reviewed_at: Optional[datetime] = None  # When trainer reviewed
     reviewed_by_id: Optional[int] = None  # Trainer user ID who reviewed
@@ -129,7 +130,8 @@ class BulkAssignResult(BaseModel):
 
 class TrainerReviewRequest(BaseModel):
     """Trainer's review submission"""
-    trainer_score: int  # Required: trainer's final score (0-100)
+    # Float to match fractional scoring; still bounded to 0..100.
+    trainer_score: float = Field(..., ge=0, le=100)  # Required: trainer's final score
     feedback: Optional[str] = None  # Optional feedback from trainer (deprecated, use trainer_evaluation)
     trainer_evaluation: Optional[dict] = None  # Comprehensive trainer evaluation structure
 
@@ -140,9 +142,9 @@ class TrainerReviewRequest(BaseModel):
 class TrainerReviewResponse(BaseModel):
     """Response after trainer review"""
     submission_id: int
-    trainer_score: int
-    final_score: int
-    ai_score: Optional[int] = None
+    trainer_score: float
+    final_score: float
+    ai_score: Optional[float] = None
     feedback: Optional[str] = None
     reviewed_at: datetime
     reviewed_by_id: int
