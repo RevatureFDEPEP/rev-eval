@@ -75,6 +75,7 @@ export interface Question {
   difficulty?: QuestionDifficulty;
   skills: string[];
   tags: string[];
+  image_key?: string;
   created_at: string;
   updated_at: string;
 }
@@ -89,6 +90,7 @@ export interface QuestionCreate {
   difficulty?: QuestionDifficulty;
   skills: string[];
   tags: string[];
+  image_key?: string;
 }
 
 export type QuestionUpdate = Partial<QuestionCreate>;

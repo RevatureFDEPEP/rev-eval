@@ -1,7 +1,11 @@
+import uuid
+
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import ValidationError
+from src.config.settings import settings
 from src.schemas.question import QuestionCreate, QuestionResponse, QuestionUpdate
 from src.services.question_service import QuestionService
+from src.utils.s3_client import ensure_bucket, generate_presigned_put_url
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
 
@@ -62,6 +66,53 @@ async def get_all_questions():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while fetching questions: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/presigned-upload-url",
+    response_model=dict,
+    summary="Get a pre-signed URL for direct image upload",
+    description="""
+    Generate a pre-signed PUT URL so the browser can upload an image directly to
+    MinIO without routing the bytes through this service.
+
+    **Supported extensions:** `.png`, `.jpg`, `.jpeg`
+
+    **Returns:**
+    - `url` – pre-signed PUT URL (valid for 1 hour); already rewritten to the
+      public-facing MinIO address so the browser can reach it
+    - `key` – object key to persist on the question document
+    - `content_type` – MIME type that the browser must send as `Content-Type`
+      in its PUT request (required for signature validation)
+    """,
+)
+async def get_presigned_upload_url(
+    filename: str = Query(..., description="Original filename including extension (e.g. diagram.png)"),
+):
+    """Generate a presigned PUT URL for direct browser-to-MinIO image upload."""
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext not in {"png", "jpg", "jpeg"}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Only .png and .jpg / .jpeg files are allowed",
+        )
+
+    content_type = "image/png" if ext == "png" else "image/jpeg"
+    key = f"questions/{uuid.uuid4()}/{filename}"
+
+    try:
+        ensure_bucket()
+        url = generate_presigned_put_url(key=key, content_type=content_type)
+        # Rewrite the internal Docker hostname to the public-facing URL so the
+        # browser can reach MinIO directly (e.g. minio:9000 → localhost:9000).
+        if settings.S3_PUBLIC_ENDPOINT_URL and settings.S3_PUBLIC_ENDPOINT_URL != settings.S3_ENDPOINT_URL:
+            url = url.replace(settings.S3_ENDPOINT_URL, settings.S3_PUBLIC_ENDPOINT_URL, 1)
+        return {"url": url, "key": key, "content_type": content_type}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate presigned URL: {str(e)}",
         ) from e
 
 

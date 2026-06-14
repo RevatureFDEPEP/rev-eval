@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { ArrowLeft, Check, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, ImagePlus, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -37,12 +37,23 @@ import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   createQuestion,
+  getPresignedUploadUrl,
   QuestionCreate,
   QuestionType,
   getSkills,
   SkillInfo,
 } from "@/lib/api";
 import { toast } from "sonner";
+
+// Zod schema for validating a question image file before upload
+const imageFileSchema = z
+  .instanceof(File)
+  .refine((f) => ["image/png", "image/jpeg"].includes(f.type), {
+    message: "Only .png and .jpg files are allowed",
+  })
+  .refine((f) => f.size <= 5 * 1024 * 1024, {
+    message: "File must be 5 MB or less",
+  });
 
 // Base fields common to all question types
 const baseSchema = {
@@ -108,6 +119,13 @@ export default function CreateQuestionPage() {
   const [error, setError] = useState<string | null>(null);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
+
+  // Image upload state
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageKey, setImageKey] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const questionType = (searchParams.get("type") as QuestionType) || "mcq";
 
@@ -206,6 +224,53 @@ const questionSchema = z.discriminatedUnion("questionType", [
     loadSkills();
   }, []);
 
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset previous upload state
+    setImageFile(null);
+    setImageKey(null);
+    setImageError(null);
+
+    // Validate with Zod
+    const result = imageFileSchema.safeParse(file);
+    if (!result.success) {
+      setImageError(result.error.errors[0].message);
+      // Clear the input so the user can re-select the same file if they fix the issue
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setImageFile(file);
+    setUploadingImage(true);
+    try {
+      const { url, key, content_type } = await getPresignedUploadUrl(file.name);
+      const response = await fetch(url, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": content_type },
+      });
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+      }
+      setImageKey(key);
+    } catch (err) {
+      setImageError(err instanceof Error ? err.message : "Failed to upload image. Please try again.");
+      setImageFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImageKey(null);
+    setImageError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const transformFormData = (values: QuestionFormValues): QuestionCreate => {
     // For MCQ type, determine if it's actually MCQ (single answer) or MULTI (multiple answers)
     let actualType: QuestionType = questionType;
@@ -250,6 +315,7 @@ const questionSchema = z.discriminatedUnion("questionType", [
       correct_answers,
       sample_answer: questionType === "text" ? (values as TextFormValues).sample_answer || undefined : undefined,
       answer_explanation: values.answer_explanation || undefined,
+      image_key: imageKey || undefined,
     };
   };
 
@@ -504,6 +570,56 @@ const questionSchema = z.discriminatedUnion("questionType", [
               </CardContent>
             </Card>
           )}
+
+          {/* Question Image */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Question Image (Optional)</CardTitle>
+              <CardDescription>
+                Upload an image for this question. Accepted formats: .png, .jpg — max 5 MB.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {imageKey ? (
+                <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-4">
+                  <ImagePlus className="size-5 shrink-0 text-green-600" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-green-800">{imageFile?.name}</p>
+                    <p className="text-xs text-green-600">Uploaded successfully</p>
+                  </div>
+                  <Button type="button" variant="ghost" size="icon" onClick={removeImage}>
+                    <X className="size-4 text-slate-500" />
+                  </Button>
+                </div>
+              ) : uploadingImage ? (
+                <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="size-5 animate-spin rounded-full border-b-2 border-slate-600" />
+                  <p className="text-sm text-slate-600">Uploading {imageFile?.name}…</p>
+                </div>
+              ) : (
+                <label
+                  htmlFor="question-image"
+                  className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 p-8 text-center transition hover:border-orange-400 hover:bg-orange-50/30"
+                >
+                  <ImagePlus className="size-8 text-slate-400" />
+                  <span className="text-sm font-medium text-slate-600">Click to select an image</span>
+                  <span className="text-xs text-slate-400">.png or .jpg · max 5 MB</span>
+                </label>
+              )}
+              <input
+                id="question-image"
+                ref={fileInputRef}
+                type="file"
+                accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+                className="sr-only"
+                onChange={handleFileChange}
+                disabled={uploadingImage}
+              />
+              {imageError && (
+                <p className="text-sm font-medium text-destructive">{imageError}</p>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Answer Explanation */}
           <Card>
