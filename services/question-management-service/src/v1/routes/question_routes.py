@@ -105,37 +105,6 @@ async def get_all_questions(
         )
 
 
-@router.get(
-    "/{id}",
-    response_model=None,
-    summary="Get question by ID",
-    description=(
-        "Retrieve a specific question by its MongoDB _id. Answer keys are "
-        "included only for trainer/admin callers."
-    ),
-)
-async def get_question_by_id(
-    id: str,
-    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
-):
-    """Retrieve a specific question by ID (answer keys role-gated)."""
-    try:
-        question = await QuestionService.get_question_by_id(id)
-        if not question:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Question with ID '{id}' not found"
-            )
-        return _serialize(question, _is_privileged(x_user_role))
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred while fetching the question: {str(e)}"
-        )
-
-
 @router.put(
     "/{id}",
     response_model=dict,
@@ -377,4 +346,39 @@ async def filter_questions(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred: {str(e)}"
+        )
+
+
+# NOTE: the dynamic `/{id}` GET route is registered LAST, after every static
+# GET route (/filter, /by-tags, /by-type, /by-skill, /by-difficulty). FastAPI
+# matches in registration order, so declaring it earlier would shadow those
+# static paths (e.g. /questions/filter would be treated as id="filter").
+@router.get(
+    "/{id}",
+    response_model=None,
+    summary="Get question by ID",
+    description=(
+        "Retrieve a specific question by its MongoDB _id. Answer keys are "
+        "included only for trainer/admin callers."
+    ),
+)
+async def get_question_by_id(
+    id: str,
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+):
+    """Retrieve a specific question by ID (answer keys role-gated)."""
+    try:
+        question = await QuestionService.get_question_by_id(id)
+        if not question:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Question with ID '{id}' not found"
+            )
+        return _serialize(question, _is_privileged(x_user_role))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while fetching the question: {str(e)}"
         )
