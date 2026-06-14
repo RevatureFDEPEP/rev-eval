@@ -123,7 +123,53 @@ export async function getSubmissionReviewDetails(submissionId: number): Promise<
     duration_seconds?: number;
     skills: Array<{ id: number; name: string; description?: string }>;
   };
-  transcript: unknown; // Full transcript from interview service
+  transcript: {
+    session_id: string;
+    submission_id: number;
+    test_name: string;
+    test_role?: string;
+    messages: Array<{ role: string; content: string; timestamp: string }>;
+    audio_urls?: Array<{ message_index: number; audio_url: string; uploaded_at: string }>;
+    message_count: number;
+    duration_seconds?: number;
+    status: string;
+    created_at: string;
+    ended_at?: string;
+    lambda_evaluation?: {
+      overall_score: number;
+      score_breakdown: {
+        technical_knowledge?: number;
+        problem_solving?: number;
+        communication?: number;
+        code_quality?: number;
+        engagement?: number;
+      };
+      skill_breakdown: Record<string, { score: number; feedback: string; proficiency_level: string }>;
+      feedback: string;
+      strengths: string[];
+      improvements: string[];
+      key_highlights: string[];
+      red_flags: string[];
+      recommendation: string;
+      reasoning: string;
+      evaluated_at?: string;
+      evaluated_by?: string;
+    };
+    trainer_evaluation?: {
+      overall_score: number;
+      score_breakdown?: {
+        technical_knowledge?: number;
+        problem_solving?: number;
+        communication?: number;
+        code_quality?: number;
+        engagement?: number;
+      };
+      skill_breakdown?: Record<string, { score: number; feedback: string; proficiency_level: string }>;
+      feedback?: string;
+      strengths?: string[];
+      improvements?: string[];
+    };
+  };
 }> {
   return api.get(`/v1/api/submissions/${submissionId}/review-details`);
 }

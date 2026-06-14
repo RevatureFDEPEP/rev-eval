@@ -1,12 +1,10 @@
-import asyncio
 import os
 
 import jwt
 import pytest
-
 from src.middleware.auth import add_user_context_headers, verify_jwt_token
 
-_SECRET = os.environ["JWT_SECRET"]
+_SECRET = os.environ.get("JWT_SECRET", "test-secret-for-gateway-tests")
 
 
 @pytest.mark.parametrize("role", ["TRAINER", "PARTICIPANT"])
@@ -20,13 +18,14 @@ def test_add_user_context_headers_injects_all_x_user_fields(role):
     assert result.get("Content-Type") == "application/json"
 
 
-def test_verify_jwt_token_returns_user_context_for_valid_token():
+@pytest.mark.asyncio
+async def test_verify_jwt_token_returns_user_context_for_valid_token():
     token = jwt.encode(
         {"sub": "42", "email": "user@example.com", "role": "TRAINER"},
         _SECRET,
         algorithm="HS256",
     )
-    ctx = asyncio.run(verify_jwt_token(f"Bearer {token}"))
+    ctx = await verify_jwt_token(f"Bearer {token}")
     assert ctx["user_id"] == "42"
     assert ctx["email"] == "user@example.com"
     assert ctx["role"] == "TRAINER"

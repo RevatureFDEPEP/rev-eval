@@ -26,9 +26,7 @@ async def get_skill(skill_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/{skill_id}/", response_model=SkillOut)
-async def update_skill(
-    skill_id: int, skill_in: SkillUpdate, db: AsyncSession = Depends(get_db)
-):
+async def update_skill(skill_id: int, skill_in: SkillUpdate, db: AsyncSession = Depends(get_db)):
     try:
         return await SkillService.update_skill(db, skill_id, skill_in)
     except ValueError:

@@ -43,9 +43,7 @@ class Option(BaseModel):
         text: Display text for the option
     """
 
-    option_id: int = Field(
-        ..., ge=1, description="Auto-generated option identifier (1-indexed)"
-    )
+    option_id: int = Field(..., ge=1, description="Auto-generated option identifier (1-indexed)")
     text: str = Field(..., min_length=1, max_length=500, description="Option text")
 
     @field_validator("text")

@@ -139,9 +139,7 @@ class TrainerReviewRequest(BaseModel):
     """Trainer's review submission"""
 
     trainer_score: int  # Required: trainer's final score (0-100)
-    feedback: str | None = (
-        None  # Optional feedback from trainer (deprecated, use trainer_evaluation)
-    )
+    feedback: str | None = None  # Optional feedback from trainer (deprecated, use trainer_evaluation)
     trainer_evaluation: dict | None = None  # Comprehensive trainer evaluation structure
 
     class Config:

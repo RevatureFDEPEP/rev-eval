@@ -138,9 +138,7 @@ class QuestionRepository:
         Returns:
             List[Question]: List of matching Question documents
         """
-        return (
-            await Question.find(Question.type == question_type).limit(limit).to_list()
-        )
+        return await Question.find(Question.type == question_type).limit(limit).to_list()
 
     @staticmethod
     async def find_by_skill(skill: str, limit: int = 100) -> list[Question]:
@@ -168,11 +166,7 @@ class QuestionRepository:
         Returns:
             List[Question]: List of matching Question documents
         """
-        return (
-            await Question.find(Question.difficulty == difficulty)
-            .limit(limit)
-            .to_list()
-        )
+        return await Question.find(Question.difficulty == difficulty).limit(limit).to_list()
 
     @staticmethod
     async def find_by_tags(tags: list[str], limit: int = 100) -> list[Question]:

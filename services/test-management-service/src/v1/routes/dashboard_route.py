@@ -91,7 +91,10 @@ def get_user_context(
 #     completed_submissions = sum(
 #         1 for s in submissions if s.status == SubmissionStatus.COMPLETED
 #     )
-#     logger.info(f"📈 Submissions - Total: {total_submissions}, Pending: {pending_submissions_count}, Completed: {completed_submissions}")
+#     logger.info(
+#         f"📈 Submissions - Total: {total_submissions}, "
+#         f"Pending: {pending_submissions_count}, Completed: {completed_submissions}"
+#     )
 
 #     # Get unique participants count (user_id instead of participant_id)
 #     unique_user_ids = set(s.user_id for s in submissions)
@@ -159,10 +162,16 @@ def get_user_context(
 #         1 for s in submissions if s.status == SubmissionStatus.IN_PROGRESS
 #     )
 
-#     logger.info(f"📈 Participant submissions - Total: {assigned_tests_count}, Completed: {completed_tests_count}, In Progress: {in_progress_tests_count}")
+#     logger.info(
+#         f"📈 Participant submissions - Total: {assigned_tests_count}, "
+#         f"Completed: {completed_tests_count}, In Progress: {in_progress_tests_count}"
+#     )
 
 #     # Calculate average score from completed tests
-#     completed_with_scores = [s for s in submissions if s.status == SubmissionStatus.COMPLETED and s.final_score is not None]
+#     completed_with_scores = [
+#         s for s in submissions
+#         if s.status == SubmissionStatus.COMPLETED and s.final_score is not None
+#     ]
 #     average_score = (
 #         sum(s.final_score for s in completed_with_scores) / len(completed_with_scores)
 #         if completed_with_scores else None

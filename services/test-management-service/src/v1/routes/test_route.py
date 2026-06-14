@@ -111,8 +111,6 @@ async def list_tests_created_by_user(user_id: int, db: AsyncSession = Depends(ge
 
 
 @router.get("/submissions-by/{user_id}/", response_model=list[TestOut])
-async def list_tests_with_submissions_by_user(
-    user_id: int, db: AsyncSession = Depends(get_db)
-):
+async def list_tests_with_submissions_by_user(user_id: int, db: AsyncSession = Depends(get_db)):
     """Get all tests that a specific user has submitted"""
     return await TestService.list_tests_with_submissions_by_user(db, user_id)

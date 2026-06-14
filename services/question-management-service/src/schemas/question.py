@@ -18,19 +18,11 @@ class QuestionCreate(BaseModel):
     """
 
     type: QuestionType
-    question_text: str = Field(
-        ..., min_length=10, max_length=2000, description="The question text"
-    )
-    options: list[OptionCreate] | None = (
-        None  # User provides text only, IDs are auto-generated
-    )
+    question_text: str = Field(..., min_length=10, max_length=2000, description="The question text")
+    options: list[OptionCreate] | None = None  # User provides text only, IDs are auto-generated
     correct_answers: list[int | bool | str] | None = None
-    sample_answer: str | None = Field(
-        None, max_length=5000, description="Sample answer for text questions"
-    )
-    answer_explanation: str | None = Field(
-        None, max_length=2000, description="Explanation for the correct answer"
-    )
+    sample_answer: str | None = Field(None, max_length=5000, description="Sample answer for text questions")
+    answer_explanation: str | None = Field(None, max_length=2000, description="Explanation for the correct answer")
     difficulty: str | None = Field(default="medium", pattern="^(easy|medium|hard)$")
     skills: list[str] = Field(default_factory=list, max_length=20)
     tags: list[str] = Field(default_factory=list, max_length=30)
@@ -74,15 +66,11 @@ class QuestionCreate(BaseModel):
 
     @field_validator("options")
     @classmethod
-    def validate_options(
-        cls, v: list[OptionCreate] | None
-    ) -> list[OptionCreate] | None:
+    def validate_options(cls, v: list[OptionCreate] | None) -> list[OptionCreate] | None:
         """Validate options list structure (option_ids are auto-generated)."""
         if v is not None:
             if len(v) < 2:
-                raise ValueError(
-                    "At least 2 options are required when options are provided"
-                )
+                raise ValueError("At least 2 options are required when options are provided")
             if len(v) > 10:
                 raise ValueError("Maximum 10 options allowed")
 
@@ -91,9 +79,7 @@ class QuestionCreate(BaseModel):
                 if not opt.text or not opt.text.strip():
                     raise ValueError(f"Option at position {idx} has empty text")
                 if len(opt.text.strip()) < 1 or len(opt.text.strip()) > 500:
-                    raise ValueError(
-                        f"Option at position {idx} text must be between 1 and 500 characters"
-                    )
+                    raise ValueError(f"Option at position {idx} text must be between 1 and 500 characters")
 
             # Check for duplicate option text (shouldn't have exact duplicates)
             option_texts = [opt.text.strip().lower() for opt in v]
@@ -120,16 +106,11 @@ class QuestionCreate(BaseModel):
                 raise ValueError("MCQ questions must have exactly one correct answer")
 
             if not isinstance(self.correct_answers[0], int):
-                raise ValueError(
-                    "MCQ correct_answers must be an integer (1-indexed position)"
-                )
+                raise ValueError("MCQ correct_answers must be an integer (1-indexed position)")
 
             # Validate correct answer is a valid position (1-indexed)
             max_option_index = len(self.options)
-            if (
-                self.correct_answers[0] < 1
-                or self.correct_answers[0] > max_option_index
-            ):
+            if self.correct_answers[0] < 1 or self.correct_answers[0] > max_option_index:
                 raise ValueError(
                     f"correct_answers must be between 1 and {max_option_index}. Got: {self.correct_answers[0]}"
                 )
@@ -140,14 +121,10 @@ class QuestionCreate(BaseModel):
                 raise ValueError("MULTI questions must have at least 2 options")
 
             if not self.correct_answers or len(self.correct_answers) == 0:
-                raise ValueError(
-                    "MULTI questions must have at least one correct answer"
-                )
+                raise ValueError("MULTI questions must have at least one correct answer")
 
             if not all(isinstance(ans, int) for ans in self.correct_answers):
-                raise ValueError(
-                    "MULTI correct_answers must be a list of integers (1-indexed positions)"
-                )
+                raise ValueError("MULTI correct_answers must be a list of integers (1-indexed positions)")
 
             # Validate all correct answers are valid positions (1-indexed)
             max_option_index = len(self.options)
@@ -163,9 +140,7 @@ class QuestionCreate(BaseModel):
 
             # At least one option should be correct, but not all
             if len(self.correct_answers) == len(self.options):
-                raise ValueError(
-                    "MULTI questions cannot have all options as correct answers"
-                )
+                raise ValueError("MULTI questions cannot have all options as correct answers")
 
         elif self.type == QuestionType.TRUE_FALSE:
             # TRUE_FALSE: Must have exactly one boolean correct answer, no options
@@ -173,14 +148,10 @@ class QuestionCreate(BaseModel):
                 raise ValueError("TRUE_FALSE questions should not have options")
 
             if not self.correct_answers:
-                raise ValueError(
-                    "TRUE_FALSE questions must have correct_answers specified"
-                )
+                raise ValueError("TRUE_FALSE questions must have correct_answers specified")
 
             if len(self.correct_answers) != 1:
-                raise ValueError(
-                    "TRUE_FALSE questions must have exactly one correct answer"
-                )
+                raise ValueError("TRUE_FALSE questions must have exactly one correct answer")
 
             if not isinstance(self.correct_answers[0], bool):
                 raise ValueError("TRUE_FALSE correct_answers must be a boolean value")
@@ -191,17 +162,13 @@ class QuestionCreate(BaseModel):
                 raise ValueError("TEXT questions should not have options")
 
             if self.correct_answers:
-                raise ValueError(
-                    "TEXT questions should not have correct_answers (use sample_answer instead)"
-                )
+                raise ValueError("TEXT questions should not have correct_answers (use sample_answer instead)")
 
             if not self.sample_answer or not self.sample_answer.strip():
                 raise ValueError("TEXT questions must have a sample_answer")
 
             if len(self.sample_answer.strip()) < 10:
-                raise ValueError(
-                    "TEXT sample_answer must be at least 10 characters long"
-                )
+                raise ValueError("TEXT sample_answer must be at least 10 characters long")
 
         return self
 
@@ -265,15 +232,11 @@ class QuestionUpdate(BaseModel):
 
     @field_validator("options")
     @classmethod
-    def validate_options(
-        cls, v: list[OptionCreate] | None
-    ) -> list[OptionCreate] | None:
+    def validate_options(cls, v: list[OptionCreate] | None) -> list[OptionCreate] | None:
         """Validate options list structure (option_ids will be auto-generated)."""
         if v is not None:
             if len(v) < 2:
-                raise ValueError(
-                    "At least 2 options are required when options are provided"
-                )
+                raise ValueError("At least 2 options are required when options are provided")
             if len(v) > 10:
                 raise ValueError("Maximum 10 options allowed")
 
@@ -282,9 +245,7 @@ class QuestionUpdate(BaseModel):
                 if not opt.text or not opt.text.strip():
                     raise ValueError(f"Option at position {idx} has empty text")
                 if len(opt.text.strip()) < 1 or len(opt.text.strip()) > 500:
-                    raise ValueError(
-                        f"Option at position {idx} text must be between 1 and 500 characters"
-                    )
+                    raise ValueError(f"Option at position {idx} text must be between 1 and 500 characters")
 
             # Check for duplicate option text
             option_texts = [opt.text.strip().lower() for opt in v]

@@ -1,6 +1,6 @@
 [tool.ruff]
 target-version = "py311"
-line-length = 88
+line-length = 120
 
 [tool.ruff.lint]
 select = [
@@ -27,3 +27,6 @@ known-first-party = [
     "v1",
     "utils",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"seed_*.py" = ["E501"]

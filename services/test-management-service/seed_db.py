@@ -564,32 +564,20 @@ def main():
         seed_test_submissions(conn)
 
         # Print summary
+        def _count(cursor, query: str) -> int:
+            cursor.execute(query)
+            row = cursor.fetchone()
+            return row[0] if row is not None else 0
+
         cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM users WHERE role = 'TRAINER';")
-        trainer_count = cur.fetchone()[0]
-
-        cur.execute("SELECT COUNT(*) FROM users WHERE role = 'PARTICIPANT';")
-        participant_count = cur.fetchone()[0]
-
-        cur.execute("SELECT COUNT(*) FROM tests;")
-        test_count = cur.fetchone()[0]
-
-        cur.execute("SELECT COUNT(*) FROM skills;")
-        skills_count = cur.fetchone()[0]
-
-        cur.execute("SELECT COUNT(*) FROM test_submissions;")
-        submission_count = cur.fetchone()[0]
-
-        cur.execute("SELECT COUNT(*) FROM test_submissions WHERE status = 'COMPLETED';")
-        completed_count = cur.fetchone()[0]
-
-        cur.execute(
-            "SELECT COUNT(*) FROM test_submissions WHERE status = 'IN_PROGRESS';"
-        )
-        in_progress_count = cur.fetchone()[0]
-
-        cur.execute("SELECT COUNT(*) FROM test_submissions WHERE status = 'ASSIGNED';")
-        assigned_count = cur.fetchone()[0]
+        trainer_count = _count(cur, "SELECT COUNT(*) FROM users WHERE role = 'TRAINER';")
+        participant_count = _count(cur, "SELECT COUNT(*) FROM users WHERE role = 'PARTICIPANT';")
+        test_count = _count(cur, "SELECT COUNT(*) FROM tests;")
+        skills_count = _count(cur, "SELECT COUNT(*) FROM skills;")
+        submission_count = _count(cur, "SELECT COUNT(*) FROM test_submissions;")
+        completed_count = _count(cur, "SELECT COUNT(*) FROM test_submissions WHERE status = 'COMPLETED';")
+        in_progress_count = _count(cur, "SELECT COUNT(*) FROM test_submissions WHERE status = 'IN_PROGRESS';")
+        assigned_count = _count(cur, "SELECT COUNT(*) FROM test_submissions WHERE status = 'ASSIGNED';")
 
         cur.close()
         conn.close()
