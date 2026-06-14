@@ -1,0 +1,23 @@
+-- Migration 001: add ADMIN to the userrole enum
+--
+-- Context: the UserRole enum gained an ADMIN member (W5 security hardening).
+-- SQLAlchemy's Base.metadata.create_all only CREATEs a missing enum type — it
+-- never ALTERs an existing one. Databases provisioned before this change still
+-- have a `userrole` enum with only TRAINER/PARTICIPANT, so inserting/updating a
+-- user with role ADMIN fails with "invalid input value for enum userrole".
+--
+-- Run this ONCE against each existing PostgreSQL database. Fresh databases
+-- (created by create_all after this change) already include ADMIN and do not
+-- need it; the IF NOT EXISTS guard makes re-running safe.
+--
+-- Usage:
+--   psql "postgresql://<user>:<pass>@<host>:<port>/<db>" -f 001_add_admin_role.sql
+-- or via docker compose:
+--   docker compose exec -T postgres \
+--     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f - < 001_add_admin_role.sql
+--
+-- Note: ALTER TYPE ... ADD VALUE cannot run inside a transaction block on some
+-- PostgreSQL versions. Run it as a standalone statement (psql autocommit), not
+-- wrapped in BEGIN/COMMIT.
+
+ALTER TYPE userrole ADD VALUE IF NOT EXISTS 'ADMIN';
