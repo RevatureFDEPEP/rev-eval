@@ -65,5 +65,9 @@ async def init_db():
             await conn.execute(text("SELECT 1"))
         print("✅ Async DB connected successfully and tables are ready.")
     except OperationalError as e:
+        # Fail fast: re-raise so startup aborts and the container is reported
+        # unhealthy. Swallowing this left the service "up" but guaranteed later
+        # runtime 500s that are far harder to diagnose than a failed boot.
         print("❌ Async DB connection failed!")
         print(str(e))
+        raise

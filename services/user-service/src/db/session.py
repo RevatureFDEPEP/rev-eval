@@ -38,5 +38,8 @@ def init_db():
             conn.execute(text("SELECT 1"))
         print("✅ DB connected successfully and tables are ready.")
     except OperationalError as e:
+        # Fail fast: re-raise so startup aborts and the container is reported
+        # unhealthy instead of serving traffic against an uninitialized DB.
         print("❌ DB connection failed!")
         print(str(e))
+        raise
