@@ -10,7 +10,11 @@ jobs:
   backend-build-test:
     name: Backend (${{ matrix.service }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     env:
+      IMAGE_TAG: rev-eval-${{ matrix.service }}:ci
       JWT_SECRET: ${{ secrets.JWT_SIGNING_SECRET }}
     strategy:
       fail-fast: false
@@ -56,12 +60,38 @@ jobs:
         working-directory: services/${{ matrix.service }}
         run: |
           if [ -d tests ]; then
-            PYTHONPATH=. pytest --cov --cov-report=xml
+            PYTHONPATH=. pytest --cov --cov-report=xml --cov-fail-under=70
           else
             echo "No tests/ directory in services/${{ matrix.service }} — skipping pytest."
           fi
 
-      # NOTE: Trivy scan added in W2 D7 by candidates (not seeded here)
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.service }}
+          path: services/${{ matrix.service }}/coverage.xml
+          if-no-files-found: ignore
+
+      - name: Build Docker image
+        run: docker build -t ${{ env.IMAGE_TAG }} services/${{ matrix.service }}
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_TAG }}
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+
+      - name: Upload Trivy SARIF report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-sarif-${{ matrix.service }}
+          path: trivy-${{ matrix.service }}.sarif
+          if-no-files-found: ignore
 
   frontend-build-test:
     name: Frontend
