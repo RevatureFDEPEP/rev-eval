@@ -26,6 +26,7 @@ class QuestionCreate(BaseModel):
     difficulty: str | None = Field(default="medium", pattern="^(easy|medium|hard)$")
     skills: list[str] = Field(default_factory=list, max_length=20)
     tags: list[str] = Field(default_factory=list, max_length=30)
+    image_key: str | None = None
 
     @field_validator("question_text")
     @classmethod
@@ -193,6 +194,7 @@ class QuestionUpdate(BaseModel):
     difficulty: str | None = Field(None, pattern="^(easy|medium|hard)$")
     skills: list[str] | None = Field(None, max_length=20)
     tags: list[str] | None = Field(None, max_length=30)
+    image_key: str | None = None
 
     @field_validator("question_text")
     @classmethod
@@ -296,6 +298,7 @@ class QuestionResponse(BaseModel):
     difficulty: str | None = "medium"
     skills: list[str] = []
     tags: list[str] = []
+    image_key: str | None = None
     created_at: datetime
     updated_at: datetime
 

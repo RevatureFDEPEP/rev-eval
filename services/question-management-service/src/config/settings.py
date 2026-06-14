@@ -34,6 +34,10 @@ class Settings(BaseSettings):
 
     # S3 / MinIO Configuration (object storage for question images)
     S3_ENDPOINT_URL: str = "http://minio:9000"
+    # Public-facing MinIO URL used in presigned URLs returned to the browser.
+    # Override when the internal Docker hostname (minio:9000) differs from the
+    # address the browser must reach (e.g. http://localhost:9000 in local dev).
+    S3_PUBLIC_ENDPOINT_URL: str = "http://localhost:9000"
     S3_ACCESS_KEY: str = "minioadmin"
     S3_SECRET_KEY: str = "minioadmin"
     S3_BUCKET_NAME: str = "question-images"
