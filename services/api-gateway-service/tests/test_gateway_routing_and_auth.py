@@ -48,10 +48,17 @@ class FakeAsyncClient:
         return FakeAsyncClient.response
 
 
+TEST_SECRET = "unit-test-secret-key-that-is-long-enough-1234567890"
+TEST_ISSUER = "rev-eval-user-service"
+TEST_AUDIENCE = "rev-eval-clients"
+
+
 @pytest.fixture(autouse=True)
 def jwt_env(monkeypatch):
-    monkeypatch.setenv("JWT_SECRET", "test-secret")
+    monkeypatch.setenv("JWT_SECRET", TEST_SECRET)
     monkeypatch.setenv("JWT_ALGORITHM", "HS256")
+    monkeypatch.setenv("JWT_ISSUER", TEST_ISSUER)
+    monkeypatch.setenv("JWT_AUDIENCE", TEST_AUDIENCE)
 
 
 @pytest.fixture
@@ -63,8 +70,26 @@ def client(monkeypatch):
     return TestClient(main.app)
 
 
+def _claims(**overrides):
+    """Build a fully-claimed token payload; overrides win."""
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": "99",
+        "email": "user@example.com",
+        "role": "TRAINER",
+        "iat": now,
+        "nbf": now,
+        "exp": now + timedelta(minutes=5),
+        "iss": TEST_ISSUER,
+        "aud": TEST_AUDIENCE,
+    }
+    payload.update(overrides)
+    return payload
+
+
 def bearer(payload):
-    token = jwt.encode(payload, "test-secret", algorithm="HS256")
+    """Bearer header for a token, filling in required claims when omitted."""
+    token = jwt.encode(_claims(**payload), TEST_SECRET, algorithm="HS256")
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -90,39 +115,106 @@ async def test_verify_jwt_token_rejects_missing_or_bad_headers():
     assert bad_format.value.status_code == 401
 
 
+def _token(**overrides):
+    return jwt.encode(_claims(**overrides), TEST_SECRET, algorithm="HS256")
+
+
 @pytest.mark.asyncio
-async def test_verify_jwt_token_validates_secret_expiry_and_subject(monkeypatch):
+async def test_get_secret_raises_500_when_unset(monkeypatch):
     monkeypatch.delenv("JWT_SECRET")
     with pytest.raises(HTTPException) as no_secret:
         auth._get_secret()
     assert no_secret.value.status_code == 500
 
-    monkeypatch.setenv("JWT_SECRET", "test-secret")
-    expired = jwt.encode(
-        {"sub": "42", "exp": datetime.now(timezone.utc) - timedelta(minutes=1)},
-        "test-secret",
-        algorithm="HS256",
-    )
-    with pytest.raises(HTTPException) as expired_error:
-        await auth.verify_jwt_token(f"Bearer {expired}")
-    assert expired_error.value.detail == "Token expired"
 
-    no_sub = jwt.encode({"email": "user@example.com"}, "test-secret", algorithm="HS256")
-    with pytest.raises(HTTPException) as missing_sub:
-        await auth.verify_jwt_token(f"Bearer {no_sub}")
-    assert "sub" in missing_sub.value.detail
-
-    valid = jwt.encode(
-        {"sub": "42", "email": "user@example.com", "role": "TRAINER"},
-        "test-secret",
-        algorithm="HS256",
-    )
-    context = await auth.verify_jwt_token(f"Bearer {valid}")
+@pytest.mark.asyncio
+async def test_verify_jwt_token_accepts_fully_claimed_token():
+    context = await auth.verify_jwt_token(f"Bearer {_token(sub='42', role='TRAINER')}")
     assert context == {
         "user_id": "42",
         "email": "user@example.com",
         "role": "TRAINER",
     }
+
+
+@pytest.mark.asyncio
+async def test_verify_jwt_token_rejects_expired():
+    now = datetime.now(timezone.utc)
+    expired = _token(exp=now - timedelta(minutes=1), nbf=now - timedelta(minutes=5),
+                     iat=now - timedelta(minutes=5))
+    with pytest.raises(HTTPException) as err:
+        await auth.verify_jwt_token(f"Bearer {expired}")
+    assert err.value.detail == "Token expired"
+
+
+@pytest.mark.asyncio
+async def test_verify_jwt_token_rejects_future_nbf():
+    future = datetime.now(timezone.utc) + timedelta(minutes=10)
+    with pytest.raises(HTTPException) as err:
+        await auth.verify_jwt_token(f"Bearer {_token(nbf=future, iat=future)}")
+    assert err.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_verify_jwt_token_rejects_wrong_issuer():
+    with pytest.raises(HTTPException) as err:
+        await auth.verify_jwt_token(f"Bearer {_token(iss='evil-issuer')}")
+    assert err.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_verify_jwt_token_rejects_wrong_audience():
+    with pytest.raises(HTTPException) as err:
+        await auth.verify_jwt_token(f"Bearer {_token(aud='some-other-aud')}")
+    assert err.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_verify_jwt_token_rejects_missing_role():
+    payload = _claims(sub="42")
+    payload.pop("role")
+    token = jwt.encode(payload, TEST_SECRET, algorithm="HS256")
+    with pytest.raises(HTTPException) as err:
+        await auth.verify_jwt_token(f"Bearer {token}")
+    assert err.value.status_code == 401
+    assert "role" in err.value.detail
+
+
+@pytest.mark.asyncio
+async def test_verify_jwt_token_rejects_unknown_role():
+    with pytest.raises(HTTPException) as err:
+        await auth.verify_jwt_token(f"Bearer {_token(role='SUPERUSER')}")
+    assert err.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_verify_jwt_token_rejects_missing_required_claim():
+    # A token with no exp/iat/nbf/iss/aud must be rejected.
+    bare = jwt.encode({"sub": "42", "role": "TRAINER"}, TEST_SECRET, algorithm="HS256")
+    with pytest.raises(HTTPException) as err:
+        await auth.verify_jwt_token(f"Bearer {bare}")
+    assert err.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_validate_jwt_secret_rejects_default_and_short(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET", "change-me-in-production")
+    monkeypatch.delenv("ALLOW_INSECURE_DEV_SECRETS", raising=False)
+    with pytest.raises(RuntimeError):
+        auth.validate_jwt_secret()
+
+    monkeypatch.setenv("JWT_SECRET", "short")
+    with pytest.raises(RuntimeError):
+        auth.validate_jwt_secret()
+
+    # Escape hatch allows weak secrets for local dev.
+    monkeypatch.setenv("ALLOW_INSECURE_DEV_SECRETS", "true")
+    auth.validate_jwt_secret()
+
+    # A strong secret passes regardless of the escape hatch.
+    monkeypatch.delenv("ALLOW_INSECURE_DEV_SECRETS", raising=False)
+    monkeypatch.setenv("JWT_SECRET", TEST_SECRET)
+    auth.validate_jwt_secret()
 
 
 def test_add_user_context_headers_does_not_mutate_original():
@@ -236,3 +328,48 @@ def test_smart_gateway_delete_204_passthrough(client):
     )
     assert response.status_code == 204
     assert response.content == b""
+
+
+def test_legacy_service_name_route_requires_auth(client):
+    """The removed legacy route now falls through to the JWT-guarded smart
+    route, so an unauthenticated /{service}/... request is rejected."""
+    response = client.get("/user-service/v1/api/users/")
+
+    assert response.status_code == 401
+    # Request must never reach a downstream service.
+    assert FakeAsyncClient.requests == []
+
+
+def test_spoofed_user_role_is_replaced_with_verified_claim(client):
+    response = client.get(
+        "/v1/api/tests",
+        headers={
+            **bearer({"sub": "99", "email": "p@example.com", "role": "PARTICIPANT"}),
+            "X-User-Role": "ADMIN",
+            "X-User-Id": "1",
+        },
+    )
+
+    assert response.status_code == 200
+    _, _, kwargs = FakeAsyncClient.requests[0]
+    forwarded = kwargs["headers"]
+    # Forwarded identity comes from the verified token, not the spoofed header.
+    assert forwarded["X-User-Role"] == "PARTICIPANT"
+    assert forwarded["X-User-Id"] == "99"
+    # No lowercase spoofed copy survives.
+    assert "x-user-role" not in forwarded
+
+
+def test_spoofed_internal_key_is_stripped(client):
+    response = client.get(
+        "/v1/api/tests",
+        headers={
+            **bearer({"sub": "99", "email": "p@example.com", "role": "TRAINER"}),
+            "X-Internal-Key": "attacker-supplied",
+        },
+    )
+
+    assert response.status_code == 200
+    _, _, kwargs = FakeAsyncClient.requests[0]
+    forwarded = {k.lower(): v for k, v in kwargs["headers"].items()}
+    assert "x-internal-key" not in forwarded

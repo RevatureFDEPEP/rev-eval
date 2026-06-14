@@ -4,7 +4,7 @@ User Management Routes
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from src.db.session import get_db
 from src.models.user import User, UserRole
@@ -15,10 +15,20 @@ from src.schemas.user_schema import (
     UserUpdate,
 )
 from src.services.user_service import UserService
-from src.utils.dependencies import get_current_user
+from src.utils.dependencies import (
+    get_admin_or_internal,
+    get_admin_or_self_or_internal,
+    get_current_admin,
+    get_current_admin_or_self,
+    get_current_user,
+    is_admin,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Fields a non-admin user is never allowed to change on their own record.
+_PRIVILEGED_UPDATE_FIELDS = ("role", "is_active")
 
 
 @router.get("/users/me", response_model=UserOut)
@@ -28,7 +38,12 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 
 @router.get("/users/by-email/{email}", response_model=UserOut)
-def get_user_by_email(email: str, db: Session = Depends(get_db)):
+def get_user_by_email(
+    email: str,
+    db: Session = Depends(get_db),
+    _caller: Optional[User] = Depends(get_admin_or_internal),
+):
+    """Look up a user by email. Admin or trusted internal caller only."""
     user = UserService.get_user_by_email(db, email)
     if not user:
         raise HTTPException(status_code=404, detail=f"User not found with email: {email}")
@@ -36,7 +51,12 @@ def get_user_by_email(email: str, db: Session = Depends(get_db)):
 
 
 @router.get("/users/{user_id}", response_model=UserOut)
-def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
+def get_user_by_id(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _caller: Optional[User] = Depends(get_admin_or_self_or_internal),
+):
+    """Read a user record. Admin, the user themselves, or a trusted internal caller."""
     user = UserService.get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail=f"User not found with id: {user_id}")
@@ -49,12 +69,41 @@ def list_users(
     limit: int = Query(100, ge=1, le=1000, description="Max number of results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
 ):
+    """List users. Admin only."""
     return UserService.list_users(db=db, role=role, limit=limit, offset=offset)
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
-def update_user(user_id: int, user_update: UserUpdate, db: Session = Depends(get_db)):
+def update_user(
+    user_id: int,
+    user_update: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_or_self),
+):
+    """Update a user. Admin, or the user updating their own profile.
+
+    Non-admin callers may change only safe profile fields. Attempts to set
+    privileged fields (`role`, `is_active`) on a self-update are rejected.
+    """
+    caller_is_admin = is_admin(current_user)
+
+    if not caller_is_admin:
+        attempted_privileged = [
+            field
+            for field in _PRIVILEGED_UPDATE_FIELDS
+            if getattr(user_update, field) is not None
+        ]
+        if attempted_privileged:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "You may not change privileged fields "
+                    f"({', '.join(attempted_privileged)})"
+                ),
+            )
+
     user = UserService.get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail=f"User not found with id: {user_id}")
@@ -65,9 +114,9 @@ def update_user(user_id: int, user_update: UserUpdate, db: Session = Depends(get
         user.first_name = user_update.first_name
     if user_update.last_name is not None:
         user.last_name = user_update.last_name
-    if user_update.role is not None:
+    if caller_is_admin and user_update.role is not None:
         user.role = user_update.role
-    if user_update.is_active is not None:
+    if caller_is_admin and user_update.is_active is not None:
         user.is_active = user_update.is_active
 
     db.commit()
@@ -77,7 +126,11 @@ def update_user(user_id: int, user_update: UserUpdate, db: Session = Depends(get
 
 
 @router.post("/users/invite", response_model=InviteUserResponse, status_code=201)
-def invite_user(invite_request: InviteUserRequest, db: Session = Depends(get_db)):
+def invite_user(
+    invite_request: InviteUserRequest,
+    db: Session = Depends(get_db),
+    _caller: Optional[User] = Depends(get_admin_or_internal),
+):
     try:
         result = UserService.invite_user(
             db=db,

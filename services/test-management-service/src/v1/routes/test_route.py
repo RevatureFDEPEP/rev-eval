@@ -5,7 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.session import get_db
 from src.schemas.test_schema import TestCreate, TestOut, TestUpdate
 from src.services.test_service import TestService
-from src.utils.dependencies import get_current_user_from_headers
+from src.utils.dependencies import (
+    get_current_trainer_or_admin,
+    get_current_user_from_headers,
+    is_admin,
+)
 
 router = APIRouter(prefix="/tests", tags=["Tests"])
 
@@ -26,8 +30,13 @@ async def get_current_user_id(current_user: dict = Depends(get_current_user_from
     return int(user_id)
 
 @router.post("/", response_model=TestOut, status_code=status.HTTP_201_CREATED)
-async def create_test(test_in: TestCreate, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    return await TestService.create_test(db, test_in, creator_id=user_id)
+async def create_test(
+    test_in: TestCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_trainer_or_admin),
+):
+    """Create a test. Trainer/admin only; the creator is the caller."""
+    return await TestService.create_test(db, test_in, creator_id=int(current_user["id"]))
 
 @router.get("/", response_model=List[TestOut])
 async def list_tests(db: AsyncSession = Depends(get_db)):
@@ -45,19 +54,22 @@ async def update_test(
     test_id: int,
     test_in: TestUpdate,
     db: AsyncSession = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+    current_user: dict = Depends(get_current_trainer_or_admin),
 ):
     """
-    Update a test. Only the creator can update their test.
-    If created_by_id is null (legacy test), allow editing.
+    Update a test. Trainer creator or admin only.
+    Admins bypass the creator check; legacy tests (null creator) remain editable.
     """
     try:
         # Get the test to check ownership
         test = await TestService.get_test_by_id(db, test_id)
 
-        # Check if user is the creator
-        # If created_by_id is null, allow editing (legacy tests)
-        if test.created_by_id is not None and test.created_by_id != user_id:
+        # Creator-only unless admin; null created_by_id = legacy, allow editing.
+        if (
+            not is_admin(current_user)
+            and test.created_by_id is not None
+            and test.created_by_id != int(current_user["id"])
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to update this test. Only the creator can update it."
@@ -71,19 +83,21 @@ async def update_test(
 async def delete_test(
     test_id: int,
     db: AsyncSession = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+    current_user: dict = Depends(get_current_trainer_or_admin),
 ):
     """
-    Delete a test. Only the creator can delete their test.
-    If created_by_id is null (legacy test), allow deletion.
+    Delete a test. Trainer creator or admin only.
+    Admins bypass the creator check; legacy tests (null creator) remain deletable.
     """
     try:
         # Get the test to check ownership
         test = await TestService.get_test_by_id(db, test_id)
 
-        # Check if user is the creator
-        # If created_by_id is null, allow deletion (legacy tests)
-        if test.created_by_id is not None and test.created_by_id != user_id:
+        if (
+            not is_admin(current_user)
+            and test.created_by_id is not None
+            and test.created_by_id != int(current_user["id"])
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to delete this test. Only the creator can delete it."

@@ -17,6 +17,7 @@ from src.schemas.test_submission_schema import (
     TrainerReviewResponse,
 )
 from src.services.test_service import TestService
+from src.utils.dependencies import internal_auth_headers
 
 logger = logging.getLogger(__name__)
 
@@ -200,14 +201,16 @@ class TestSubmissionService:
                 try:
                     # Check if user exists (direct call to user-service)
                     user_response = await client.get(
-                        f"{user_service_url}/v1/api/users/by-email/{email}"
+                        f"{user_service_url}/v1/api/users/by-email/{email}",
+                        headers=internal_auth_headers(),
                     )
 
                     if user_response.status_code == 404:
                         # User doesn't exist, create and invite (direct call to user-service)
                         invite_response = await client.post(
                             f"{user_service_url}/v1/api/users/invite",
-                            json={"email": email}
+                            json={"email": email},
+                            headers=internal_auth_headers(),
                         )
 
                         if invite_response.status_code not in [200, 201]:
@@ -309,7 +312,8 @@ class TestSubmissionService:
                 # Fetch participant details
                 try:
                     user_response = await client.get(
-                        f"{user_service_url}/v1/api/users/{submission.user_id}"
+                        f"{user_service_url}/v1/api/users/{submission.user_id}",
+                        headers=internal_auth_headers(),
                     )
                     if user_response.status_code == 200:
                         user_data = user_response.json()
@@ -410,7 +414,8 @@ class TestSubmissionService:
                 # Fetch participant details
                 try:
                     user_response = await client.get(
-                        f"{user_service_url}/v1/api/users/{submission.user_id}"
+                        f"{user_service_url}/v1/api/users/{submission.user_id}",
+                        headers=internal_auth_headers(),
                     )
                     if user_response.status_code == 200:
                         user_data = user_response.json()

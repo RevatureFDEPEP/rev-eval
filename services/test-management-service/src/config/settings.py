@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     # of raising AttributeError.
     INTERVIEW_SERVICE_URL: Optional[str] = None
 
+    # Shared secret presented to user-service on internal calls so they pass
+    # its admin-guarded read endpoints without a user JWT. Must match
+    # user-service's INTERNAL_API_KEY.
+    INTERNAL_API_KEY: Optional[str] = None
+
     @property
     def SQLALCHEMY_DATABASE_URL(self) -> str:
         return (

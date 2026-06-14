@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import ValidationError
 from src.schemas.question import (
     QuestionCreate,
@@ -9,6 +9,7 @@ from src.schemas.question import (
     QuestionUpdate,
 )
 from src.services.question_service import QuestionService
+from src.utils.dependencies import require_question_editor
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
 
@@ -60,8 +61,11 @@ def _serialize_many(questions, privileged: bool) -> list:
     - TEXT: Requires sample_answer, no options or correct_answers
     """
 )
-async def create_question(question: QuestionCreate):
-    """Create a new question with comprehensive validation."""
+async def create_question(
+    question: QuestionCreate,
+    _role: str = Depends(require_question_editor),
+):
+    """Create a new question with comprehensive validation. Trainer/admin only."""
     try:
         question_id = await QuestionService.create_question(question)
         return {
@@ -118,8 +122,12 @@ async def get_all_questions(
     - Only provide fields you want to update (partial updates supported)
     """
 )
-async def update_question(id: str, question_update: QuestionUpdate):
-    """Update an existing question with validation."""
+async def update_question(
+    id: str,
+    question_update: QuestionUpdate,
+    _role: str = Depends(require_question_editor),
+):
+    """Update an existing question with validation. Trainer/admin only."""
     try:
         updated = await QuestionService.update_question(id, question_update)
         if not updated:
@@ -152,8 +160,11 @@ async def update_question(id: str, question_update: QuestionUpdate):
     summary="Delete question",
     description="Delete a question by its MongoDB _id."
 )
-async def delete_question(id: str):
-    """Delete a question by ID."""
+async def delete_question(
+    id: str,
+    _role: str = Depends(require_question_editor),
+):
+    """Delete a question by ID. Trainer/admin only."""
     try:
         deleted = await QuestionService.delete_question(id)
         if not deleted:

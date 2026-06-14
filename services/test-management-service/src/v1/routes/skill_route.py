@@ -5,11 +5,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.session import get_db
 from src.schemas.skill_schema import SkillCreate, SkillOut, SkillUpdate
 from src.services.skill_service import SkillService
+from src.utils.dependencies import get_current_trainer_or_admin
 
 router = APIRouter(prefix="/skills", tags=["Skills"])
 
 @router.post("/", response_model=SkillOut, status_code=status.HTTP_201_CREATED)
-async def create_skill(skill_in: SkillCreate, db: AsyncSession = Depends(get_db)):
+async def create_skill(
+    skill_in: SkillCreate,
+    db: AsyncSession = Depends(get_db),
+    _caller: dict = Depends(get_current_trainer_or_admin),
+):
+    """Create a skill. Trainer/admin only."""
     return await SkillService.create_skill(db, skill_in)
 
 @router.get("/", response_model=List[SkillOut])
@@ -24,14 +30,25 @@ async def get_skill(skill_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Skill not found")
 
 @router.put("/{skill_id}/", response_model=SkillOut)
-async def update_skill(skill_id: int, skill_in: SkillUpdate, db: AsyncSession = Depends(get_db)):
+async def update_skill(
+    skill_id: int,
+    skill_in: SkillUpdate,
+    db: AsyncSession = Depends(get_db),
+    _caller: dict = Depends(get_current_trainer_or_admin),
+):
+    """Update a skill. Trainer/admin only."""
     try:
         return await SkillService.update_skill(db, skill_id, skill_in)
     except ValueError:
         raise HTTPException(status_code=404, detail="Skill not found")
 
 @router.delete("/{skill_id}/", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_skill(skill_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_skill(
+    skill_id: int,
+    db: AsyncSession = Depends(get_db),
+    _caller: dict = Depends(get_current_trainer_or_admin),
+):
+    """Delete a skill. Trainer/admin only."""
     try:
         await SkillService.delete_skill(db, skill_id)
     except ValueError:
