@@ -118,6 +118,38 @@ def list_routes():
         ]
     }
 
+# Statuses that must not carry a response body per HTTP semantics.
+_BODYLESS_STATUSES = {204, 205, 304}
+
+
+def relay_downstream_response(resp) -> Response:
+    """Faithfully relay a downstream httpx response back to the caller.
+
+    A 204/empty/non-JSON response must NOT be JSON-decoded: calling
+    resp.json() on an empty body raises, which previously surfaced a
+    successful downstream 204 (e.g. every DELETE) to the client as a 500.
+    """
+    status_code = resp.status_code
+    content_type = resp.headers.get("content-type", "")
+
+    # No body expected/allowed → relay status only, never decode.
+    if status_code in _BODYLESS_STATUSES or not resp.content:
+        return Response(status_code=status_code)
+
+    if content_type.startswith("application/json"):
+        try:
+            return JSONResponse(content=resp.json(), status_code=status_code)
+        except ValueError:
+            # Content-Type lied / malformed JSON — relay raw rather than 500.
+            pass
+
+    return Response(
+        content=resp.content,
+        status_code=status_code,
+        media_type=content_type or None,
+    )
+
+
 # ===== PUBLIC AUTH PASS-THROUGH (no JWT required) =====
 @app.api_route(
     "/v1/api/auth/{auth_path:path}",
@@ -147,13 +179,7 @@ async def public_auth_proxy(auth_path: str, request: Request):
             request.method, target_url, content=body, headers=headers, timeout=30.0,
         )
 
-    if resp.headers.get("content-type", "").startswith("application/json"):
-        return JSONResponse(content=resp.json(), status_code=resp.status_code)
-    return Response(
-        content=resp.content,
-        status_code=resp.status_code,
-        media_type=resp.headers.get("content-type"),
-    )
+    return relay_downstream_response(resp)
 
 
 # ===== SMART ROUTING (NO SERVICE NAME IN URL) =====
@@ -230,18 +256,8 @@ async def smart_gateway(
 
         logger.info("=" * 80)
 
-        # Return response with correct status code
-        if resp.headers.get("content-type", "").startswith("application/json"):
-            return JSONResponse(
-                content=resp.json(),
-                status_code=resp.status_code
-            )
-        else:
-            return Response(
-                content=resp.content,
-                status_code=resp.status_code,
-                media_type=resp.headers.get("content-type")
-            )
+        # Return response with correct status code (handles 204/empty/non-JSON).
+        return relay_downstream_response(resp)
 
     except HTTPException:
         raise

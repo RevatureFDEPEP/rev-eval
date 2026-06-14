@@ -192,3 +192,47 @@ def test_routes_endpoint_lists_configured_patterns(client):
 
     assert response.status_code == 200
     assert any(route["service"] == "user-service" for route in response.json()["routes"])
+
+
+# ===== Phase 3: empty-body / non-JSON passthrough =====
+
+def test_relay_204_returns_204_not_500():
+    resp = FakeResponse(204, headers={"content-type": "application/json"}, content=b"")
+    relayed = main.relay_downstream_response(resp)
+    assert relayed.status_code == 204
+    assert relayed.body == b""
+
+
+def test_relay_empty_body_is_not_json_decoded():
+    # Empty body with a JSON content-type must not be decoded (would raise).
+    resp = FakeResponse(200, headers={"content-type": "application/json"}, content=b"")
+    relayed = main.relay_downstream_response(resp)
+    assert relayed.status_code == 200
+    assert relayed.body == b""
+
+
+def test_relay_non_json_body_unchanged():
+    resp = FakeResponse(200, headers={"content-type": "text/plain"}, content=b"plain text")
+    relayed = main.relay_downstream_response(resp)
+    assert relayed.status_code == 200
+    assert relayed.body == b"plain text"
+    assert relayed.media_type == "text/plain"
+
+
+def test_relay_json_body_preserved():
+    resp = FakeResponse(200, headers={"content-type": "application/json"}, json_data={"a": 1}, content=b'{"a": 1}')
+    relayed = main.relay_downstream_response(resp)
+    assert relayed.status_code == 200
+    assert relayed.body == b'{"a":1}'
+
+
+def test_smart_gateway_delete_204_passthrough(client):
+    FakeAsyncClient.response = FakeResponse(
+        204, headers={"content-type": "application/json"}, content=b""
+    )
+    response = client.delete(
+        "/v1/api/submissions/5/",
+        headers=bearer({"sub": "1", "role": "TRAINER"}),
+    )
+    assert response.status_code == 204
+    assert response.content == b""
