@@ -32,12 +32,23 @@ async function handleRequest(
     }
   }
 
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${session.token}`,
+    'Content-Type': 'application/json',
+  };
+  // Forward select request-scoped headers the gateway/services rely on:
+  // Idempotency-Key makes retried mutations (e.g. POST /sessions/{id}/answer)
+  // replay the prior response instead of re-applying; X-Correlation-Id ties
+  // distributed logs together. Both are dropped by default, so pass them
+  // through when present.
+  for (const name of ['Idempotency-Key', 'X-Correlation-Id']) {
+    const value = request.headers.get(name);
+    if (value) headers[name] = value;
+  }
+
   const response = await fetch(url.toString(), {
     method: request.method,
-    headers: {
-      Authorization: `Bearer ${session.token}`,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body,
   });
 
