@@ -30,23 +30,15 @@ done
 
 echo "✅ Database is ready!"
 
-# Create database tables using init_db
-echo "📦 Creating database tables..."
-python -c "
-import asyncio
-from src.db.session import init_db
-
-async def create_tables():
-    await init_db()
-    print('✅ Tables created successfully!')
-
-asyncio.run(create_tables())
-"
+# Apply database migrations
+echo "📦 Applying database migrations..."
+alembic upgrade head
 
 if [ $? -eq 0 ]; then
-    echo "✅ Database tables ready!"
+    echo "✅ Database migrations applied!"
 else
-    echo "⚠️ Table creation failed, but continuing..."
+    echo "❌ Migration failed, aborting startup."
+    exit 1
 fi
 
 # Seed the database with mock data

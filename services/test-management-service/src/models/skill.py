@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, String, Text
 from sqlalchemy.orm import relationship
+
 from src.db.session import Base
+from src.models.category import skill_categories
 
 
 class Skill(Base):
@@ -14,6 +16,8 @@ class Skill(Base):
 
     # Convenience read-only relationship to Tests
     tests = relationship("Test", secondary="test_skills", viewonly=True)
+
+    categories = relationship("Category", secondary=skill_categories, back_populates="skills")
 
     def __repr__(self):
         return f"<Skill(id={self.id}, name='{self.name}')>"
