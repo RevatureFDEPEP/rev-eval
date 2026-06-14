@@ -11,6 +11,16 @@ import httpx
 from fastapi import Depends, Header, HTTPException, status
 
 
+def internal_auth_headers() -> Dict[str, str]:
+    """Headers identifying this service as a trusted internal caller.
+
+    Presents X-Internal-Key so user-service's admin-guarded read endpoints
+    accept the server-to-server call. Empty when no key is configured.
+    """
+    key = os.getenv("INTERNAL_API_KEY")
+    return {"X-Internal-Key": key} if key else {}
+
+
 async def get_current_user_from_headers(
     x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
     x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
@@ -37,7 +47,7 @@ async def get_current_user_from_headers(
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(endpoint)
+            response = await client.get(endpoint, headers=internal_auth_headers())
     except httpx.RequestError as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -57,14 +67,51 @@ async def get_current_user_from_headers(
     )
 
 
+def role_of(user: Dict) -> str:
+    """Normalized (upper-cased) role string for a resolved user dict."""
+    return (user.get("role") or "").upper()
+
+
+def is_admin(user: Dict) -> bool:
+    return role_of(user) == "ADMIN"
+
+
+def is_trainer(user: Dict) -> bool:
+    return role_of(user) == "TRAINER"
+
+
 async def get_current_trainer(
     current_user: Dict = Depends(get_current_user_from_headers),
 ) -> Dict:
     """Require the current user to have TRAINER role."""
-    if (current_user.get("role") or "").upper() != "TRAINER":
+    if not is_trainer(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This endpoint requires trainer role",
+        )
+    return current_user
+
+
+async def get_current_trainer_or_admin(
+    current_user: Dict = Depends(get_current_user_from_headers),
+) -> Dict:
+    """Require TRAINER or ADMIN. Used to guard management/write routes."""
+    if not (is_trainer(current_user) or is_admin(current_user)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This endpoint requires trainer or admin role",
+        )
+    return current_user
+
+
+async def get_current_admin(
+    current_user: Dict = Depends(get_current_user_from_headers),
+) -> Dict:
+    """Require ADMIN role."""
+    if not is_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This endpoint requires admin role",
         )
     return current_user
 
@@ -73,9 +120,25 @@ async def get_current_participant(
     current_user: Dict = Depends(get_current_user_from_headers),
 ) -> Dict:
     """Require the current user to have PARTICIPANT role."""
-    if (current_user.get("role") or "").upper() != "PARTICIPANT":
+    if role_of(current_user) != "PARTICIPANT":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This endpoint requires participant role",
         )
     return current_user
+
+
+def ensure_can_access_submission(current_user: Dict, owner_user_id: Optional[int]) -> None:
+    """Authorize access to a submission owned by `owner_user_id`.
+
+    Participants may only touch their own submissions; trainers and admins may
+    cross ownership boundaries (review/management workflows).
+    """
+    if is_trainer(current_user) or is_admin(current_user):
+        return
+    caller_id = current_user.get("id")
+    if caller_id is None or owner_user_id is None or int(caller_id) != int(owner_user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this submission",
+        )

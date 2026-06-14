@@ -487,14 +487,14 @@ async def test_bulk_assign_test_handles_existing_invited_and_failed_users():
         async def __aexit__(self, exc_type, exc, tb):
             return False
 
-        async def get(self, url):
+        async def get(self, url, **kwargs):
             if "existing@example.com" in url:
                 return FakeResponse(200, {"id": 101})
             if "new@example.com" in url:
                 return FakeResponse(404)
             return FakeResponse(500, text="user-service error")
 
-        async def post(self, url, json):
+        async def post(self, url, json, **kwargs):
             return FakeResponse(201, {"id": 202})
 
     created_submissions = [

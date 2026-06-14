@@ -91,7 +91,10 @@ class TestSubmissionRepository:
         submission = TestSubmission(**submission_data)
         db.add(submission)
         await db.commit()
-        await db.refresh(submission)
+        # Eager-load the `test` relationship in this async context. Without it,
+        # serializing TestSubmissionOut (which reads `.test`) would trigger a
+        # lazy load outside the greenlet and raise MissingGreenlet.
+        await db.refresh(submission, attribute_names=["test"])
         return submission
 
     @staticmethod
@@ -103,7 +106,9 @@ class TestSubmissionRepository:
         for field, value in update_data.items():
             setattr(submission, field, value)
         await db.commit()
-        await db.refresh(submission)
+        # Eager-load `test` (see create) so downstream TestSubmissionOut
+        # serialization does not lazy-load outside the async context.
+        await db.refresh(submission, attribute_names=["test"])
         return submission
 
     @staticmethod

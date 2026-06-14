@@ -9,6 +9,7 @@ class UserRole(str, enum.Enum):
     """User roles in the system"""
     TRAINER = "TRAINER"
     PARTICIPANT = "PARTICIPANT"
+    ADMIN = "ADMIN"
 
 
 class User(Base):
