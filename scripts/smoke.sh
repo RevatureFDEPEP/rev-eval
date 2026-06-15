@@ -3,9 +3,9 @@
 # Exits non-zero on the first failure.
 set -euo pipefail
 
-USER_URL="${USER_SERVICE_URL:-http://localhost:8001}"
+USER_URL="${USER_SERVICE_URL:-http://localhost:8002}"
 QUESTION_URL="${QUESTION_SERVICE_URL:-http://localhost:8003}"
-TEST_MGMT_URL="${TEST_MGMT_SERVICE_URL:-http://localhost:8002}"
+TEST_MGMT_URL="${TEST_MGMT_SERVICE_URL:-http://localhost:8001}"
 GATEWAY_URL="${API_BASE_URL:-http://localhost:8000}"
 
 check() {
