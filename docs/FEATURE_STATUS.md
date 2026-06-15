@@ -12,7 +12,24 @@ This file stays at summary level only.
 > start, advance, or finish a feature, update its detail file (check off steps,
 > add evidence) **and** its status row here, in the same PR as the code change.
 
-**Last assessed:** 2026-06-15 (**W4-F4 completed** — trainer dashboard on
+**Last assessed:** 2026-06-15 (**W4-F5 completed** — Day 20 capstone audit on
+`richardh-feat-W4F5`, the final feature in the program: a docs-only reflective
+deliverable (only code change is comment-only AI-assistance annotations on 4
+seams — 10 insertions, 0 deletions). `docs/technical-debt.md` inventories
+shortcuts in 8 categories (each row: name · file:line · condition-under-which-
+it-matters · urgency vs. current local-first scale) and closes with a
+prioritized repayment backlog — high-urgency security items (`JWT_SECRET`
+default, CORS `*`) lead, then migration coverage, pagination, header-trust
+hardening, validation, cruft. Two ADRs satisfy the spec's required pair:
+`0001` (reporting reads TMS Postgres directly — written during W4-F1) and the
+new `0002` (multi-select Jaccard scoring vs. all-or-nothing / correct-minus-
+wrong — lifted from W3-F2's `partial_credit.py` docstring). `docs/ai-assistance.md`
+discloses the AI-assisted-under-human-review workflow, documents the inline
+annotation convention, and carries a per-section verbal defence; the narrative
+(`docs/technical-narrative.md`) tells reporting (→0001) and scoring (→0002) as
+what/why/how. Validation: `pnpm lint` 0 errors, `pnpm build` clean, code diff
+comment-only/all-additive. **Program complete: all 22 features ✅.** Prior:
+**W4-F4 completed** — trainer dashboard on
 `richardh-feat-W4F4`: `/admin/dashboard` is a parallel-route page (mirrors
 W4-F2) whose two data regions — pass-rate-per-test bar chart (`/reports/aggregate`)
 and attempt-volume-over-time line chart — each carry their own `loading.tsx`
@@ -178,7 +195,7 @@ Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 | W4-F2 | Candidate results page (Suspense, error boundaries, chart) | 17 | ✅ Completed | [w4-f2-candidate-results-page.md](features/w4-f2-candidate-results-page.md) |
 | W4-F3 | Role-based authz (API) + aggregate reporting queries | 18 | ✅ Completed | [w4-f3-rbac-aggregate-queries.md](features/w4-f3-rbac-aggregate-queries.md) |
 | W4-F4 | Trainer dashboard frontend (server RBAC, URL-synced filters) | 19 | ✅ Completed | [w4-f4-trainer-dashboard-frontend.md](features/w4-f4-trainer-dashboard-frontend.md) |
-| W4-F5 | Technical debt audit + ADR documentation | 20 | ❌ Not Started | [w4-f5-tech-debt-audit-adrs.md](features/w4-f5-tech-debt-audit-adrs.md) |
+| W4-F5 | Technical debt audit + ADR documentation | 20 | ✅ Completed | [w4-f5-tech-debt-audit-adrs.md](features/w4-f5-tech-debt-audit-adrs.md) |
 
 ## Suggested order of attack
 
@@ -194,4 +211,4 @@ Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 9a. ~~**W3-F7 review remediation before W3-F6**~~ — done (branch `richardh-feat-W3F7`): timer fix + reuse semantics landed before the Playwright happy path; the `/questions/sample` role gate previews W4-F3.
 10. ~~**W2-M10 → W4-F1 → W4-F3**~~ — done; RBAC gate + aggregate endpoints landed on `richardh-feat-W4F3`.
 11. ~~**W4-F2 → W4-F4**~~ — done; trainer dashboard on `richardh-feat-W4F4` reuses `<ChartWrapper>`, adds the `/reports/timeseries` endpoint, server-side `/admin` RBAC, and URL-synced filters.
-12. **W4-F5 last** — debt audit + ADRs need a substantially complete codebase; capture the W4-F1 and W3-F2 ADR decisions as those features land.
+12. ~~**W4-F5 last**~~ — done (branch `richardh-feat-W4F5`): debt inventory + repayment backlog (`docs/technical-debt.md`), ADR 0002 (scoring; 0001 already landed in W4-F1), AI-assistance disclosure/annotations, technical narrative. The W4-F1 and W3-F2 ADR decisions were captured as those features landed, as planned. **Program complete.**
