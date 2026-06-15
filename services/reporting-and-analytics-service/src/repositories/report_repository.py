@@ -249,6 +249,33 @@ class ReportRepository:
         return list(result.all())
 
     @staticmethod
+    async def attempts_timeseries(db: AsyncSession, query):
+        """Attempt volume per (day, test) over SUBMITTED sessions.
+
+        GROUP BY date(submitted_at), test_id — ``func.date`` is portable
+        across Postgres and the aiosqlite fixture. Reuses ``_apply_filters``
+        (test_id + date range), so the same filters drive this and
+        ``/aggregate``. Ordered (date, test_id) for stable client rendering.
+        """
+        day = func.date(TmsSession.submitted_at).label("date")
+        base = (
+            select(
+                day,
+                TmsSession.test_id,
+                TmsTest.name.label("test_name"),
+                func.count(TmsSession.session_id).label("attempts"),
+            )
+            .join(TmsTest, TmsTest.id == TmsSession.test_id)
+            .where(TmsSession.status == SessionStatus.SUBMITTED)
+        )
+        base = ReportRepository._apply_filters(base, query)
+        stmt = base.group_by(day, TmsSession.test_id, TmsTest.name).order_by(
+            day, TmsSession.test_id
+        )
+        result = await db.execute(stmt)
+        return list(result.all())
+
+    @staticmethod
     async def get_test(db: AsyncSession, test_id: int):
         result = await db.execute(select(TmsTest).where(TmsTest.id == test_id))
         return result.scalar_one_or_none()

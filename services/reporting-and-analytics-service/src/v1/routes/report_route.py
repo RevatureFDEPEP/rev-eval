@@ -1,5 +1,5 @@
 """Reporting endpoints: candidate results (W4-F1) and trainer-only
-aggregates (W4-F3).
+aggregates (W4-F3) + attempt-volume timeseries (W4-F4).
 
 Read-only: every query runs against test-management-service's Postgres via
 the dedicated TMS engine (get_tms_db). The API gateway verifies the JWT
@@ -18,6 +18,8 @@ from src.schemas.report_schema import (
     AttemptsPage,
     AttemptsQuery,
     QuestionDifficultyReport,
+    TimeseriesQuery,
+    TimeseriesReport,
     UserSummary,
 )
 from src.services.report_service import ReportService
@@ -39,6 +41,22 @@ async def get_aggregate_report(
     score, pass rate vs. the configured threshold, median time-to-complete.
     Optional test/date filters; `min_attempts` drops thin groups (HAVING)."""
     return await ReportService.aggregate_by_test(db, query)
+
+
+@router.get(
+    "/timeseries",
+    response_model=TimeseriesReport,
+    dependencies=[Depends(require_trainer)],
+)
+async def get_attempts_timeseries(
+    query: Annotated[TimeseriesQuery, Query()],
+    db: AsyncSession = Depends(get_tms_db),
+):
+    """Trainer-only attempt volume per (day, test) over SUBMITTED sessions.
+    Granular rows: the frontend sums for a total line or draws one line per
+    test; the `test_id` filter narrows to a single quiz. Same test/date
+    filters as `/aggregate`."""
+    return await ReportService.attempts_timeseries(db, query)
 
 
 @router.get(

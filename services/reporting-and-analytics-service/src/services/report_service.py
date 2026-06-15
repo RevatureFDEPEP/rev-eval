@@ -20,6 +20,9 @@ from src.schemas.report_schema import (
     QuestionDifficultyRow,
     ScoreHistogram,
     TestAggregateRow,
+    TimeseriesPoint,
+    TimeseriesQuery,
+    TimeseriesReport,
     UserSummary,
 )
 
@@ -89,6 +92,22 @@ class ReportService:
             for row in rows
         ]
         return AggregateReport(items=items, pass_threshold=threshold)
+
+    @staticmethod
+    async def attempts_timeseries(
+        db: AsyncSession, query: TimeseriesQuery
+    ) -> TimeseriesReport:
+        rows = await ReportRepository.attempts_timeseries(db, query)
+        items = [
+            TimeseriesPoint(
+                date=row.date,
+                test_id=row.test_id,
+                test_name=row.test_name,
+                attempts=row.attempts,
+            )
+            for row in rows
+        ]
+        return TimeseriesReport(items=items)
 
     @staticmethod
     async def question_difficulty(

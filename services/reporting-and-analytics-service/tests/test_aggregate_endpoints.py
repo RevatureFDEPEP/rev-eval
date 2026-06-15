@@ -15,6 +15,7 @@ import pytest
 from src.v1.dependencies.auth import require_trainer
 
 AGGREGATE = "/v1/api/reports/aggregate"
+TIMESERIES = "/v1/api/reports/timeseries"
 
 
 @pytest.fixture
@@ -125,3 +126,50 @@ async def test_question_difficulty_all_correct_test(trainer_client):
 async def test_question_difficulty_unknown_test_is_404(trainer_client):
     resp = await trainer_client.get("/v1/api/reports/test/999/questions")
     assert resp.status_code == 404
+
+
+def _cells(body):
+    """(date, test_id) -> attempts."""
+    return {(r["date"], r["test_id"]): r["attempts"] for r in body["items"]}
+
+
+async def test_timeseries_groups_by_day_and_test(trainer_client):
+    # SUBMITTED submitted_at: S1 06-01 t1, S5 06-02 t1, S2 06-03 t2.
+    resp = await trainer_client.get(TIMESERIES)
+    assert resp.status_code == 200
+    body = resp.json()
+    cells = _cells(body)
+    assert cells == {
+        ("2026-06-01", 1): 1,
+        ("2026-06-02", 1): 1,
+        ("2026-06-03", 2): 1,
+    }
+    # Ordered (date, test_id) for stable client rendering.
+    dates = [r["date"] for r in body["items"]]
+    assert dates == sorted(dates)
+    # test_name is carried for the per-quiz line labels.
+    assert body["items"][0]["test_name"] == "Java Fundamentals Quiz"
+
+
+async def test_timeseries_test_filter_narrows_series(trainer_client):
+    resp = await trainer_client.get(TIMESERIES, params={"test_id": 1})
+    assert resp.status_code == 200
+    cells = _cells(resp.json())
+    assert cells == {("2026-06-01", 1): 1, ("2026-06-02", 1): 1}
+
+
+async def test_timeseries_date_range_bounds_attempt_start(trainer_client):
+    resp = await trainer_client.get(TIMESERIES, params={"from": "2026-06-03"})
+    assert resp.status_code == 200
+    cells = _cells(resp.json())
+    assert cells == {("2026-06-03", 2): 1}
+
+    resp = await trainer_client.get(TIMESERIES, params={"to": "2026-06-01"})
+    cells = _cells(resp.json())
+    assert cells == {("2026-06-01", 1): 1}
+
+
+async def test_timeseries_excludes_active_and_expired(trainer_client):
+    # 3 SUBMITTED sessions seeded; ACTIVE S3 + EXPIRED S4 must not appear.
+    resp = await trainer_client.get(TIMESERIES)
+    assert sum(r["attempts"] for r in resp.json()["items"]) == 3
