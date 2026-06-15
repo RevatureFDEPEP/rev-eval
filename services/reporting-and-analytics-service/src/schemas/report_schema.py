@@ -101,6 +101,38 @@ class AggregateQuery(BaseModel):
     min_attempts: Optional[int] = Field(None, ge=1)
 
 
+class TimeseriesQuery(BaseModel):
+    """Query-parameter dependency for GET /reports/timeseries (W4-F4).
+
+    Same ``test_id``/``from``/``to`` filter surface as AggregateQuery (no
+    ``min_attempts`` — there is no per-test HAVING on a time series), so the
+    shared ``_apply_filters`` applies unchanged.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    test_id: Optional[int] = None
+    date_from: Optional[date] = Field(None, alias="from")
+    date_to: Optional[date] = Field(None, alias="to")
+
+
+class TimeseriesPoint(BaseModel):
+    """Attempt count for one (day, test) cell over SUBMITTED sessions.
+
+    Granular by design: the frontend sums across tests per day for a total
+    line, or draws one line per test; the ``test_id`` filter narrows to a
+    single quiz."""
+
+    date: date
+    test_id: int
+    test_name: str
+    attempts: int
+
+
+class TimeseriesReport(BaseModel):
+    items: List[TimeseriesPoint]
+
+
 class TestAggregateRow(BaseModel):
     """Per-test aggregate over SUBMITTED sessions. ``pass_rate`` is the
     percentage of attempts scoring at or above the configured threshold."""

@@ -11,6 +11,7 @@ verified token payload.
 
 AGGREGATE = "/v1/api/reports/aggregate"
 QUESTIONS = "/v1/api/reports/test/1/questions"
+TIMESERIES = "/v1/api/reports/timeseries"
 
 
 async def test_missing_authorization_header_is_401(client):
@@ -82,6 +83,20 @@ async def test_questions_endpoint_is_gated_too(client, make_token):
     trainer = make_token("TRAINER")
     resp = await client.get(
         QUESTIONS, headers={"Authorization": f"Bearer {trainer}"}
+    )
+    assert resp.status_code == 200
+
+
+async def test_timeseries_endpoint_is_gated_too(client, make_token):
+    assert (await client.get(TIMESERIES)).status_code == 401
+    participant = make_token("PARTICIPANT")
+    resp = await client.get(
+        TIMESERIES, headers={"Authorization": f"Bearer {participant}"}
+    )
+    assert resp.status_code == 403
+    trainer = make_token("TRAINER")
+    resp = await client.get(
+        TIMESERIES, headers={"Authorization": f"Bearer {trainer}"}
     )
     assert resp.status_code == 200
 

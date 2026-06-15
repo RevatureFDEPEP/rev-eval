@@ -12,7 +12,30 @@ This file stays at summary level only.
 > start, advance, or finish a feature, update its detail file (check off steps,
 > add evidence) **and** its status row here, in the same PR as the code change.
 
-**Last assessed:** 2026-06-12 (**W4-F3 completed** — RBAC + aggregate
+**Last assessed:** 2026-06-15 (**W4-F4 completed** — trainer dashboard on
+`richardh-feat-W4F4`: `/admin/dashboard` is a parallel-route page (mirrors
+W4-F2) whose two data regions — pass-rate-per-test bar chart (`/reports/aggregate`)
+and attempt-volume-over-time line chart — each carry their own `loading.tsx`
+skeleton + `SectionErrorFallback` boundary, so one failing/403 reporting call
+blanks only its panel. Server-side RBAC is the gate: a shared pure
+`resolveAccess` helper (`lib/auth/access.ts`) drives both the Edge middleware
+and the layout/page `getSession` re-check — `/admin` is **TRAINER-only**
+(matching W4-F3's backend gate; ADMIN redirected, not walled behind a 403);
+the AuthContext-gated "Analytics" nav link is an explicit UX-affordance only.
+Filters (`DashboardFilters`) write `test_id`/`from`/`to` to the query string
+(URL-shareable) via `router.replace` — dropdown immediate, date inputs
+debounced 300ms (dependency-free `useDebouncedCallback`); the slot server
+components read `searchParams` and fetch server-side (no flicker). The line
+chart is fed by a **new `GET /reports/timeseries`** (require_trainer-gated,
+GROUP BY day(submitted_at), test_id) added to the reporting service —
+`/aggregate` is collapsed per-test with no date axis; additive/zero-risk since
+nothing else consumes the service. Pure `pivotVolumeByTest` derives a total
+line + one line per quiz, collapsing to one series when a test is filtered.
+Reporting suite 45 (5 timeseries tests added over the aiosqlite fixture);
+frontend 154 (was 130: resolver matrix, URL-sync+debounce, chart transforms,
+EmptyState) + lint/build clean; live smoke: trainer dashboard 200 server-
+rendered with real data, participant 307→/unauthorized, no-cookie 307→/,
+timeseries 200/403/401 + filter via gateway. Prior: **W4-F3 completed** — RBAC + aggregate
 reporting on `richardh-feat-W4F3`: the reporting service is the first to
 re-verify the JWT itself (defense-in-depth) — `require_trainer`
 (`src/v1/dependencies/auth.py`, python-jose + shared `JWT_SECRET`) returns 401
@@ -154,7 +177,7 @@ Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 | W4-F1 | Candidate results reporting endpoints (filtering + pagination) | 16 | ✅ Completed | [w4-f1-results-reporting-endpoints.md](features/w4-f1-results-reporting-endpoints.md) |
 | W4-F2 | Candidate results page (Suspense, error boundaries, chart) | 17 | ✅ Completed | [w4-f2-candidate-results-page.md](features/w4-f2-candidate-results-page.md) |
 | W4-F3 | Role-based authz (API) + aggregate reporting queries | 18 | ✅ Completed | [w4-f3-rbac-aggregate-queries.md](features/w4-f3-rbac-aggregate-queries.md) |
-| W4-F4 | Trainer dashboard frontend (server RBAC, URL-synced filters) | 19 | ❌ Not Started | [w4-f4-trainer-dashboard-frontend.md](features/w4-f4-trainer-dashboard-frontend.md) |
+| W4-F4 | Trainer dashboard frontend (server RBAC, URL-synced filters) | 19 | ✅ Completed | [w4-f4-trainer-dashboard-frontend.md](features/w4-f4-trainer-dashboard-frontend.md) |
 | W4-F5 | Technical debt audit + ADR documentation | 20 | ❌ Not Started | [w4-f5-tech-debt-audit-adrs.md](features/w4-f5-tech-debt-audit-adrs.md) |
 
 ## Suggested order of attack
@@ -170,5 +193,5 @@ Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 9. ~~**W3-F5 + W3-F6**~~ — verification layer, done. (W3-F5 — PR #79; W3-F6 — branch `richardh-feat-W3F6`.)
 9a. ~~**W3-F7 review remediation before W3-F6**~~ — done (branch `richardh-feat-W3F7`): timer fix + reuse semantics landed before the Playwright happy path; the `/questions/sample` role gate previews W4-F3.
 10. ~~**W2-M10 → W4-F1 → W4-F3**~~ — done; RBAC gate + aggregate endpoints landed on `richardh-feat-W4F3`.
-11. **~~W4-F2~~ → W4-F4** — results page done (branch `richardh-feat-W4F2`, builds `<ChartWrapper>`); next the trainer dashboard that reuses it — its W4-F3 backend is now live.
+11. ~~**W4-F2 → W4-F4**~~ — done; trainer dashboard on `richardh-feat-W4F4` reuses `<ChartWrapper>`, adds the `/reports/timeseries` endpoint, server-side `/admin` RBAC, and URL-synced filters.
 12. **W4-F5 last** — debt audit + ADRs need a substantially complete codebase; capture the W4-F1 and W3-F2 ADR decisions as those features land.

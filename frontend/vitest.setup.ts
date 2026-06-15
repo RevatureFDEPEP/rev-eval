@@ -8,6 +8,17 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 
+// jsdom has no ResizeObserver; recharts' ResponsiveContainer needs it. A no-op
+// stub lets chart components mount under test (geometry is 0×0, which is fine —
+// chart tests assert structure/empty-states, not rendered SVG dimensions).
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
 afterEach(() => {
   cleanup();
 });

@@ -18,6 +18,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { handleSignOut } from "@/app/(dashboard)/actions";
 import { toast } from "sonner";
 import {
+  BarChart3,
   BookOpen,
   ChevronLeft,
   ChevronRight,
@@ -81,8 +82,17 @@ export function DashboardShell({ children }: DashboardShellProps) {
       items.push({ label: "Questions", href: `${navBase}/questions`, icon: BookOpen });
     }
 
+    // Trainer analytics dashboard (W4-F4). This conditional render is a UX
+    // affordance ONLY — hiding the link is not a security control. The gate is
+    // server-side: the Edge middleware + the /admin layout/page role check
+    // (and the W4-F3 require_trainer backend gate). A non-trainer who navigates
+    // to /admin/dashboard directly is still redirected.
+    if ((user?.role ?? "").toUpperCase() === "TRAINER") {
+      items.push({ label: "Analytics", href: "/admin/dashboard", icon: BarChart3 });
+    }
+
     return items;
-  }, [navBase]);
+  }, [navBase, user?.role]);
 
   const activeHref = useMemo(() => {
     if (!pathname) return "";
