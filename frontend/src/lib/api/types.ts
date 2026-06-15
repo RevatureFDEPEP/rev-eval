@@ -390,6 +390,49 @@ export interface QuizSubmitResponse {
   analysis?: string;
 }
 
+// ===== W3-F3: Quiz session (sequential-reveal, score-free contract) =====
+
+/** A question as exposed to the candidate — answer key stripped server-side. */
+export interface SanitizedQuestion {
+  id: string;
+  /** "mcq" | "multi" | "true_false" | "text" (backend QuestionType enum) */
+  type: string;
+  question_text: string;
+  /** 1-indexed option_ids; null for TRUE_FALSE/TEXT. */
+  options?: { option_id: number; text: string }[] | null;
+  difficulty?: string | null;
+}
+
+/** Response of POST /v1/api/sessions/ — only the current question is revealed. */
+export interface SessionResponse {
+  session_id: string;
+  session_token: string;
+  server_now: string;
+  expires_at: string;
+  current_index: number;
+  total_questions: number;
+  question?: SanitizedQuestion | null;
+  /** Autosaved partial answers, present only on a resumed session (W3-F4). */
+  draft_answers?: Record<string, number[]> | null;
+}
+
+/** Response of POST /v1/api/sessions/{id}/answer — deliberately score-free. */
+export interface AnswerResult {
+  question_id: string;
+  current_index: number;
+  total_questions: number;
+  status: 'ACTIVE' | 'SUBMITTED' | 'EXPIRED';
+  submitted_at?: string | null;
+  next_question?: SanitizedQuestion | null;
+}
+
+/** Display identity seeded server-side into AuthContext (never the raw cookie). */
+export interface AuthIdentity {
+  userId: number;
+  email: string;
+  role: string;
+}
+
 // ===== TYPE ALIASES (for backwards compatibility) =====
 
 /** @deprecated Use SubmissionStatus instead */

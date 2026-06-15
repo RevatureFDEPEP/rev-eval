@@ -108,10 +108,11 @@ export const api = {
   /**
    * POST request
    */
-  async post<T>(endpoint: string, data?: unknown): Promise<T> {
+  async post<T>(endpoint: string, data?: unknown, headers?: HeadersInit): Promise<T> {
     const response = await fetchApi(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
+      headers,
     });
 
     return response.json();
