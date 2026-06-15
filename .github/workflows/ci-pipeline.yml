@@ -25,6 +25,20 @@ jobs:
       SERVICE_NAME: ${{ matrix.service }}
       PORT: "8004"
       SERVICE_HOSTNAME: "localhost"
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
     strategy:
       fail-fast: false
       matrix:

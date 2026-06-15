@@ -1,14 +1,30 @@
 'use client';
 
-import { useEffect, useState, useCallback, use, useMemo, useRef } from 'react';
-import { useRouter, useSearchParams, notFound } from 'next/navigation';
+import { useEffect, useState, useCallback, use, useMemo, useRef, useReducer } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
-import { getTest, createTestSession, getPartAQuestions, submitPartA, getPartBQuestions, submitPartB, getCurrentUser } from '@/lib/api';
+import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import {
+  getTest,
+  createTestSession,
+  getPartAQuestions,
+  submitPartA,
+  getPartBQuestions,
+  submitPartB,
+  getCurrentUser,
+  ApiError,
+} from '@/lib/api';
 import { Test, QuizQuestion, QuizAnswer } from '@/lib/api/types';
 import { useTimer } from '@/lib/hooks/useTimer';
+import { useAutosave } from '@/lib/hooks/useAutosave';
+import {
+  submitReducer,
+  SUBMIT_INITIAL_STATE,
+  canSubmit,
+  isTerminalError,
+} from '@/lib/submitMachine';
 import { Timer } from '@/components/quiz/Timer';
 import { ProgressHeader } from '@/components/quiz/ProgressHeader';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
@@ -24,14 +40,12 @@ interface QuizTestPageProps {
 type Part = 'A' | 'B';
 type QuizState = 'loading' | 'part-a' | 'transitioning' | 'part-b' | 'submitting' | 'completed' | 'error';
 
-// Answer type can be: number (mcq), number[] (multi), boolean (true_false)
 type AnswerValue = number | number[] | boolean;
 
 export default function QuizTestPage({ params }: QuizTestPageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Use React's use() hook to unwrap Promise params in Client Component
   const resolvedParams = use(params);
 
   const testId = parseInt(resolvedParams.testId, 10);
@@ -48,8 +62,13 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   const [partBQuestions, setPartBQuestions] = useState<QuizQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   const [answers, setAnswers] = useState<Map<string, AnswerValue>>(new Map());
-  const [submittedPartAQuestionIds, setSubmittedPartAQuestionIds] = useState<Set<string>>(() => new Set());
+  const [submittedPartAQuestionIds, setSubmittedPartAQuestionIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const [error, setError] = useState<string | null>(null);
+
+  // 6-state submit machine — tracks submit button lifecycle independently of page state
+  const [submitState, dispatchSubmit] = useReducer(submitReducer, SUBMIT_INITIAL_STATE);
 
   const answeredQuestionIds = useMemo(() => {
     const combined = new Set<string>();
@@ -73,7 +92,8 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
-      e.returnValue = 'You are leaving the test. Your progress may be lost and the test may be marked as abandoned. Are you sure you want to leave?';
+      e.returnValue =
+        'You are leaving the test. Your progress may be lost and the test may be marked as abandoned. Are you sure you want to leave?';
       return e.returnValue;
     };
 
@@ -92,9 +112,10 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
       : undefined;
 
   const expectedPartBCount = useMemo(() => {
-    const totalRemaining = derivedTotalQuestions != null
-      ? Math.max(derivedTotalQuestions - partAQuestions.length, 0)
-      : 0;
+    const totalRemaining =
+      derivedTotalQuestions != null
+        ? Math.max(derivedTotalQuestions - partAQuestions.length, 0)
+        : 0;
     return Math.max(totalRemaining, partBQuestions.length);
   }, [derivedTotalQuestions, partAQuestions.length, partBQuestions.length]);
 
@@ -118,7 +139,6 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
 
   const timer = useTimer({
     durationSeconds: totalDuration || 0,
-    // Guard against NaN before hooks were validated — safe string fallback
     testId: isNaN(testId) ? '0' : testId.toString(),
     onTimeExpired: () => handleTimeExpiredRef.current(),
     autoStart: false,
@@ -127,6 +147,9 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   const pauseTimer = timer.pause;
   const resumeTimer = timer.resume;
   const resetTimer = timer.reset;
+
+  // Debounced autosave — persists draft answers to localStorage with idempotency keys
+  useAutosave({ sessionId, answers });
 
   useEffect(() => {
     if (state === 'part-a' || state === 'part-b') {
@@ -138,11 +161,12 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
 
   // Submit Part A handler
   const handleSubmitPartA = useCallback(async () => {
-    if (!sessionId) return;
+    if (!sessionId || !canSubmit(submitState)) return;
 
     try {
       setState('transitioning');
       pauseTimer();
+      dispatchSubmit({ type: 'SUBMIT' });
 
       const answersArray: QuizAnswer[] = Array.from(answers.entries()).map(([qId, answer]) => ({
         question_id: qId,
@@ -158,35 +182,79 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
         answers: answersArray,
       });
 
+      dispatchSubmit({ type: 'SUCCESS' });
+
       const partBData = await getPartBQuestions(sessionId);
       setPartBQuestions(partBData.questions);
       setQuestions(partBData.questions);
       setCurrentPart('B');
       setCurrentQuestionIndex(0);
-      setSubmittedPartAQuestionIds(new Set(partAQuestions.map((question) => question.question_id)));
+      setSubmittedPartAQuestionIds(
+        new Set(partAQuestions.map((question) => question.question_id))
+      );
       setAnswers(new Map());
+      dispatchSubmit({ type: 'RESET' }); // reset machine for Part B submit
 
       localStorage.setItem(`quiz-part-${testId}`, 'B');
       localStorage.removeItem(`quiz-answers-${testId}`);
+      localStorage.removeItem(`quiz-draft-${sessionId}`);
 
       setState('part-b');
       resumeTimer();
       toast.success('Part A submitted! Starting Part B...');
     } catch (err) {
-      console.error('Part A submission error:', err);
-      toast.error('Failed to submit Part A. Please try again.');
-      setState('part-a');
-      resumeTimer();
+      if (err instanceof ApiError) {
+        if (err.status === 409) {
+          // Already submitted — treat as success and move to Part B
+          dispatchSubmit({ type: 'ERROR_TERMINAL_409', message: 'Part A already submitted.' });
+          toast.info('Part A was already submitted. Loading Part B...');
+          try {
+            const partBData = await getPartBQuestions(sessionId);
+            setPartBQuestions(partBData.questions);
+            setQuestions(partBData.questions);
+            setCurrentPart('B');
+            setCurrentQuestionIndex(0);
+            setSubmittedPartAQuestionIds(
+              new Set(partAQuestions.map((question) => question.question_id))
+            );
+            setAnswers(new Map());
+            dispatchSubmit({ type: 'RESET' });
+            setState('part-b');
+            resumeTimer();
+          } catch {
+            setState('error');
+            setError('Session already submitted but could not load Part B.');
+          }
+        } else if (err.status === 410) {
+          // Session expired — cannot continue
+          dispatchSubmit({ type: 'ERROR_TERMINAL_410', message: 'Session has expired.' });
+          setError('Your session has expired. Please contact your trainer to restart.');
+          setState('error');
+          toast.error('Session expired.');
+        } else {
+          dispatchSubmit({ type: 'ERROR_RECOVERABLE', message: err.message });
+          toast.error('Failed to submit Part A. Please try again.');
+          setState('part-a');
+          resumeTimer();
+        }
+      } else {
+        dispatchSubmit({ type: 'ERROR_RECOVERABLE', message: 'Network error. Please try again.' });
+        console.error('Part A submission error:', err);
+        toast.error('Failed to submit Part A. Please try again.');
+        setState('part-a');
+        resumeTimer();
+      }
     }
-  }, [sessionId, answers, pauseTimer, resumeTimer, partAQuestions, testId]);
+  }, [sessionId, submitState, answers, pauseTimer, resumeTimer, partAQuestions, testId]);
 
   // Final submit handler
   const handleFinalSubmit = useCallback(async () => {
-    if (!sessionId) return;
+    if (!sessionId || !canSubmit(submitState)) return;
 
     try {
       setState('submitting');
       pauseTimer();
+      dispatchSubmit({ type: 'SUBMIT' });
 
       const answersArray: QuizAnswer[] = Array.from(answers.entries()).map(([qId, answer]) => ({
         question_id: qId,
@@ -202,10 +270,13 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
         answers: answersArray,
       });
 
+      dispatchSubmit({ type: 'SUCCESS' });
+
       localStorage.removeItem(`quiz-session-${testId}`);
       localStorage.removeItem(`quiz-part-${testId}`);
       localStorage.removeItem(`quiz-answers-${testId}`);
       localStorage.removeItem(`quiz-timer-${testId}`);
+      localStorage.removeItem(`quiz-draft-${sessionId}`);
 
       setState('completed');
       toast.success('Quiz submitted successfully! Redirecting to your tests...');
@@ -214,12 +285,34 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
         router.push('/participant/tests');
       }, 2000);
     } catch (err) {
-      console.error('Final submission error:', err);
-      toast.error('Failed to submit quiz. Please try again.');
-      setState('part-b');
-      resumeTimer();
+      if (err instanceof ApiError) {
+        if (err.status === 409) {
+          // Already completed — navigate away
+          dispatchSubmit({ type: 'ERROR_TERMINAL_409', message: 'Quiz already submitted.' });
+          setState('completed');
+          toast.info('Quiz was already submitted. Redirecting...');
+          setTimeout(() => router.push('/participant/tests'), 2000);
+        } else if (err.status === 410) {
+          // Session expired — show terminal error
+          dispatchSubmit({ type: 'ERROR_TERMINAL_410', message: 'Session has expired.' });
+          setError('Your session has expired. Your answers could not be submitted.');
+          setState('error');
+          toast.error('Session expired. Please contact your trainer.');
+        } else {
+          dispatchSubmit({ type: 'ERROR_RECOVERABLE', message: err.message });
+          toast.error('Failed to submit quiz. Please try again.');
+          setState('part-b');
+          resumeTimer();
+        }
+      } else {
+        dispatchSubmit({ type: 'ERROR_RECOVERABLE', message: 'Network error. Please try again.' });
+        console.error('Final submission error:', err);
+        toast.error('Failed to submit quiz. Please try again.');
+        setState('part-b');
+        resumeTimer();
+      }
     }
-  }, [sessionId, answers, pauseTimer, resumeTimer, testId, router]);
+  }, [sessionId, submitState, answers, pauseTimer, resumeTimer, testId, router]);
 
   // Auto-submit handler — declared after its dependencies
   const handleTimeExpired = useCallback(async () => {
@@ -239,7 +332,6 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
 
   // Load test data and create session
   useEffect(() => {
-    // Skip if params are invalid — early-return UI handles that below
     if (isNaN(testId) || isNaN(submissionId)) return;
 
     const initializeQuiz = async () => {
@@ -251,33 +343,18 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
         setAnswers(new Map());
         setCurrentQuestionIndex(0);
 
-        console.log('🚀 Initializing quiz for testId:', testId, 'submissionId:', submissionId);
-
-        // Clear any stale localStorage data for this test
         localStorage.removeItem(`quiz-session-${testId}`);
         localStorage.removeItem(`quiz-part-${testId}`);
         localStorage.removeItem(`quiz-answers-${testId}`);
         localStorage.removeItem(`quiz-timer-${testId}`);
-        console.log('🧹 Cleared localStorage for test:', testId);
 
-        // Fetch test data
         const testData = await getTest(testId);
         setTest(testData);
-        console.log('📋 Test data loaded:', testData.name);
 
-        const durationSeconds = testData.duration_seconds || 2700;
-        resetTimer(durationSeconds);
+        const durationSeconds = testData.duration_seconds || 7200;
 
-        // Get authenticated user's ID
         const currentUser = await getCurrentUser();
         const userId = currentUser.id;
-
-        console.log('🔄 Creating new test session with:', {
-          test_id: testId,
-          submission_id: submissionId,
-          user_id: userId,
-          total_questions: testData.number_of_questions,
-        });
 
         const session = await createTestSession({
           test_id: testId,
@@ -286,12 +363,6 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
           total_questions: testData.number_of_questions,
         });
 
-        console.log('✅ Test session created successfully:', {
-          session_id: session.session_id,
-          status: session.status,
-        });
-
-        // Set session ID in state
         const activeSessionId = session.session_id || session.id || null;
         if (!activeSessionId) {
           throw new Error('Session ID is missing from session response');
@@ -299,28 +370,38 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
         setSessionId(activeSessionId);
         setCurrentPart('A');
 
-        // Store session ID in localStorage for crash recovery
+        // Use server-computed expires_at as the authoritative deadline.
+        // Append Z if missing — backend serializes naive utcnow() without timezone suffix,
+        // and Date.parse treats no-timezone strings as local time on most browsers.
+        const raw = session.expires_at;
+        const expiresAtMs = raw
+          ? Date.parse(raw.endsWith('Z') || raw.includes('+') ? raw : raw + 'Z')
+          : undefined;
+        resetTimer(durationSeconds, expiresAtMs);
+
         localStorage.setItem(`quiz-session-${testId}`, activeSessionId);
         localStorage.setItem(`quiz-part-${testId}`, 'A');
 
-        // Load Part A questions
-        console.log('📥 Fetching Part A questions for session:', activeSessionId);
         const partAData = await getPartAQuestions(activeSessionId);
-        console.log('✅ Part A questions loaded:', partAData.questions.length, 'questions');
 
         setPartAQuestions(partAData.questions);
         setQuestions(partAData.questions);
+
+        // Rehydrate draft answers from server if session has a saved draft
+        if (session.draft_answers && session.draft_answers.length > 0) {
+          const rehydrated = new Map<string, AnswerValue>();
+          for (const entry of session.draft_answers) {
+            const v = entry.answer;
+            rehydrated.set(entry.question_id, Array.isArray(v) ? v : (v as AnswerValue));
+          }
+          setAnswers(rehydrated);
+        }
+
         setState('part-a');
 
         toast.success('Quiz loaded successfully!');
       } catch (err) {
-        console.error('❌ Quiz initialization error:', err);
-
-        if (err instanceof Error) {
-          console.error('Error message:', err.message);
-          console.error('Error stack:', err.stack);
-        }
-
+        console.error('Quiz initialization error:', err);
         setError(err instanceof Error ? err.message : 'Failed to initialize quiz');
         setState('error');
         toast.error('Failed to load quiz. Please try again.');
@@ -340,7 +421,24 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   // ─── CONDITIONAL RETURNS (safe after all hooks) ──────────────────────────────
 
   if (isNaN(testId)) {
-    notFound();
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="w-full max-w-md border-red-200">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center gap-4">
+              <AlertCircle className="size-12 text-red-600" />
+              <div className="text-center">
+                <h2 className="text-lg font-semibold text-slate-900">Invalid Test ID</h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  The test ID in the URL is invalid. Received: &quot;{resolvedParams.testId}&quot;
+                </p>
+              </div>
+              <Button onClick={() => router.push('/participant/tests')}>Back to Tests</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (isNaN(submissionId)) {
@@ -360,7 +458,6 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
 
   // ─── HANDLERS ────────────────────────────────────────────────────────────────
 
-  // Answer change handler
   const handleAnswerChange = (questionId: string, answer: AnswerValue) => {
     setAnswers((prev) => {
       const newAnswers = new Map(prev);
@@ -369,12 +466,13 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
     });
   };
 
-  // Navigation handlers
   const handleNavigate = (questionId: string, targetPart: Part) => {
     if (targetPart !== currentPart) return;
 
     const sourceQuestions = targetPart === 'A' ? partAQuestions : partBQuestions;
-    const targetIndex = sourceQuestions.findIndex((question) => question.question_id === questionId);
+    const targetIndex = sourceQuestions.findIndex(
+      (question) => question.question_id === questionId
+    );
 
     if (targetIndex !== -1) {
       setCurrentQuestionIndex(targetIndex);
@@ -394,6 +492,8 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   };
 
   const handleConfirmSubmit = () => {
+    if (!canSubmit(submitState)) return;
+
     const unansweredCount = questions.length - currentPartAnsweredCount;
 
     if (unansweredCount > 0) {
@@ -428,6 +528,7 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
   }
 
   if (state === 'error') {
+    const isExpired = isTerminalError(submitState) && submitState.status === 'error_terminal_410';
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Card className="w-full max-w-md border-red-200">
@@ -435,7 +536,9 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
             <div className="flex flex-col items-center gap-4">
               <AlertCircle className="size-12 text-red-600" />
               <div className="text-center">
-                <h2 className="text-lg font-semibold text-slate-900">Error Loading Quiz</h2>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  {isExpired ? 'Session Expired' : 'Error Loading Quiz'}
+                </h2>
                 <p className="mt-2 text-sm text-slate-600">{error}</p>
               </div>
               <Button onClick={() => router.push('/participant/tests')}>Back to Tests</Button>
@@ -479,6 +582,13 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
       : partAQuestions.length + (expectedPartBCount || partBQuestions.length);
   const overallQuestionCount = totalQuestionCount > 0 ? totalQuestionCount : questions.length;
 
+  const submitDisabled = !canSubmit(submitState);
+  const submitLabel = submitState.status === 'submitting'
+    ? 'Submitting…'
+    : currentPart === 'A'
+      ? 'Submit Part A'
+      : 'Submit Quiz';
+
   return (
     <div className="min-h-screen bg-slate-50 pb-8">
       <ProgressHeader
@@ -503,8 +613,22 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
                 question={currentQuestion}
                 questionNumber={currentQuestionIndex + 1}
                 selectedAnswer={answers.get(currentQuestion.question_id) ?? null}
-                onAnswerChange={(answer) => handleAnswerChange(currentQuestion.question_id, answer)}
+                onAnswerChange={(answer) =>
+                  handleAnswerChange(currentQuestion.question_id, answer)
+                }
               />
+            )}
+
+            {/* Recoverable error banner */}
+            {submitState.status === 'error_recoverable' && (
+              <Card className="border-amber-200 bg-amber-50">
+                <CardContent className="pt-4 pb-4">
+                  <p className="text-sm text-amber-800">
+                    <AlertCircle className="mr-1 inline size-4" />
+                    {submitState.message} — please try again.
+                  </p>
+                </CardContent>
+              </Card>
             )}
 
             <Card className="border-blue-200 bg-blue-50">
@@ -515,11 +639,19 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
                       {currentPart === 'A' ? 'Ready to submit Part A?' : 'Ready to submit your quiz?'}
                     </p>
                     <p className="mt-1 text-xs text-slate-600">
-                      {currentPartAnsweredCount} of {questions.length} questions answered in Part {currentPart}
+                      {currentPartAnsweredCount} of {questions.length} questions answered in Part{' '}
+                      {currentPart}
                     </p>
                   </div>
-                  <Button onClick={handleConfirmSubmit} size="lg">
-                    {currentPart === 'A' ? 'Submit Part A' : 'Submit Quiz'}
+                  <Button
+                    onClick={handleConfirmSubmit}
+                    size="lg"
+                    disabled={submitDisabled}
+                  >
+                    {submitState.status === 'submitting' && (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    )}
+                    {submitLabel}
                   </Button>
                 </div>
               </CardContent>

@@ -284,6 +284,12 @@ export interface QuizAnswer {
   time_spent_seconds?: number;
 }
 
+export interface DraftAnswer {
+  question_id: string;
+  answer: number | number[] | boolean;
+  idempotency_key: string;
+}
+
 export interface TestSessionCreate {
   test_id: number;  // SQL test ID
   submission_id: number;  // SQL submission ID
@@ -312,6 +318,7 @@ export interface TestSession {
   user_id: number;
   status: "STARTED" | "PART_A_IN_PROGRESS" | "PART_A_COMPLETED" | "PART_B_IN_PROGRESS" | "PART_B_COMPLETED" | "GRADED" | "COMPLETED";
   started_at: string;
+  expires_at: string;
   completed_at?: string;
   total_questions: number;
   part_a_config?: {
@@ -326,6 +333,7 @@ export interface TestSession {
   };
   part_a?: TestSessionPart;
   part_b?: TestSessionPart;
+  draft_answers?: DraftAnswer[] | null;
   total_score?: number;
   percentage_score?: number;
   ai_model_used?: string;  // AI model used for evaluation (set by Lambda)

@@ -25,6 +25,7 @@ from src.repositories.quiz_session_repository import QuizSessionRepository
 from src.repositories.test_repository import TestRepository
 from src.schemas.quiz_session_schema import (
     QuizSessionCreate,
+    DraftSaveIn,
     PartASubmitIn,
     PartBSubmitIn,
     QuizSubmitOut,
@@ -597,3 +598,15 @@ class QuizSessionService:
 
         await QuizSessionRepository.save(db, session)
         return result_payload
+
+    @staticmethod
+    async def save_draft(db: AsyncSession, session_id: str, body: DraftSaveIn) -> QuizSession:
+        """Last-write-wins draft snapshot. 409 if session not in active state."""
+        session = await QuizSessionRepository.get_by_id(db, session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        active = {SessionStatus.PART_A_IN_PROGRESS, SessionStatus.PART_B_IN_PROGRESS}
+        if session.status not in active:
+            raise HTTPException(status_code=409, detail="Session is not active — draft rejected")
+        session.draft_answers = body.answers
+        return await QuizSessionRepository.save(db, session)

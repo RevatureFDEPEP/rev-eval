@@ -18,6 +18,13 @@ class SessionStatus(str, Enum):
 # Request schemas
 # ---------------------------------------------------------------------------
 
+class DraftSaveIn(BaseModel):
+    answers: List[Any]
+
+    class Config:
+        from_attributes = True
+
+
 class PartAConfig(BaseModel):
     easy: int = 3
     medium: int = 4
@@ -129,12 +136,14 @@ class QuizSessionOut(BaseModel):
     user_id: int
     status: SessionStatus
     started_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     total_questions: int
     part_a_config: Optional[Any] = None
     part_b_config: Optional[Any] = None
     part_a: Optional[Any] = None
     part_b: Optional[Any] = None
+    draft_answers: Optional[Any] = None
     total_score: Optional[float] = None
     percentage_score: Optional[float] = None
     created_at: Optional[datetime] = None
