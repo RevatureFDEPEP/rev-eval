@@ -5,6 +5,9 @@
  * Security note: this is one half of the server-side gate (the middleware runs
  * it at the edge; each /admin page re-checks via getSession). Client-side
  * conditional rendering of nav links is a UX affordance only — never the gate.
+ *
+ * AI-assisted (Claude Code); human-reviewed RBAC resolver — see
+ * docs/ai-assistance.md.
  */
 
 /** Route prefix -> roles allowed to enter it (verified JWT role claim). */

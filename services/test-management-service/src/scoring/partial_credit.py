@@ -22,6 +22,8 @@ Rationale, versus the alternatives considered:
   union without adding to the intersection) and spurious wrong options (same
   effect). A perfect answer is exactly ``1.0``, which we treat as fully correct.
 """
+# AI-assisted (Claude Code); human-reviewed scoring algorithm — see
+# docs/ai-assistance.md and ADR docs/adr/0002-multiselect-scoring-algorithm.md.
 from typing import List
 
 from src.scoring.result import ScoreResult

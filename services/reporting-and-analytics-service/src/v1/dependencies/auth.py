@@ -7,6 +7,9 @@ JWT with the shared signing key, so a caller who bypasses the gateway (curl
 straight to :8004 with spoofed X-User-Role headers) is still rejected. The
 role claim is read ONLY from the verified token payload, never from request
 headers or body.
+
+AI-assisted (Claude Code); human-reviewed authorization gate — see
+docs/ai-assistance.md.
 """
 from fastapi import Header, HTTPException
 from jose import JWTError, jwt
