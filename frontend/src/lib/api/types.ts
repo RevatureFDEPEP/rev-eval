@@ -510,6 +510,45 @@ export interface ReportAttemptsPage {
   size: number;
 }
 
+// ===== W4-F3/F4 TRAINER AGGREGATE REPORTING =====
+// Mirrors reporting-and-analytics-service src/schemas/report_schema.py.
+// All endpoints below are TRAINER-gated (require_trainer); scores are 0–100.
+
+/** Optional filters shared by /reports/aggregate and /reports/timeseries. */
+export interface ReportFilters {
+  testId?: number;
+  from?: string; // ISO date (YYYY-MM-DD); bounds the attempt start
+  to?: string; // ISO date (YYYY-MM-DD), inclusive
+}
+
+/** One row of GET /v1/api/reports/aggregate (per-test, SUBMITTED only). */
+export interface TestAggregateRow {
+  test_id: number;
+  test_name: string;
+  total_attempts: number;
+  distinct_candidates: number;
+  avg_score: number | null;
+  pass_rate: number | null; // % of attempts at/above pass_threshold
+  median_duration_seconds: number | null;
+}
+
+export interface AggregateReport {
+  items: TestAggregateRow[];
+  pass_threshold: number;
+}
+
+/** One (day, test) cell of GET /v1/api/reports/timeseries. */
+export interface TimeseriesPoint {
+  date: string; // ISO date (YYYY-MM-DD)
+  test_id: number;
+  test_name: string;
+  attempts: number;
+}
+
+export interface TimeseriesReport {
+  items: TimeseriesPoint[];
+}
+
 // ===== TYPE ALIASES (for backwards compatibility) =====
 
 /** @deprecated Use SubmissionStatus instead */

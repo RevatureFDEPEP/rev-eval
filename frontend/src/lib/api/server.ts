@@ -6,9 +6,12 @@
 import 'server-only';
 import { getSession } from '@/lib/session';
 import {
+  AggregateReport,
   AuthIdentity,
   ReportAttemptsPage,
+  ReportFilters,
   SessionOut,
+  TimeseriesReport,
   TrainerDashboardStats,
   TrainerTestInfo,
   UserReportSummary,
@@ -106,6 +109,45 @@ export async function getUserReportAttemptsServer(
   if (opts.size !== undefined) params.set('size', String(opts.size));
   const qs = params.size > 0 ? `?${params.toString()}` : '';
   const response = await authedFetch(`/v1/api/reports/user/${userId}/attempts${qs}`);
+  if (!response.ok) {
+    throw new ServerApiError(response.status, response.statusText, await response.text());
+  }
+  return response.json();
+}
+
+/** Serialize shared trainer-report filters into a query string. */
+function reportFilterParams(filters: ReportFilters = {}): string {
+  const params = new URLSearchParams();
+  if (filters.testId !== undefined) params.set('test_id', String(filters.testId));
+  if (filters.from) params.set('from', filters.from);
+  if (filters.to) params.set('to', filters.to);
+  return params.size > 0 ? `?${params.toString()}` : '';
+}
+
+/**
+ * Fetch the W4-F3 per-test aggregate report (`GET /v1/api/reports/aggregate`).
+ * TRAINER-gated — a non-trainer JWT yields 403 (surfaced via ServerApiError to
+ * the section error boundary). Drives the dashboard's pass-rate bar chart.
+ */
+export async function getAggregateReportServer(
+  filters: ReportFilters = {},
+): Promise<AggregateReport> {
+  const response = await authedFetch(`/v1/api/reports/aggregate${reportFilterParams(filters)}`);
+  if (!response.ok) {
+    throw new ServerApiError(response.status, response.statusText, await response.text());
+  }
+  return response.json();
+}
+
+/**
+ * Fetch the W4-F4 attempt-volume timeseries (`GET /v1/api/reports/timeseries`),
+ * granular by (day, test). TRAINER-gated. Drives the attempt-volume line chart;
+ * the client sums across tests for a total or draws one line per quiz.
+ */
+export async function getTimeseriesServer(
+  filters: ReportFilters = {},
+): Promise<TimeseriesReport> {
+  const response = await authedFetch(`/v1/api/reports/timeseries${reportFilterParams(filters)}`);
   if (!response.ok) {
     throw new ServerApiError(response.status, response.statusText, await response.text());
   }
