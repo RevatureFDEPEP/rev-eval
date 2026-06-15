@@ -37,6 +37,8 @@ async def get_db():
         yield db
 
 # ===== Read-only engine: test-management-service Postgres (eval_ai_dev) =====
+# AI-assisted (Claude Code); human-reviewed cross-service seam — see
+# docs/ai-assistance.md and ADR docs/adr/0001-reporting-cross-service-data-access.md.
 # Report queries SELECT from sessions/answers/tests, tables owned by the TMS
 # Alembic chain. This service never writes on this engine and never emits DDL
 # for these tables. See docs/adr/0001-reporting-cross-service-data-access.md.
