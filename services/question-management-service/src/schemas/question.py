@@ -281,6 +281,15 @@ class QuestionUpdate(BaseModel):
         return self
 
 
+class QuestionSampleRequest(BaseModel):
+    skills: list[str]
+    count: int = Field(..., ge=1, le=500)
+
+
+class QuestionSampleResponse(BaseModel):
+    question_ids: list[str]
+
+
 class QuestionResponse(BaseModel):
     """
     Response schema for Question documents.

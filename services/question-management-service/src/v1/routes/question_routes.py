@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import ValidationError
 from src.config.settings import settings
-from src.schemas.question import QuestionCreate, QuestionResponse, QuestionUpdate
+from src.schemas.question import QuestionCreate, QuestionResponse, QuestionSampleRequest, QuestionSampleResponse, QuestionUpdate
 from src.services.question_service import QuestionService
 from src.utils.s3_client import ensure_bucket, generate_presigned_put_url
 
@@ -114,6 +114,18 @@ async def get_presigned_upload_url(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate presigned URL: {str(e)}",
         ) from e
+
+
+@router.post(
+    "/sample",
+    response_model=QuestionSampleResponse,
+    status_code=200,
+    summary="Sample question IDs by skills",
+    description="Randomly sample question IDs from questions matching the given skills.",
+)
+async def sample_question_ids(body: QuestionSampleRequest):
+    ids = await QuestionService.sample_question_ids(body.skills, body.count)
+    return QuestionSampleResponse(question_ids=ids)
 
 
 @router.get(

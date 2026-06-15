@@ -9,7 +9,7 @@ import os
 from typing import Any
 
 import httpx
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 
 
 async def get_current_user_from_headers(
@@ -80,3 +80,7 @@ async def get_current_participant(
             detail="This endpoint requires participant role",
         )
     return current_user
+
+
+async def get_http_client(request: Request) -> httpx.AsyncClient:
+    return request.app.state.http_client

@@ -1,5 +1,6 @@
 from os import getenv
 
+import httpx
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -7,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import settings
 from src.db.session import init_db
 from src.v1.routes.category_route import router as category_router
+from src.v1.routes.session_route import router as session_router
 from src.v1.routes.skill_route import router as skill_router
 from src.v1.routes.test_route import router as test_router
 from src.v1.routes.test_submission_route import router as test_submission_router
@@ -35,6 +37,7 @@ app.include_router(test_router, prefix="/v1/api")
 app.include_router(skill_router, prefix="/v1/api")
 app.include_router(test_submission_router, prefix="/v1/api")
 app.include_router(category_router, prefix="/v1/api")
+app.include_router(session_router, prefix="/v1/api")
 
 
 # ---- Health Endpoint ----
@@ -43,10 +46,16 @@ def health_check():
     return {"status": "ok"}
 
 
-# ---- DB Init ----
+# ---- DB Init + HTTP client lifecycle ----
 @app.on_event("startup")
 async def on_startup():
     await init_db()
+    app.state.http_client = httpx.AsyncClient(timeout=httpx.Timeout(10.0, connect=5.0))
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    await app.state.http_client.aclose()
 
 
 # ---- Run server ----
