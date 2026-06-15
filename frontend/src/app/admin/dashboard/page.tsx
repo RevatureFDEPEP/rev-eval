@@ -1,31 +1,23 @@
 /**
- * /admin/dashboard — trainer aggregate reporting (W4-F4).
+ * Filter bar (children slot) for /admin/dashboard.
  *
- * Server component. Second-layer RBAC: even though the Edge middleware already
- * gates /admin to TRAINER, this re-checks the verified session role and
- * redirects a non-trainer who somehow bypassed it — defense in depth, the
- * server gate is never the client's responsibility.
- *
- * Filter controls + charts are wired in M4; this commit establishes the route
- * and its guard.
+ * Server component: fetches the trainer's tests to populate the selector, then
+ * renders the URL-synced <DashboardFilters>. The explicit TRAINER re-check here
+ * satisfies the spec's "even if middleware was bypassed" guard (the layout
+ * gates first, so this is belt-and-suspenders).
  */
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
+import { getTrainerTestsServer } from '@/lib/api/server';
+import { DashboardFilters } from '@/components/admin/DashboardFilters';
 
-export default async function AdminDashboardPage() {
+export default async function AdminDashboardFilters() {
   const session = await getSession();
   if (!session || session.role.toUpperCase() !== 'TRAINER') {
     redirect('/unauthorized');
   }
 
-  return (
-    <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Trainer dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Aggregate reporting across tests and candidates.
-        </p>
-      </header>
-    </main>
-  );
+  const tests = await getTrainerTestsServer();
+
+  return <DashboardFilters tests={tests.map((t) => ({ id: t.id, name: t.name }))} />;
 }
