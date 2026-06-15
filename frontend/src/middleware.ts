@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { decodeJwt } from 'jose';
+import { resolveAccess } from '@/lib/auth/access';
 
 const AUTH_COOKIE = 'auth_token';
 
@@ -10,12 +11,6 @@ const PUBLIC_PATHS = new Set<string>([
 ]);
 
 const PUBLIC_PATH_PREFIXES = ['/api/auth/'];
-
-const roleProtectedRoutes: Record<string, string[]> = {
-  '/trainer': ['TRAINER', 'ADMIN'],
-  '/participant': ['PARTICIPANT'],
-  '/dashboard': ['TRAINER', 'PARTICIPANT', 'ADMIN'],
-};
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
@@ -64,15 +59,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/participant/dashboard', request.url));
   }
 
-  // Role-protected prefixes
-  const protectedEntry = Object.entries(roleProtectedRoutes).find(
-    ([prefix]) => pathname.startsWith(prefix),
-  );
-  if (protectedEntry) {
-    const [, allowedRoles] = protectedEntry;
-    if (!allowedRoles.includes(session.role)) {
-      return NextResponse.redirect(new URL('/unauthorized', request.url));
-    }
+  // Role-protected prefixes (shared rules in @/lib/auth/access).
+  if (resolveAccess(pathname, session.role) === 'forbidden') {
+    return NextResponse.redirect(new URL('/unauthorized', request.url));
   }
 
   return NextResponse.next();
