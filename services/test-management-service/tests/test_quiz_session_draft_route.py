@@ -38,12 +38,33 @@ def test_draft_requires_answers_body():
     assert resp.status_code == 422
 
 
+def test_draft_requires_client_version():
+    """A PATCH without the monotonic `client_version` is rejected at validation."""
+    with patch(SAVE_DRAFT, new_callable=AsyncMock) as save:
+        resp = _client().patch("/sessions/abc/draft", json={"answers": {"q1": [1]}})
+    assert resp.status_code == 422
+    save.assert_not_called()
+
+
+def test_draft_rejects_non_positive_client_version_422():
+    with patch(SAVE_DRAFT, new_callable=AsyncMock) as save:
+        resp = _client().patch(
+            "/sessions/abc/draft",
+            json={"answers": {"q1": [1]}, "client_version": 0},
+        )
+    assert resp.status_code == 422
+    save.assert_not_called()
+
+
 def test_draft_rejects_oversized_payload_422():
     """An over-cap answer map is rejected at validation before reaching the
     service, so an advisory autosave can't persist an unbounded blob."""
     oversized = {f"q{i}": [1] for i in range(201)}  # > _MAX_DRAFT_QUESTIONS
     with patch(SAVE_DRAFT, new_callable=AsyncMock) as save:
-        resp = _client().patch("/sessions/abc/draft", json={"answers": oversized})
+        resp = _client().patch(
+            "/sessions/abc/draft",
+            json={"answers": oversized, "client_version": 1},
+        )
     assert resp.status_code == 422
     save.assert_not_called()
 
@@ -52,7 +73,8 @@ def test_draft_rejects_too_many_options_per_question_422():
     with patch(SAVE_DRAFT, new_callable=AsyncMock) as save:
         resp = _client().patch(
             "/sessions/abc/draft",
-            json={"answers": {"q1": list(range(51))}},  # > _MAX_OPTIONS_PER_QUESTION
+            # > _MAX_OPTIONS_PER_QUESTION
+            json={"answers": {"q1": list(range(51))}, "client_version": 1},
         )
     assert resp.status_code == 422
     save.assert_not_called()
@@ -60,7 +82,10 @@ def test_draft_rejects_too_many_options_per_question_422():
 
 def test_draft_rejects_negative_option_id_422():
     with patch(SAVE_DRAFT, new_callable=AsyncMock) as save:
-        resp = _client().patch("/sessions/abc/draft", json={"answers": {"q1": [-1]}})
+        resp = _client().patch(
+            "/sessions/abc/draft",
+            json={"answers": {"q1": [-1]}, "client_version": 1},
+        )
     assert resp.status_code == 422
     save.assert_not_called()
 
@@ -73,16 +98,23 @@ def test_draft_happy_path_returns_ack():
         saved_at=datetime(2026, 6, 12, 10, 0, 0),
     )
     with patch(SAVE_DRAFT, new_callable=AsyncMock, return_value=ack):
-        resp = _client().patch("/sessions/abc/draft", json={"answers": {"q2": [1]}})
+        resp = _client().patch(
+            "/sessions/abc/draft", json={"answers": {"q2": [1]}, "client_version": 1}
+        )
     assert resp.status_code == 200
     body = resp.json()
     assert body["current_index"] == 2
     assert body["status"] == "ACTIVE"
+    # saved_at is a naive-UTC datetime; it must serialize with an explicit UTC
+    # offset so the client parses it as UTC, not local time (W3-F4 hygiene).
+    assert body["saved_at"] == "2026-06-12T10:00:00+00:00"
 
 
 def test_draft_missing_session_maps_404():
     with patch(SAVE_DRAFT, new_callable=AsyncMock, side_effect=ValueError("nope")):
-        resp = _client().patch("/sessions/abc/draft", json={"answers": {"q2": [1]}})
+        resp = _client().patch(
+            "/sessions/abc/draft", json={"answers": {"q2": [1]}, "client_version": 1}
+        )
     assert resp.status_code == 404
 
 
@@ -92,7 +124,9 @@ def test_draft_wrong_user_maps_403():
         new_callable=AsyncMock,
         side_effect=QuizSessionError("forbidden", status_code=403),
     ):
-        resp = _client().patch("/sessions/abc/draft", json={"answers": {"q2": [1]}})
+        resp = _client().patch(
+            "/sessions/abc/draft", json={"answers": {"q2": [1]}, "client_version": 1}
+        )
     assert resp.status_code == 403
 
 
@@ -102,5 +136,7 @@ def test_draft_inactive_session_maps_409():
         new_callable=AsyncMock,
         side_effect=QuizSessionError("not active", status_code=409),
     ):
-        resp = _client().patch("/sessions/abc/draft", json={"answers": {"q2": [1]}})
+        resp = _client().patch(
+            "/sessions/abc/draft", json={"answers": {"q2": [1]}, "client_version": 1}
+        )
     assert resp.status_code == 409

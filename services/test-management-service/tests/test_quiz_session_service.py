@@ -366,40 +366,77 @@ class TestSaveDraft:
     async def test_persists_without_advancing(self, db_session):
         await self._seed_active(db_session)
         resp = await QuizSessionService.save_draft(
-            db_session, "draft-sess", 42, {"q2": [1, 2]}
+            db_session, "draft-sess", 42, {"q2": [1, 2]}, 1
         )
         # index/status must be untouched — autosave never scores or advances
         assert resp.current_index == 1
         assert resp.status == QuizSessionStatus.ACTIVE
         assert resp.saved_at is not None
+        assert resp.applied is True
+        assert resp.draft_version == 1
         persisted = await db_session.get(QuizSession, "draft-sess")
         assert persisted.draft_answers == {"q2": [1, 2]}
         assert persisted.current_index == 1
 
-    async def test_last_write_wins(self, db_session):
+    async def test_newer_version_wins(self, db_session):
         await self._seed_active(db_session)
-        await QuizSessionService.save_draft(db_session, "draft-sess", 42, {"q2": [1]})
-        await QuizSessionService.save_draft(db_session, "draft-sess", 42, {"q2": [2]})
+        await QuizSessionService.save_draft(
+            db_session, "draft-sess", 42, {"q2": [1]}, 1
+        )
+        resp = await QuizSessionService.save_draft(
+            db_session, "draft-sess", 42, {"q2": [2]}, 2
+        )
+        assert resp.applied is True
         persisted = await db_session.get(QuizSession, "draft-sess")
         assert persisted.draft_answers == {"q2": [2]}
+        assert persisted.draft_version == 2
+
+    async def test_stale_version_rejected_keeps_fresher_snapshot(self, db_session):
+        # A reordered save: the fresher v2 lands first, the stale v1 arrives late
+        # and must NOT clobber it. The late save is a benign no-op (applied=False).
+        await self._seed_active(db_session)
+        await QuizSessionService.save_draft(
+            db_session, "draft-sess", 42, {"q2": [2]}, 2
+        )
+        resp = await QuizSessionService.save_draft(
+            db_session, "draft-sess", 42, {"q2": [1]}, 1
+        )
+        assert resp.applied is False
+        assert resp.draft_version == 2
+        persisted = await db_session.get(QuizSession, "draft-sess")
+        assert persisted.draft_answers == {"q2": [2]}
+        assert persisted.draft_version == 2
+
+    async def test_equal_version_rejected(self, db_session):
+        # A duplicate/replayed save at the same version is rejected, not applied.
+        await self._seed_active(db_session)
+        await QuizSessionService.save_draft(
+            db_session, "draft-sess", 42, {"q2": [1]}, 3
+        )
+        resp = await QuizSessionService.save_draft(
+            db_session, "draft-sess", 42, {"q2": [9]}, 3
+        )
+        assert resp.applied is False
+        persisted = await db_session.get(QuizSession, "draft-sess")
+        assert persisted.draft_answers == {"q2": [1]}
 
     async def test_wrong_user_rejected_403(self, db_session):
         await self._seed_active(db_session, user_id=42)
         with pytest.raises(QuizSessionError) as exc:
             await QuizSessionService.save_draft(
-                db_session, "draft-sess", 99, {"q2": [1]}
+                db_session, "draft-sess", 99, {"q2": [1]}, 1
             )
         assert exc.value.status_code == 403
 
     async def test_missing_session_raises_value_error(self, db_session):
         with pytest.raises(ValueError):
-            await QuizSessionService.save_draft(db_session, "nope", 42, {"q2": [1]})
+            await QuizSessionService.save_draft(db_session, "nope", 42, {"q2": [1]}, 1)
 
     async def test_submitted_session_rejected_409(self, db_session):
         await self._seed_active(db_session, status=QuizSessionStatus.SUBMITTED)
         with pytest.raises(QuizSessionError) as exc:
             await QuizSessionService.save_draft(
-                db_session, "draft-sess", 42, {"q2": [1]}
+                db_session, "draft-sess", 42, {"q2": [1]}, 1
             )
         assert exc.value.status_code == 409
 
@@ -407,7 +444,7 @@ class TestSaveDraft:
         await self._seed_active(db_session, expires_delta=timedelta(minutes=-1))
         with pytest.raises(QuizSessionError) as exc:
             await QuizSessionService.save_draft(
-                db_session, "draft-sess", 42, {"q2": [1]}
+                db_session, "draft-sess", 42, {"q2": [1]}, 1
             )
         assert exc.value.status_code == 409
         persisted = await db_session.get(QuizSession, "draft-sess")
@@ -415,17 +452,21 @@ class TestSaveDraft:
 
     async def test_get_session_returns_saved_draft(self, db_session):
         await self._seed_active(db_session)
-        await QuizSessionService.save_draft(db_session, "draft-sess", 42, {"q2": [3]})
+        await QuizSessionService.save_draft(
+            db_session, "draft-sess", 42, {"q2": [3]}, 1
+        )
         docs = [question_doc(1), question_doc(2), question_doc(3)]
         with patch(
             QUESTION_CLIENT, return_value=mock_question_client(sample_handler(docs))
         ):
             resp = await QuizSessionService.get_session(db_session, "draft-sess", 42)
         assert resp.draft_answers == {"q2": [3]}
+        assert resp.draft_version == 1
 
     async def test_create_session_resume_rehydrates_draft(self, db_session):
         # The page mints via create_session; its idempotent resume branch must
-        # echo draft_answers so the client can restore the in-progress selection.
+        # echo draft_answers (and draft_version, so the client's autosave counter
+        # resumes above the last persisted version) to restore the selection.
         test = await make_quiz(db_session, number_of_questions=2)
         docs = [question_doc(1), question_doc(2)]
         with patch(
@@ -433,8 +474,9 @@ class TestSaveDraft:
         ):
             first = await QuizSessionService.create_session(db_session, test.id, 42)
             await QuizSessionService.save_draft(
-                db_session, first.session_id, 42, {"q1": [2]}
+                db_session, first.session_id, 42, {"q1": [2]}, 5
             )
             resumed = await QuizSessionService.create_session(db_session, test.id, 42)
         assert resumed.session_id == first.session_id
         assert resumed.draft_answers == {"q1": [2]}
+        assert resumed.draft_version == 5

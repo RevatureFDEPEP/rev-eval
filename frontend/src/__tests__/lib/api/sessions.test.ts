@@ -32,15 +32,16 @@ afterEach(() => {
 describe('saveDraft', () => {
   it('does not retry on a transient failure (single attempt)', async () => {
     vi.mocked(api.patch).mockRejectedValue(transient())
-    await expect(saveDraft('s1', { q1: [1] })).rejects.toBeInstanceOf(ApiError)
+    await expect(saveDraft('s1', { q1: [1] }, 1)).rejects.toBeInstanceOf(ApiError)
     expect(api.patch).toHaveBeenCalledTimes(1)
   })
 
-  it('sends the answers map to the draft endpoint', async () => {
+  it('sends the answers map and client_version to the draft endpoint', async () => {
     vi.mocked(api.patch).mockResolvedValue({} as never)
-    await saveDraft('s1', { q1: [1, 2] })
+    await saveDraft('s1', { q1: [1, 2] }, 3)
     expect(api.patch).toHaveBeenCalledWith('/v1/api/sessions/s1/draft', {
       answers: { q1: [1, 2] },
+      client_version: 3,
     })
   })
 })
