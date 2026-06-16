@@ -38,13 +38,19 @@ structural graph can be built **deterministically, no model required**.
 - **Model runtime: Ollama in a container**, profile-gated.
   - Extraction/query LLM: `qwen2.5:7b-instruct` (~5GB loaded; good small-model
     structured output).
-  - Embeddings: `nomic-embed-text` (~275MB).
+  - Embeddings: `nomic-embed-text` (768-dim, ~275MB). Note: we call the Ollama embed
+    API directly rather than LightRAG's `ollama_embed` helper, which hard-codes
+    `embedding_dim=1024` and fails validation against nomic's 768.
 - **Toggle / memory control:**
   - Own compose file `tools/knowledge-graph/docker-compose.kg.yml`, Ollama on a **`kg`
     profile** → not started by the main stack; `up`/`down` = on/off.
-  - `OLLAMA_KEEP_ALIVE=0` → model unloaded from RAM immediately after each request
-    (cold-start next call, ~0 idle footprint). Idle container itself is tiny.
-  - `docker compose -f ... down` frees everything.
+  - `OLLAMA_KEEP_ALIVE` default **`5m`** (configurable via `KG_KEEP_ALIVE`): model
+    stays warm during active use, auto-unloads after 5 min idle. *(Revised from the
+    original `0`: unloading after every request reloads the model on each of the
+    hundreds of embed/LLM calls an ingest makes — cripplingly slow + reload-contention
+    400s. `0` remains available for a zero-idle stance, not for ingest.)*
+  - `kg.py down` removes the container → frees all model RAM immediately (the hard
+    off switch). Pulled models persist in a volume so re-`up` is fast.
 
 ## Two-layer graph design
 
@@ -115,10 +121,9 @@ CLI: `kg.py up|down`, `ingest [--include-source]`, `query "..."`,
 No catalog spec; validate against this plan's acceptance. Pass bar = all of:
 1. **Layer 1 model-off:** `python kg.py structure "W4-F1"` with Ollama **down** returns
    ADR 0001 + plan + evidence files. Proves Layer 1 needs no model.
-2. **Toggle + memory:** `python kg.py up` → `docker ps` shows Ollama; `docker stats`
-   ~0 model RAM idle. First `query` loads model; after response `docker stats` shows RAM
-   drop (KEEP_ALIVE=0 confirmed). `python kg.py down` → `docker ps` empty, host RAM
-   back to baseline.
+2. **Toggle + memory:** `python kg.py up` → `docker ps` shows Ollama. Model loads on
+   first call and auto-unloads after the keep-alive idle window (default 5m).
+   `python kg.py down` → `docker ps` empty, all model RAM freed.
 3. **Semantic query:** after `ingest`, `query "Why was Jaccard chosen for multi-select
    scoring?"` returns an answer grounded in ADR 0002.
 4. **Export:** `export --format mermaid` renders the feature/ADR/plan graph.

@@ -23,11 +23,27 @@ def check_ollama() -> None:
         )
 
 
+async def _embed(texts):
+    """Embed via the Ollama client directly.
+
+    We deliberately do NOT use lightrag.llm.ollama.ollama_embed: it is decorated
+    with a fixed embedding_dim=1024, which fails validation against the 768-dim
+    nomic-embed-text. Calling the client ourselves lets our EmbeddingFunc declare
+    the correct dim (config.EMBED_DIM).
+    """
+    import numpy as np
+    import ollama
+
+    client = ollama.AsyncClient(host=config.OLLAMA_HOST)
+    resp = await client.embed(model=config.EMBED_MODEL, input=texts)
+    return np.array(resp["embeddings"])
+
+
 def make_rag():
     """Construct a LightRAG instance pointed at the containerized Ollama."""
     try:
         from lightrag import LightRAG
-        from lightrag.llm.ollama import ollama_embed, ollama_model_complete
+        from lightrag.llm.ollama import ollama_model_complete
         from lightrag.utils import EmbeddingFunc
     except ImportError:
         sys.exit(
@@ -44,9 +60,7 @@ def make_rag():
         embedding_func=EmbeddingFunc(
             embedding_dim=config.EMBED_DIM,
             max_token_size=8192,
-            func=lambda texts: ollama_embed(
-                texts, embed_model=config.EMBED_MODEL, host=config.OLLAMA_HOST
-            ),
+            func=_embed,
         ),
     )
 

@@ -12,13 +12,26 @@ services:
     ports:
       - "11434:11434"
     environment:
-      # Unload the model from RAM immediately after each request → ~0 idle footprint.
-      # Trade-off: a cold-start reload on the next call. See README "Memory".
-      OLLAMA_KEEP_ALIVE: "0"
+      # Keep the model warm during active use, then auto-unload after this idle
+      # window (default 5m) → RAM freed when you stop querying, but NOT reloaded
+      # between the hundreds of calls a single ingest makes. `kg.py down` is the
+      # hard "free all RAM now" switch. Set KG_KEEP_ALIVE=0 for zero idle RAM at
+      # the cost of a model reload on EVERY request (cripplingly slow for ingest).
+      OLLAMA_KEEP_ALIVE: "${KG_KEEP_ALIVE:-5m}"
     volumes:
       # Persist pulled models across on/off cycles so we don't re-download.
       - ollama-models:/root/.ollama
     restart: unless-stopped
+    # GPU opt-in: requires the NVIDIA Container Toolkit on the host
+    # (`nvidia-ctk`, docker `nvidia` runtime). Without it, leave commented —
+    # Ollama runs CPU-only. Uncomment to offload to the GPU(s):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
 
 volumes:
   ollama-models:

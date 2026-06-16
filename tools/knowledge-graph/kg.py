@@ -46,7 +46,8 @@ def cmd_up(_: argparse.Namespace) -> int:
             return rc
     print(
         f"\nKG model runtime up at {config.OLLAMA_HOST}.\n"
-        "Idle RAM ~0 (OLLAMA_KEEP_ALIVE=0 unloads after each request).\n"
+        "Model auto-unloads after idle (OLLAMA_KEEP_ALIVE, default 5m); "
+        "`python kg.py down` frees all RAM now.\n"
         "Next: python kg.py ingest  then  python kg.py query \"...\""
     )
     return 0

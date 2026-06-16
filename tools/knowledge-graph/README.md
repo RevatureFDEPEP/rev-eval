@@ -25,7 +25,8 @@ python kg.py structure ADR-0001
 python kg.py export --format mermaid --out graph.mmd
 python kg.py export --format json --out graph.json
 
-# Layer 2 — semantic Q&A:
+# Layer 2 — semantic Q&A (use a venv; required on PEP-668 / Arch systems):
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python kg.py up                          # start Ollama + pull models (first run ~5GB)
 python kg.py ingest                      # index docs/ (+ evidence source files)
@@ -51,11 +52,25 @@ python kg.py down                        # stop Ollama, free all model RAM
 
 - Ollama runs as **one container** behind the `kg` Docker Compose profile, so the
   root `docker compose up` never starts it. `python kg.py up`/`down` is the switch.
-- `OLLAMA_KEEP_ALIVE=0` (set in `docker-compose.kg.yml`) unloads the model from RAM
-  **immediately after each request** → ~zero idle footprint while the container
-  idles. Trade-off: a cold-start reload (a few seconds) on the next call.
-- `python kg.py down` removes the container entirely — host RAM back to baseline.
-  Pulled models persist in the `ollama-models` volume, so re-`up` is fast.
+- **`python kg.py down` is the hard "free all RAM now" switch** — it removes the
+  container, so the model and its memory go with it. Pulled models persist in the
+  `ollama-models` volume, so re-`up` is fast (no re-download).
+- While the container is *up*, `OLLAMA_KEEP_ALIVE` (default `5m`, set in
+  `docker-compose.kg.yml`) keeps the model warm during active use and **auto-unloads
+  it after 5 min idle** → RAM frees itself when you stop querying. The idle container
+  with no model loaded is tiny.
+- Why not unload after *every* request (`KG_KEEP_ALIVE=0`)? A single `ingest` makes
+  hundreds of embed/LLM calls; reloading the model each time is cripplingly slow and
+  causes reload-contention errors. `0` is available via `KG_KEEP_ALIVE=0` for a
+  pure-idle/zero-RAM stance, but don't use it while ingesting.
+
+## GPU (optional, much faster ingest)
+
+CPU-only by default so `up` works anywhere. To offload to NVIDIA GPU(s): install
+the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+on the host, then uncomment the `deploy.resources` block in `docker-compose.kg.yml`
+and `python kg.py down && python kg.py up`. CPU-only ingest of all of `docs/` with a
+7B model is slow; a GPU (or a smaller model via `KG_LLM_MODEL`) cuts it dramatically.
 
 ## Config (env overrides)
 
@@ -65,12 +80,13 @@ python kg.py down                        # stop Ollama, free all model RAM
 | `KG_LLM_MODEL` | `qwen2.5:7b-instruct` | extraction / answer model |
 | `KG_EMBED_MODEL` | `nomic-embed-text` | embedding model |
 | `KG_EMBED_DIM` | `768` | embedding dim (must match the embed model) |
+| `KG_KEEP_ALIVE` | `5m` | model idle-unload window; `0` = unload every request (slow) |
 
 ## Layout
 
 ```
 kg.py                     CLI entrypoint (argparse dispatch)
-docker-compose.kg.yml     Ollama service, kg profile, KEEP_ALIVE=0
+docker-compose.kg.yml     Ollama service, kg profile, idle-unload keep-alive
 requirements.txt          Layer 2 deps (Layer 1 needs none)
 src/config.py             paths + model config
 src/structural.py         Layer 1 parser + `structure`
