@@ -12,17 +12,18 @@ This file stays at summary level only.
 > start, advance, or finish a feature, update its detail file (check off steps,
 > add evidence) **and** its status row here, in the same PR as the code change.
 
-**Last assessed:** 2026-06-12 — **Tianya Chen (`tianyac` branch)**
+**Last assessed:** 2026-06-16 — **Tianya Chen (`tianyac` branch)**
 
 Work completed across `tianyac-feat-nginx` (merged), `tianyac-feat-unit-test`
-(PR #45 merged), and `tianyac` CI pipeline commits. Documentation system added
-on this branch (`tianyac-feat-doc`): `docs/FEATURE_STATUS.md` +
+(PR #45 merged), `tianyac` CI pipeline commits, and `tianyac-feat-session`
+(W3-F1). Documentation system added on `tianyac-feat-doc`: `docs/FEATURE_STATUS.md` +
 `docs/features/` detail files for all 21 features, replacing `docs/plans/`.
 
-**Progress summary:** W2-F1 (nginx TLS + basic routing), W2-F2 (frontend +
-backend unit tests), W2-F4 (Ruff/ESLint CI gates), W2-F6 (question authoring
-schema + tests) are partially done (🟡); all other W2, all W3, and all W4
-features not yet started on this branch.
+**Progress summary:** W3-F1 (quiz session backend) ✅ complete on
+`tianyac-feat-session` (commit `ca6877d`). W2-F1 (nginx TLS + basic routing),
+W2-F2 (frontend + backend unit tests), W2-F4 (Ruff/ESLint CI gates), W2-F6
+(question authoring schema + tests) partially done (🟡). All other W2,
+remaining W3, and all W4 features not yet started on this branch.
 
 **W2-F1** — nginx reverse proxy live: :80→:443 redirect, TLS, `/_next/` WebSocket
 routing, `/→frontend`. Remaining: step 4 BFF bearer pattern (direct
@@ -78,12 +79,13 @@ Spec: `days_6_10_features.md`.
 
 ## Days 11–15 (Week 3 — quiz-taking vertical slice)
 
-Spec: `days_11_15_features.md`. Blocked: W3-F1 depends on W2-F7 (Alembic +
-sessions table), which is not yet started.
+Spec: `days_11_15_features.md`. W3-F1 complete (`tianyac-feat-session`, commit
+`ca6877d`). Alembic initialized independently on test-management-service
+(W2-F7 not yet landed). W3-F2 through W3-F7 not yet started.
 
 | # | Feature | Day | Status | Detail |
 |---|---|---|---|---|
-| W3-F1 | Quiz session creation backend (`POST /sessions`, httpx integration) | 11 | ❌ Not Started | [w3-f1-quiz-session-backend.md](features/w3-f1-quiz-session-backend.md) |
+| W3-F1 | Quiz session creation backend (`POST /sessions`, httpx integration) | 11 | ✅ Completed | [w3-f1-quiz-session-backend.md](features/w3-f1-quiz-session-backend.md) |
 | W3-F2 | Scoring engine + attempt locking (idempotency, state machine) | 12 | ❌ Not Started | [w3-f2-scoring-engine-locking.md](features/w3-f2-scoring-engine-locking.md) |
 | W3-F3 | Test-taking frontend skeleton (`/take/[testId]`, AuthContext) | 13 | ❌ Not Started | [w3-f3-test-taking-frontend-skeleton.md](features/w3-f3-test-taking-frontend-skeleton.md) |
 | W3-F4 | Auto-saving exam client (server timer, autosave, submit-lock) | 14 | ❌ Not Started | [w3-f4-autosave-exam-client.md](features/w3-f4-autosave-exam-client.md) |
