@@ -41,3 +41,17 @@ class RankingsResponse(BaseModel):
     page: int
     page_size: int
     rankings: List[RankingEntry]
+
+
+class UserSessionEntry(BaseModel):
+    session_id: str
+    test_id: int
+    test_name: str
+    percentage_score: Optional[float]
+    completed_at: Optional[datetime]
+    status: str
+
+
+class UserReportResponse(BaseModel):
+    user_id: int
+    sessions: List[UserSessionEntry]

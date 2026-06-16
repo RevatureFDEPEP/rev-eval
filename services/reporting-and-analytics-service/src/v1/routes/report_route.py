@@ -4,9 +4,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.session import get_db
-from src.schemas.report_schema import AggregateReportResponse, QueryParams, RankingsResponse, TestSummary
+from src.schemas.report_schema import (
+    AggregateReportResponse,
+    QueryParams,
+    RankingsResponse,
+    TestSummary,
+    UserReportResponse,
+)
 from src.services.report_service import ReportService
-from src.utils.dependencies import get_current_trainer
+from src.utils.dependencies import get_current_trainer, get_current_user
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
@@ -64,3 +70,23 @@ async def get_test_rankings(
         page_size=params.page_size,
         rankings=rankings,
     )
+
+
+@router.get(
+    "/user/{user_id}",
+    response_model=UserReportResponse,
+    summary="Completed sessions for a candidate (results page feed)",
+)
+async def get_user_report(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current: Dict = Depends(get_current_user),
+):
+    role = (current.get("role") or "").upper()
+    if role != "TRAINER" and current["id"] != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: can only view your own results",
+        )
+    sessions = await ReportService.get_user_sessions(db, user_id)
+    return UserReportResponse(user_id=user_id, sessions=sessions)

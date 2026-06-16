@@ -264,3 +264,65 @@ def test_21_rbac_trainer_header_accepted():
     )
     assert r.status_code == 200
     app.dependency_overrides[get_current_trainer] = override_get_current_trainer
+
+
+def test_22_rbac_non_numeric_user_id_returns_401():
+    del app.dependency_overrides[get_current_trainer]
+    r = client.get(
+        "/v1/api/reports/tests/1",
+        headers={"X-User-Id": "not-a-number", "X-User-Role": "TRAINER"},
+    )
+    assert r.status_code == 401
+    app.dependency_overrides[get_current_trainer] = override_get_current_trainer
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/api/reports/user/{user_id}
+# ---------------------------------------------------------------------------
+
+from src.utils.dependencies import get_current_user  # noqa: E402
+
+
+async def override_get_current_user_10():
+    return {"id": 10, "role": "PARTICIPANT"}
+
+
+async def override_get_current_trainer_as_user():
+    return {"id": 1, "role": "TRAINER"}
+
+
+def test_23_user_report_own_sessions():
+    app.dependency_overrides[get_current_user] = override_get_current_user_10
+    r = client.get("/v1/api/reports/user/10")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["user_id"] == 10
+    assert len(data["sessions"]) == 2  # s1 (test1) + s5 (test2)
+    assert all(s["status"] == "COMPLETED" for s in data["sessions"])
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_24_user_report_trainer_sees_any_user():
+    app.dependency_overrides[get_current_user] = override_get_current_trainer_as_user
+    r = client.get("/v1/api/reports/user/13")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["user_id"] == 13
+    assert len(data["sessions"]) == 1
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_25_user_report_forbidden_wrong_user():
+    app.dependency_overrides[get_current_user] = override_get_current_user_10
+    r = client.get("/v1/api/reports/user/99")
+    assert r.status_code == 403
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_26_user_report_empty_user():
+    app.dependency_overrides[get_current_user] = override_get_current_trainer_as_user
+    r = client.get("/v1/api/reports/user/999")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["sessions"] == []
+    app.dependency_overrides.pop(get_current_user, None)

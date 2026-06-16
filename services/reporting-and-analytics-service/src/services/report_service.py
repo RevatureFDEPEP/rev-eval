@@ -18,3 +18,7 @@ class ReportService:
     @staticmethod
     async def get_rankings(db: AsyncSession, test_id: int, params: QueryParams) -> List[dict]:
         return await ReportRepository(db).get_rankings(test_id, params)
+
+    @staticmethod
+    async def get_user_sessions(db: AsyncSession, user_id: int) -> List[dict]:
+        return await ReportRepository(db).get_user_sessions(user_id)

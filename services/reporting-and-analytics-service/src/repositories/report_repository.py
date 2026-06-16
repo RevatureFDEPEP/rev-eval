@@ -148,3 +148,33 @@ class ReportRepository:
             }
             for row in rows
         ]
+
+    async def get_user_sessions(self, user_id: int) -> List[dict]:
+        stmt = (
+            select(
+                QuizSession.id.label("session_id"),
+                QuizSession.test_id,
+                Test.name.label("test_name"),
+                QuizSession.percentage_score,
+                QuizSession.completed_at,
+                QuizSession.status,
+            )
+            .join(Test, Test.id == QuizSession.test_id)
+            .where(
+                QuizSession.user_id == user_id,
+                QuizSession.status == "COMPLETED",
+            )
+            .order_by(QuizSession.completed_at.desc())
+        )
+        rows = (await self.db.execute(stmt)).fetchall()
+        return [
+            {
+                "session_id": row.session_id,
+                "test_id": row.test_id,
+                "test_name": row.test_name,
+                "percentage_score": float(row.percentage_score) if row.percentage_score is not None else None,
+                "completed_at": row.completed_at,
+                "status": row.status,
+            }
+            for row in rows
+        ]
