@@ -9,6 +9,7 @@ import { api } from './client';
 import {
   TestSessionCreate,
   TestSession,
+  DraftAnswer,
   PartAQuestionsResponse,
   PartBQuestionsResponse,
   PartAAnswersSubmit,
@@ -37,6 +38,7 @@ export async function createTestSession(data: TestSessionCreate): Promise<TestSe
     user_id: response.user_id,
     status: response.status,
     started_at: response.started_at,
+    expires_at: response.expires_at ?? '',
     completed_at: response.completed_at,
     total_questions: response.total_questions,
     part_a_config: response.part_a_config,
@@ -141,6 +143,7 @@ export async function getTestSessionBySubmission(submissionId: number): Promise<
     user_id: response.user_id,
     status: response.status,
     started_at: response.started_at,
+    expires_at: response.expires_at ?? '',
     completed_at: response.completed_at,
     total_questions: response.total_questions,
     part_a_config: response.part_a_config,
@@ -167,4 +170,8 @@ export async function getSessionStatus(sessionId: string): Promise<{
   current_part: string | null;
 }> {
   return api.get(`/v1/api/test-sessions/${sessionId}/status`);
+}
+
+export async function saveDraft(sessionId: string, answers: DraftAnswer[]): Promise<void> {
+  await api.patch(`/v1/api/test-sessions/${sessionId}/draft`, { answers });
 }

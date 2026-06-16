@@ -40,6 +40,7 @@ class QuizSession(Base):
 
     part_a = Column(JSON, nullable=True)
     part_b = Column(JSON, nullable=True)
+    draft_answers = Column(JSON, nullable=True)
 
     part_a_score = Column(Float, nullable=True)
     part_b_score = Column(Float, nullable=True)
