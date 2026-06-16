@@ -1,0 +1,10 @@
+# LightRAG working dir: graph json, vector db, kv stores, cache.
+storage/
+# Local graph exports.
+*.json
+*.mmd
+*.dot
+# Python cruft.
+__pycache__/
+*.pyc
+.venv/

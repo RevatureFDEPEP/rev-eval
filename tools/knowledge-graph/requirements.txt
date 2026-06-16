@@ -1,0 +1,6 @@
+# Layer 2 (semantic) deps only. Layer 1 (structural) uses the stdlib + networkx,
+# so `structure` and `export` work without LightRAG/Ollama installed or running.
+lightrag-hku>=1.0.0
+networkx>=3.0
+ollama>=0.3.0
+numpy>=1.24
