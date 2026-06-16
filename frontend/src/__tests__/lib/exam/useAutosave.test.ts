@@ -26,13 +26,40 @@ describe('useAutosave', () => {
     expect(saveDraft).not.toHaveBeenCalled()
   })
 
-  it('saves the answer map after 30s', async () => {
+  it('saves the answer map after 30s, stamped with version 1', async () => {
     const answers = new Map([['q1', [1]]])
     renderHook(() => useAutosave('s1', answers, true))
     await act(async () => {
       vi.advanceTimersByTime(30_000)
     })
-    expect(saveDraft).toHaveBeenCalledWith('s1', { q1: [1] })
+    expect(saveDraft).toHaveBeenCalledWith('s1', { q1: [1] }, 1)
+  })
+
+  it('seeds the version from initialVersion so a resumed save is not stale', async () => {
+    // A resumed session whose stored draft_version is 5: the first autosave must
+    // stamp 6, not 1, or the server would reject it as older than what it holds.
+    const answers = new Map([['q1', [1]]])
+    renderHook(() => useAutosave('s1', answers, true, 5))
+    await act(async () => {
+      vi.advanceTimersByTime(30_000)
+    })
+    expect(saveDraft).toHaveBeenCalledWith('s1', { q1: [1] }, 6)
+  })
+
+  it('stamps a strictly increasing version on each successive save', async () => {
+    const { rerender } = renderHook(
+      ({ answers }) => useAutosave('s1', answers, true),
+      { initialProps: { answers: new Map([['q1', [1]]]) } }
+    )
+    await act(async () => {
+      vi.advanceTimersByTime(30_000)
+    })
+    rerender({ answers: new Map([['q1', [1, 2]]]) })
+    await act(async () => {
+      vi.advanceTimersByTime(30_000)
+    })
+    expect(saveDraft).toHaveBeenNthCalledWith(1, 's1', { q1: [1] }, 1)
+    expect(saveDraft).toHaveBeenNthCalledWith(2, 's1', { q1: [1, 2] }, 2)
   })
 
   it('still saves by the max-wait cap under continuous changes (debounce never settles)', async () => {
@@ -73,7 +100,7 @@ describe('useAutosave', () => {
       vi.advanceTimersByTime(10_000) // 30s since mount → original timer fires
     })
     expect(saveDraft).toHaveBeenCalledTimes(1)
-    expect(saveDraft).toHaveBeenCalledWith('s1', { q1: [2, 1] })
+    expect(saveDraft).toHaveBeenCalledWith('s1', { q1: [2, 1] }, 1)
   })
 
   it('does not save while disabled (locked)', () => {

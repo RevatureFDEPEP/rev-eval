@@ -1,10 +1,9 @@
-from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel
 
 from src.models.quiz_session import QuizSessionStatus
-from src.schemas.quiz_session_schema import ParticipantQuestion
+from src.schemas.quiz_session_schema import OptionalUtcDatetime, ParticipantQuestion
 
 
 class AnswerSubmitRequest(BaseModel):
@@ -25,4 +24,4 @@ class AnswerResult(BaseModel):
     question: (
         ParticipantQuestion | None
     )  # next question; None when session is submitted
-    submitted_at: datetime | None
+    submitted_at: OptionalUtcDatetime = None

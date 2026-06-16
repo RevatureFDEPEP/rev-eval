@@ -150,7 +150,8 @@ export function TestRunner({ session, initialQuestions }: TestRunnerProps) {
   const saveStatus = useAutosave(
     session.session_id,
     answers,
-    exam.status === 'active'
+    exam.status === 'active',
+    session.draft_version ?? 0
   );
 
   const goPrev = useCallback(() => {

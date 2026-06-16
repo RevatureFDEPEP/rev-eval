@@ -156,6 +156,7 @@ class QuizSessionService:
             "current_index": session.current_index,
             "question": question,
             "draft_answers": session.draft_answers,
+            "draft_version": session.draft_version or 0,
         }
 
     @staticmethod
@@ -278,27 +279,49 @@ class QuizSessionService:
         session_id: str,
         user_id: int,
         answers: dict[str, list[int]],
+        client_version: int,
     ) -> DraftSaveResponse:
         """Persist an advisory autosave snapshot without scoring or advancing.
 
-        Last-write-wins: overwrites draft_answers, leaves current_index/status
-        untouched. Rejects a non-active session with 409 (semantic — the client
-        halts rather than retrying) so autosave can't write to a finished or
-        expired attempt.
-        """
-        session, now = await QuizSessionService._load_owned_session(
-            db, session_id, user_id
-        )
+        Monotonic guard: the snapshot is written only when client_version exceeds
+        the stored draft_version, so a late-arriving stale snapshot can't clobber
+        a fresher one under out-of-order delivery. The compare-and-set runs under
+        a row lock (as the scoring path does) so it's atomic against a concurrent
+        save; a rejected stale save is a benign no-op (applied=False), not an
+        error. current_index/status are left untouched.
 
+        Rejects a non-active session with 409 (semantic — the client halts rather
+        than retrying) so autosave can't write to a finished or expired attempt.
+        """
+        # Lock first (row-lock on Postgres, no-op on SQLite) so the version
+        # compare-and-set is atomic against a concurrent draft save. Loading
+        # under the lock also means the version we compare is the committed one.
+        session = await QuizSessionRepository.lock_for_update(db, session_id)
+        if session is None:
+            raise ValueError("Session not found")
+        if session.user_id != user_id:
+            raise QuizSessionError("Not authorized for this session", status_code=403)
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        if session.status == QuizSessionStatus.ACTIVE and session.expires_at <= now:
+            session = await QuizSessionRepository.set_status(
+                db, session, QuizSessionStatus.EXPIRED
+            )
         if session.status != QuizSessionStatus.ACTIVE:
             raise QuizSessionError(
                 "Session is not active; cannot save draft", status_code=409
             )
 
-        session = await QuizSessionRepository.save_draft(db, session, answers)
+        applied = (session.draft_version or 0) < client_version
+        if applied:
+            session = await QuizSessionRepository.save_draft(
+                db, session, answers, client_version
+            )
         return DraftSaveResponse(
             session_id=session.session_id,
             status=session.status,
             current_index=session.current_index,
             saved_at=now,
+            applied=applied,
+            draft_version=session.draft_version or 0,
         )

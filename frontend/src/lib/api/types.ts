@@ -424,6 +424,12 @@ export interface SessionResponse {
    * (W3-F4). Absent/null on a fresh session or when nothing has been saved.
    */
   draft_answers?: Record<string, number[]> | null;
+  /**
+   * Stored monotonic draft version (0 if nothing saved yet). The client seeds
+   * its autosave counter from this so resumed saves keep increasing past the
+   * last persisted version instead of restarting and being rejected (W3-F4).
+   */
+  draft_version?: number;
 }
 
 /** Request body for POST /v1/api/sessions/{id}/answer. */
@@ -454,6 +460,9 @@ export interface AnswerResult {
 /** Request body for PATCH /v1/api/sessions/{id}/draft (advisory autosave). */
 export interface DraftSave {
   answers: Record<string, number[]>;
+  /** Strictly increasing per-save stamp; the server applies the write only when
+   *  it exceeds the stored version (monotonic guard against out-of-order saves). */
+  client_version: number;
 }
 
 /**
@@ -465,6 +474,11 @@ export interface DraftSaveResult {
   status: QuizSessionStatusValue;
   current_index: number;
   saved_at: string;
+  /** False when the monotonic guard rejected a stale snapshot (a fresher version
+   *  already won) — still a success; the client's answers are safe either way. */
+  applied?: boolean;
+  /** The now-current stored draft version. */
+  draft_version?: number;
 }
 
 /** How a fetch failure should be handled (W3-F4 error classification). */

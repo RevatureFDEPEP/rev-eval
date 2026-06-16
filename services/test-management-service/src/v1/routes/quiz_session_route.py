@@ -78,7 +78,7 @@ async def save_draft(
     retrying."""
     try:
         return await QuizSessionService.save_draft(
-            db, session_id, user_id, request.answers
+            db, session_id, user_id, request.answers, request.client_version
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e

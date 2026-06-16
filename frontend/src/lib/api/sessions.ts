@@ -38,14 +38,19 @@ export function submitAnswer(
 }
 
 /**
- * Autosave the in-progress answer map (advisory, last-write-wins). Single
- * attempt, no retry — see the module header for why retrying drafts is unsafe.
+ * Autosave the in-progress answer map (advisory). Single attempt, no retry —
+ * see the module header for why retrying drafts is unsafe. `clientVersion` is a
+ * strictly increasing stamp; the server applies the write only when it exceeds
+ * the stored version, so a late/reordered stale snapshot can't clobber a fresher
+ * one (monotonic guard).
  */
 export function saveDraft(
   sessionId: string,
-  answers: Record<string, number[]>
+  answers: Record<string, number[]>,
+  clientVersion: number
 ): Promise<DraftSaveResult> {
   return api.patch<DraftSaveResult>(`/v1/api/sessions/${sessionId}/draft`, {
     answers,
+    client_version: clientVersion,
   });
 }
