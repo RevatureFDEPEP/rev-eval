@@ -276,22 +276,25 @@ class TestSubmissionService:
 
         Returns submissions where:
         - Status is EVALUATED (AI evaluation complete, awaiting trainer review)
-        - Any trainer can review any interview (no ownership restriction)
+        - The submission's test was created by this trainer (ownership), so a
+          trainer's review queue never contains another trainer's submissions
         - Fetch participant names from User Service
-
-        Note: trainer_id parameter is kept for future access control if needed
         """
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
         from src.models.test import Test
         from src.models.test_submission import TestSubmission
 
-        # Get all EVALUATED submissions (any trainer can review any interview)
+        # Scope to EVALUATED submissions for tests this trainer owns. Without the
+        # created_by_id filter, every trainer saw every trainer's review queue.
         query = (
             select(TestSubmission)
             .options(selectinload(TestSubmission.test))  # Eagerly load test relationship
             .join(Test, TestSubmission.test_id == Test.id)
-            .where(TestSubmission.status == SubmissionStatus.EVALUATED)
+            .where(
+                TestSubmission.status == SubmissionStatus.EVALUATED,
+                Test.created_by_id == trainer_id,
+            )
             .order_by(TestSubmission.submitted_at.desc())
         )
 
@@ -336,12 +339,13 @@ class TestSubmissionService:
         return submission_outs
 
     @staticmethod
-    async def get_graded_submissions(db: AsyncSession) -> List[TestSubmissionOut]:
+    async def get_graded_submissions(db: AsyncSession, trainer_id: int) -> List[TestSubmissionOut]:
         """
         Get list of GRADED submissions (already reviewed by trainer).
 
         Returns submissions where:
         - Status is GRADED (trainer review complete)
+        - The submission's test was created by this trainer (ownership)
         - Includes trainer_score and final_score
         """
         from sqlalchemy import select
@@ -349,12 +353,15 @@ class TestSubmissionService:
         from src.models.test import Test
         from src.models.test_submission import TestSubmission
 
-        # Get all GRADED submissions
+        # Scope GRADED submissions to tests this trainer owns (see evaluated queue).
         query = (
             select(TestSubmission)
             .options(selectinload(TestSubmission.test))  # Eagerly load test relationship
             .join(Test, TestSubmission.test_id == Test.id)
-            .where(TestSubmission.status == SubmissionStatus.GRADED)
+            .where(
+                TestSubmission.status == SubmissionStatus.GRADED,
+                Test.created_by_id == trainer_id,
+            )
             .order_by(TestSubmission.reviewed_at.desc())
         )
 
@@ -454,22 +461,27 @@ class TestSubmissionService:
         if not test:
             raise ValueError(f"Test {submission.test_id} not found")
 
-        # Get interview transcript from interview service
-        interview_service_url = settings.INTERVIEW_SERVICE_URL
+        # Get interview transcript from interview service. The integration is
+        # optional: when INTERVIEW_SERVICE_URL is unset, return without a
+        # transcript instead of building a bogus URL or raising.
+        interview_service_url = getattr(settings, "INTERVIEW_SERVICE_URL", None)
         transcript_data = None
 
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(
-                    f"{interview_service_url}/v1/api/interview/submissions/{submission_id}/transcript"
-                )
+        if not interview_service_url:
+            logger.info("INTERVIEW_SERVICE_URL not configured; skipping transcript fetch")
+        else:
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.get(
+                        f"{interview_service_url}/v1/api/interview/submissions/{submission_id}/transcript"
+                    )
 
-                if response.status_code == 200:
-                    transcript_data = response.json()
-                else:
-                    logger.warning(f"⚠️ Could not fetch transcript for submission {submission_id}: {response.status_code}")
-        except Exception as e:
-            logger.error(f"❌ Error fetching transcript for submission {submission_id}: {e}")
+                    if response.status_code == 200:
+                        transcript_data = response.json()
+                    else:
+                        logger.warning(f"⚠️ Could not fetch transcript for submission {submission_id}: {response.status_code}")
+            except Exception as e:
+                logger.error(f"❌ Error fetching transcript for submission {submission_id}: {e}")
 
         # Build response
         return {
@@ -533,10 +545,15 @@ class TestSubmissionService:
         # Update using repository
         updated_submission = await TestSubmissionRepository.update(db, submission, update_data)
 
-        # Save comprehensive trainer evaluation to MongoDB (for interviews)
-        # This stores the full evaluation structure alongside AI evaluation
-        if review.trainer_evaluation and submission.test.test_type.value == "INTERVIEW":
-            interview_service_url = settings.INTERVIEW_SERVICE_URL
+        # Save comprehensive trainer evaluation to MongoDB (for interviews).
+        # Skip entirely when the interview integration is not configured rather
+        # than calling a None URL.
+        interview_service_url = getattr(settings, "INTERVIEW_SERVICE_URL", None)
+        if (
+            review.trainer_evaluation
+            and submission.test.test_type.value == "INTERVIEW"
+            and interview_service_url
+        ):
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     mongo_response = await client.patch(

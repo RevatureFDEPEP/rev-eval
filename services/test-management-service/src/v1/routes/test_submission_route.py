@@ -182,7 +182,11 @@ async def get_graded_submissions(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    return await TestSubmissionService.get_graded_submissions(db)
+    trainer_id = current_user.get("id")
+    if not trainer_id:
+        raise HTTPException(status_code=401, detail="Invalid user")
+
+    return await TestSubmissionService.get_graded_submissions(db, trainer_id)
 
 
 @router.get("/{submission_id}/review-details")

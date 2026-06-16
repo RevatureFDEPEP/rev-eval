@@ -35,6 +35,7 @@ from src.models.quiz_session import (
     QuizSessionQuestion,
     SessionStatus,
 )
+from src.models.test_submission import SubmissionStatus
 from src.repositories.quiz_session_repository import QuizSessionRepository
 from src.repositories.test_repository import TestRepository
 from src.repositories.test_submission_repository import TestSubmissionRepository
@@ -535,6 +536,13 @@ class QuizSessionService:
         else:
             session.status = SessionStatus.submitted
 
+        # Propagate the result to the linked TestSubmission summary in the same
+        # transaction. TestSubmission is the durable cross-service record that
+        # dashboards and reporting read; QuizSession is the detailed attempt.
+        await QuizSessionService._finalize_linked_submission(
+            db, session, percentage, now
+        )
+
         await db.commit()
         await db.refresh(session)
 
@@ -549,6 +557,55 @@ class QuizSessionService:
             },
         )
         return QuizSessionService._build_submit_response(session, snapshots, answers)
+
+    @staticmethod
+    async def _finalize_linked_submission(
+        db: AsyncSession,
+        session: QuizSession,
+        percentage: float,
+        now: datetime,
+    ) -> None:
+        """Update the linked TestSubmission when a quiz is finalized.
+
+        Idempotent and consistency-checked: only runs on the real finalization
+        path (submit_session returns early on replay), only fills started_at
+        when missing, and refuses to write a submission that does not belong to
+        the same user and test as the session.
+        """
+        if session.submission_id is None:
+            return
+
+        submission = await TestSubmissionRepository.get_by_id(db, session.submission_id)
+        if submission is None:
+            logger.warning(
+                "quiz submit: linked submission %s not found", session.submission_id
+            )
+            return
+
+        if (
+            submission.user_id != session.user_id
+            or submission.test_id != session.test_id
+        ):
+            # Never finalize a mismatched submission — surface, don't corrupt.
+            logger.error(
+                "quiz submit: submission %s does not match session "
+                "(submission user/test=%s/%s, session user/test=%s/%s)",
+                session.submission_id,
+                submission.user_id,
+                submission.test_id,
+                session.user_id,
+                session.test_id,
+            )
+            return
+
+        if submission.started_at is None:
+            submission.started_at = session.server_started_at
+        submission.submitted_at = now
+        # The quiz auto-score is the system/AI score; it is also authoritative
+        # for an auto-scored quiz (no trainer review step), so it seeds final.
+        submission.ai_score = percentage
+        submission.final_score = percentage
+        submission.status = SubmissionStatus.COMPLETED
 
     @staticmethod
     def _build_submit_response(

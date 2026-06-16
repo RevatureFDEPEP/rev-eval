@@ -18,8 +18,15 @@ class Settings(BaseSettings):
     SERVICE_HOSTNAME: str
 
     # Service-to-Service Communication
-    USER_SERVICE_URL: str = "http://localhost:8003"
+    # Default to the user-service port (8002). The previous default pointed at
+    # 8003 (question-service), so any non-compose run resolved user lookups to
+    # the wrong service.
+    USER_SERVICE_URL: str = "http://user-service:8002"
     QUESTION_SERVICE_URL: str = "http://question-management-service:8003"
+    # Optional: interview transcript/evaluation integration. When unset, review
+    # flows degrade gracefully (no transcript / skipped evaluation push) instead
+    # of raising AttributeError.
+    INTERVIEW_SERVICE_URL: Optional[str] = None
 
     # Shared secret presented to user-service on internal calls so they pass
     # its admin-guarded read endpoints without a user JWT. Must match

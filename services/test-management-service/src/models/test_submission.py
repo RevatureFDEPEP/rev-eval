@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, Text
+from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, Text
 from sqlalchemy.orm import relationship
 from src.db.session import Base
 
@@ -30,9 +30,11 @@ class TestSubmission(Base):
     status = Column(Enum(SubmissionStatus), default=SubmissionStatus.ASSIGNED)
     started_at = Column(DateTime, nullable=True)
     submitted_at = Column(DateTime, nullable=True)
-    ai_score = Column(Integer, nullable=True)
-    trainer_score = Column(Integer, nullable=True)
-    final_score = Column(Integer, nullable=True)
+    # Scores are stored as floats: quiz partial credit and percentage results
+    # are fractional (e.g. 66.67) and must not be truncated to integers.
+    ai_score = Column(Float, nullable=True)
+    trainer_score = Column(Float, nullable=True)
+    final_score = Column(Float, nullable=True)
     feedback = Column(Text, nullable=True)
     reviewed_at = Column(DateTime, nullable=True)  # When trainer reviewed
     reviewed_by_id = Column(Integer, nullable=True)  # Trainer user ID who reviewed
