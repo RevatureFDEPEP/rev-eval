@@ -70,7 +70,7 @@ def cmd_structure(args: argparse.Namespace) -> int:
 def cmd_export(args: argparse.Namespace) -> int:
     from src import export
 
-    return export.run_export(args.format, args.out)
+    return export.run_export(args.format, args.out, include_code=args.include_code)
 
 
 def cmd_ingest(args: argparse.Namespace) -> int:
@@ -99,6 +99,11 @@ def build_parser() -> argparse.ArgumentParser:
     e = sub.add_parser("export", help="export the structural graph")
     e.add_argument("--format", choices=["json", "mermaid", "dot"], default="mermaid")
     e.add_argument("--out", default=None, help="output file (default: stdout)")
+    e.add_argument(
+        "--include-code",
+        action="store_true",
+        help="keep code evidence nodes in mermaid/dot (default: drop for readability)",
+    )
     e.set_defaults(func=cmd_export)
 
     i = sub.add_parser("ingest", help="Layer 2: build LightRAG index (needs Ollama up)")
