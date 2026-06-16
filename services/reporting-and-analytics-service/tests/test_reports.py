@@ -45,16 +45,18 @@ async def _seed():
         db.add_all(tests)
         await db.flush()
 
+        now = datetime.utcnow()
+        from datetime import timedelta
         sessions = [
             # test1 — 4 completed sessions
-            QuizSession(id="s1", test_id=1, user_id=10, status="COMPLETED", percentage_score=85.0, completed_at=datetime.utcnow()),
-            QuizSession(id="s2", test_id=1, user_id=11, status="COMPLETED", percentage_score=62.5, completed_at=datetime.utcnow()),
-            QuizSession(id="s3", test_id=1, user_id=12, status="COMPLETED", percentage_score=91.0, completed_at=datetime.utcnow()),
-            QuizSession(id="s4", test_id=1, user_id=13, status="COMPLETED", percentage_score=45.0, completed_at=datetime.utcnow()),
-            # test2 — 1 completed session
-            QuizSession(id="s5", test_id=2, user_id=10, status="COMPLETED", percentage_score=78.0, completed_at=datetime.utcnow()),
-            # test1 — abandoned (should NOT count)
-            QuizSession(id="s6", test_id=1, user_id=14, status="ABANDONED", percentage_score=None, completed_at=None),
+            QuizSession(id="s1", test_id=1, user_id=10, status="COMPLETED", percentage_score=85.0, started_at=now - timedelta(minutes=30), completed_at=now),
+            QuizSession(id="s2", test_id=1, user_id=11, status="COMPLETED", percentage_score=62.5, started_at=now - timedelta(minutes=25), completed_at=now),
+            QuizSession(id="s3", test_id=1, user_id=12, status="COMPLETED", percentage_score=91.0, started_at=now - timedelta(minutes=20), completed_at=now),
+            QuizSession(id="s4", test_id=1, user_id=13, status="COMPLETED", percentage_score=45.0, started_at=now - timedelta(minutes=15), completed_at=now),
+            # test2 — 1 completed session for user 10
+            QuizSession(id="s5", test_id=2, user_id=10, status="COMPLETED", percentage_score=78.0, started_at=now - timedelta(minutes=10), completed_at=now),
+            # test1 — abandoned (should NOT count in completed-only endpoints)
+            QuizSession(id="s6", test_id=1, user_id=14, status="ABANDONED", percentage_score=None, started_at=None, completed_at=None),
         ]
         db.add_all(sessions)
         await db.commit()
@@ -291,38 +293,125 @@ async def override_get_current_trainer_as_user():
     return {"id": 1, "role": "TRAINER"}
 
 
-def test_23_user_report_own_sessions():
+# ---------------------------------------------------------------------------
+# GET /v1/api/reports/user/{user_id}  — summary envelope
+# ---------------------------------------------------------------------------
+
+def test_23_user_summary_own():
     app.dependency_overrides[get_current_user] = override_get_current_user_10
     r = client.get("/v1/api/reports/user/10")
     assert r.status_code == 200
     data = r.json()
     assert data["user_id"] == 10
-    assert len(data["sessions"]) == 2  # s1 (test1) + s5 (test2)
-    assert all(s["status"] == "COMPLETED" for s in data["sessions"])
+    assert data["total_attempts"] == 2  # s1 (test1) + s5 (test2)
+    assert data["avg_score"] is not None
+    assert abs(data["avg_score"] - 81.5) < 0.1  # (85 + 78) / 2
+    assert data["best_score"] == 85.0
+    assert data["most_recent"] is not None
+    assert data["most_recent"]["status"] == "COMPLETED"
     app.dependency_overrides.pop(get_current_user, None)
 
 
-def test_24_user_report_trainer_sees_any_user():
+def test_24_user_summary_trainer_sees_any_user():
     app.dependency_overrides[get_current_user] = override_get_current_trainer_as_user
     r = client.get("/v1/api/reports/user/13")
     assert r.status_code == 200
     data = r.json()
     assert data["user_id"] == 13
-    assert len(data["sessions"]) == 1
+    assert data["total_attempts"] == 1
+    assert data["best_score"] == 45.0
     app.dependency_overrides.pop(get_current_user, None)
 
 
-def test_25_user_report_forbidden_wrong_user():
+def test_25_user_summary_forbidden_wrong_user():
     app.dependency_overrides[get_current_user] = override_get_current_user_10
     r = client.get("/v1/api/reports/user/99")
     assert r.status_code == 403
     app.dependency_overrides.pop(get_current_user, None)
 
 
-def test_26_user_report_empty_user():
+def test_26_user_summary_empty_user():
     app.dependency_overrides[get_current_user] = override_get_current_trainer_as_user
     r = client.get("/v1/api/reports/user/999")
     assert r.status_code == 200
     data = r.json()
-    assert data["sessions"] == []
+    assert data["total_attempts"] == 0
+    assert data["avg_score"] is None
+    assert data["best_score"] is None
+    assert data["most_recent"] is None
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_27_user_summary_time_spent():
+    app.dependency_overrides[get_current_user] = override_get_current_user_10
+    r = client.get("/v1/api/reports/user/10")
+    data = r.json()
+    # user 10 has 2 sessions with started_at set — total time should be > 0
+    assert data["total_time_spent_seconds"] is not None
+    assert data["total_time_spent_seconds"] > 0
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/api/reports/user/{user_id}/attempts  — paginated history
+# ---------------------------------------------------------------------------
+
+def test_28_user_attempts_all():
+    app.dependency_overrides[get_current_user] = override_get_current_user_10
+    r = client.get("/v1/api/reports/user/10/attempts")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["user_id"] == 10
+    assert data["total"] == 2
+    assert len(data["attempts"]) == 2
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_29_user_attempts_filter_by_test_id():
+    app.dependency_overrides[get_current_user] = override_get_current_user_10
+    r = client.get("/v1/api/reports/user/10/attempts?test_id=1")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total"] == 1
+    assert data["attempts"][0]["test_id"] == 1
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_30_user_attempts_filter_by_status_completed():
+    app.dependency_overrides[get_current_user] = override_get_current_trainer_as_user
+    # user 14 has 1 ABANDONED session — filter COMPLETED returns 0
+    r = client.get("/v1/api/reports/user/14/attempts?status=COMPLETED")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total"] == 0
+    assert data["attempts"] == []
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_31_user_attempts_pagination():
+    app.dependency_overrides[get_current_user] = override_get_current_user_10
+    r = client.get("/v1/api/reports/user/10/attempts?page=1&page_size=1")
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data["attempts"]) == 1
+    assert data["page"] == 1
+    assert data["page_size"] == 1
+    assert data["total"] == 2
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_32_user_attempts_sort_score_asc():
+    app.dependency_overrides[get_current_user] = override_get_current_user_10
+    r = client.get("/v1/api/reports/user/10/attempts?sort_by=percentage_score&order=asc")
+    assert r.status_code == 200
+    data = r.json()
+    scores = [a["percentage_score"] for a in data["attempts"] if a["percentage_score"] is not None]
+    assert scores == sorted(scores)
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_33_user_attempts_forbidden_wrong_user():
+    app.dependency_overrides[get_current_user] = override_get_current_user_10
+    r = client.get("/v1/api/reports/user/99/attempts")
+    assert r.status_code == 403
     app.dependency_overrides.pop(get_current_user, None)

@@ -34,5 +34,6 @@ class QuizSession(Base):
     user_id = Column(Integer, nullable=False, index=True)
     status = Column(String(50), nullable=False)
     percentage_score = Column(Float, nullable=True)
+    started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=True)

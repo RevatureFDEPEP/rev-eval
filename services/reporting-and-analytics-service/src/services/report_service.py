@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.repositories.report_repository import ReportRepository
-from src.schemas.report_schema import QueryParams
+from src.schemas.report_schema import AttemptsQueryParams, QueryParams
 
 
 class ReportService:
@@ -20,5 +20,9 @@ class ReportService:
         return await ReportRepository(db).get_rankings(test_id, params)
 
     @staticmethod
-    async def get_user_sessions(db: AsyncSession, user_id: int) -> List[dict]:
-        return await ReportRepository(db).get_user_sessions(user_id)
+    async def get_user_summary(db: AsyncSession, user_id: int) -> dict:
+        return await ReportRepository(db).get_user_summary(user_id)
+
+    @staticmethod
+    async def get_user_attempts(db: AsyncSession, user_id: int, params: AttemptsQueryParams) -> Tuple[int, List[dict]]:
+        return await ReportRepository(db).get_user_attempts(user_id, params)

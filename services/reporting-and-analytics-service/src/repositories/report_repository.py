@@ -5,7 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.settings import settings
 from src.models.reporting_models import QuizSession, Test
-from src.schemas.report_schema import QueryParams
+from src.schemas.report_schema import AttemptsQueryParams, QueryParams
+
+_VALID_ATTEMPTS_SORT_COLS = {"completed_at", "percentage_score", "test_id"}
 
 _VALID_SORT_COLS = {"avg_score", "attempt_count", "test_name"}
 
@@ -149,8 +151,38 @@ class ReportRepository:
             for row in rows
         ]
 
-    async def get_user_sessions(self, user_id: int) -> List[dict]:
-        stmt = (
+    async def get_user_summary(self, user_id: int) -> dict:
+        # Aggregate: count, avg, max
+        agg_stmt = select(
+            func.count(QuizSession.id).label("total_attempts"),
+            func.avg(QuizSession.percentage_score).label("avg_score"),
+            func.max(QuizSession.percentage_score).label("best_score"),
+        ).where(
+            QuizSession.user_id == user_id,
+            QuizSession.status == "COMPLETED",
+            QuizSession.percentage_score.isnot(None),
+        )
+        agg = (await self.db.execute(agg_stmt)).one()
+
+        # Total time spent: sum (completed_at - started_at) in Python
+        time_stmt = select(
+            QuizSession.started_at,
+            QuizSession.completed_at,
+        ).where(
+            QuizSession.user_id == user_id,
+            QuizSession.status == "COMPLETED",
+            QuizSession.started_at.isnot(None),
+            QuizSession.completed_at.isnot(None),
+        )
+        time_rows = (await self.db.execute(time_stmt)).fetchall()
+        total_time = sum(
+            int((r.completed_at - r.started_at).total_seconds())
+            for r in time_rows
+            if r.completed_at > r.started_at
+        ) or None
+
+        # Most recent session (subquery pattern via LIMIT 1)
+        recent_stmt = (
             select(
                 QuizSession.id.label("session_id"),
                 QuizSession.test_id,
@@ -165,9 +197,69 @@ class ReportRepository:
                 QuizSession.status == "COMPLETED",
             )
             .order_by(QuizSession.completed_at.desc())
+            .limit(1)
         )
-        rows = (await self.db.execute(stmt)).fetchall()
-        return [
+        recent_row = (await self.db.execute(recent_stmt)).first()
+        most_recent = (
+            {
+                "session_id": recent_row.session_id,
+                "test_id": recent_row.test_id,
+                "test_name": recent_row.test_name,
+                "percentage_score": float(recent_row.percentage_score) if recent_row.percentage_score is not None else None,
+                "completed_at": recent_row.completed_at,
+                "status": recent_row.status,
+            }
+            if recent_row
+            else None
+        )
+
+        return {
+            "user_id": user_id,
+            "total_attempts": agg.total_attempts or 0,
+            "avg_score": float(agg.avg_score) if agg.avg_score is not None else None,
+            "best_score": float(agg.best_score) if agg.best_score is not None else None,
+            "total_time_spent_seconds": total_time,
+            "most_recent": most_recent,
+        }
+
+    async def get_user_attempts(self, user_id: int, params: AttemptsQueryParams) -> Tuple[int, List[dict]]:
+        col_name = params.sort_by if params.sort_by in _VALID_ATTEMPTS_SORT_COLS else "completed_at"
+        order_clause = text(f"{col_name} DESC") if params.order == "desc" else text(f"{col_name} ASC")
+
+        base_filters = [QuizSession.user_id == user_id]
+        if params.status:
+            base_filters.append(QuizSession.status == params.status.upper())
+        if params.test_id is not None:
+            base_filters.append(QuizSession.test_id == params.test_id)
+        if params.from_date is not None:
+            base_filters.append(QuizSession.completed_at >= params.from_date)
+        if params.to_date is not None:
+            base_filters.append(QuizSession.completed_at <= params.to_date)
+
+        total_stmt = (
+            select(func.count(QuizSession.id))
+            .join(Test, Test.id == QuizSession.test_id)
+            .where(*base_filters)
+        )
+        total = (await self.db.execute(total_stmt)).scalar() or 0
+
+        rows_stmt = (
+            select(
+                QuizSession.id.label("session_id"),
+                QuizSession.test_id,
+                Test.name.label("test_name"),
+                QuizSession.percentage_score,
+                QuizSession.completed_at,
+                QuizSession.status,
+            )
+            .join(Test, Test.id == QuizSession.test_id)
+            .where(*base_filters)
+            .order_by(order_clause)
+            .offset((params.page - 1) * params.page_size)
+            .limit(params.page_size)
+        )
+        rows = (await self.db.execute(rows_stmt)).fetchall()
+        attempts = [
             {
                 "session_id": row.session_id,
                 "test_id": row.test_id,
@@ -178,3 +270,4 @@ class ReportRepository:
             }
             for row in rows
         ]
+        return total, attempts

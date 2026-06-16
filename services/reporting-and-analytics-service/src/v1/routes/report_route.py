@@ -6,10 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.session import get_db
 from src.schemas.report_schema import (
     AggregateReportResponse,
+    AttemptsQueryParams,
+    AttemptsResponse,
     QueryParams,
     RankingsResponse,
     TestSummary,
-    UserReportResponse,
+    UserSummaryResponse,
 )
 from src.services.report_service import ReportService
 from src.utils.dependencies import get_current_trainer, get_current_user
@@ -72,21 +74,46 @@ async def get_test_rankings(
     )
 
 
-@router.get(
-    "/user/{user_id}",
-    response_model=UserReportResponse,
-    summary="Completed sessions for a candidate (results page feed)",
-)
-async def get_user_report(
-    user_id: int,
-    db: AsyncSession = Depends(get_db),
-    current: Dict = Depends(get_current_user),
-):
+def _check_ownership(current: Dict, user_id: int) -> None:
     role = (current.get("role") or "").upper()
     if role != "TRAINER" and current["id"] != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied: can only view your own results",
         )
-    sessions = await ReportService.get_user_sessions(db, user_id)
-    return UserReportResponse(user_id=user_id, sessions=sessions)
+
+
+@router.get(
+    "/user/{user_id}",
+    response_model=UserSummaryResponse,
+    summary="Summary stats for a candidate (total attempts, avg/best score, most recent)",
+)
+async def get_user_summary(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current: Dict = Depends(get_current_user),
+):
+    _check_ownership(current, user_id)
+    return await ReportService.get_user_summary(db, user_id)
+
+
+@router.get(
+    "/user/{user_id}/attempts",
+    response_model=AttemptsResponse,
+    summary="Paginated attempt history for a candidate",
+)
+async def get_user_attempts(
+    user_id: int,
+    params: AttemptsQueryParams = Depends(),
+    db: AsyncSession = Depends(get_db),
+    current: Dict = Depends(get_current_user),
+):
+    _check_ownership(current, user_id)
+    total, attempts = await ReportService.get_user_attempts(db, user_id, params)
+    return AttemptsResponse(
+        user_id=user_id,
+        total=total,
+        page=params.page,
+        page_size=params.page_size,
+        attempts=attempts,
+    )

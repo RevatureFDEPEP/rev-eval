@@ -13,6 +13,17 @@ class QueryParams(BaseModel):
     order: Literal["asc", "desc"] = "desc"
 
 
+class AttemptsQueryParams(BaseModel):
+    page: int = Field(1, ge=1)
+    page_size: int = Field(20, ge=1, le=100)
+    test_id: Optional[int] = None
+    from_date: Optional[datetime] = None
+    to_date: Optional[datetime] = None
+    status: Optional[str] = None
+    sort_by: str = "completed_at"
+    order: Literal["asc", "desc"] = "desc"
+
+
 class TestSummary(BaseModel):
     test_id: int
     test_name: str
@@ -52,6 +63,18 @@ class UserSessionEntry(BaseModel):
     status: str
 
 
-class UserReportResponse(BaseModel):
+class UserSummaryResponse(BaseModel):
     user_id: int
-    sessions: List[UserSessionEntry]
+    total_attempts: int
+    avg_score: Optional[float]
+    best_score: Optional[float]
+    total_time_spent_seconds: Optional[int]
+    most_recent: Optional[UserSessionEntry]
+
+
+class AttemptsResponse(BaseModel):
+    user_id: int
+    total: int
+    page: int
+    page_size: int
+    attempts: List[UserSessionEntry]
