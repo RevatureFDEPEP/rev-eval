@@ -1,0 +1,17 @@
+Async Alembic environment for test-management-service.
+
+The database URL is resolved in env.py with the same precedence as
+src/db/session.py: the DATABASE_URL environment variable first, then the
+service settings (SQLALCHEMY_DATABASE_URL). The driver is normalized to an
+async driver (asyncpg for Postgres) so migrations run in an async context.
+
+Usage (from the service directory, services/test-management-service):
+
+    # apply all migrations
+    DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/db alembic upgrade head
+
+    # roll back the most recent migration
+    alembic downgrade -1
+
+    # generate a new draft migration (always review it)
+    alembic revision --autogenerate -m "describe change"
