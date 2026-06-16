@@ -318,6 +318,20 @@ class QuestionUpdate(BaseModel):
         return self
 
 
+class PresignedUploadResponse(BaseModel):
+    """
+    Response for a question-image presigned upload URL.
+
+    The client PUTs the file bytes directly to `url` (with the same
+    Content-Type it requested), then references `key` when attaching the image
+    to a question. `expires_in` is the TTL (seconds) of the signed URL.
+    """
+
+    url: str = Field(..., description="Presigned S3/MinIO PUT URL")
+    key: str = Field(..., description="Object key to reference after upload")
+    expires_in: int = Field(..., description="URL validity in seconds")
+
+
 class QuestionResponse(BaseModel):
     """
     Response schema for Question documents.

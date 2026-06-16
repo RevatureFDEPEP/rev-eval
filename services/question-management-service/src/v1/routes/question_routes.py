@@ -1,9 +1,63 @@
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import ValidationError
-from src.schemas.question import QuestionCreate, QuestionResponse, QuestionUpdate
+from src.schemas.question import (
+    PresignedUploadResponse,
+    QuestionCreate,
+    QuestionResponse,
+    QuestionUpdate,
+)
 from src.services.question_service import QuestionService
+from src.services.upload_service import (
+    InvalidContentTypeError,
+    InvalidFilenameError,
+    create_presigned_upload,
+)
+from src.utils.auth import get_current_trainer
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
+
+
+@router.get(
+    "/presigned-upload-url",
+    response_model=PresignedUploadResponse,
+    summary="Get a presigned upload URL for a question image",
+    description="""
+    Issue a short-lived presigned PUT URL the client can use to upload a
+    question image directly to MinIO/S3 (no bytes flow through this service).
+
+    **Auth:** trainer-only. The caller's role is read from the gateway-injected
+    `X-User-Role` header (this service does not re-verify the JWT — see the
+    header-trust caveat in `src/utils/auth.py`).
+
+    **Content types:** only `image/png` and `image/jpeg` are allowed.
+
+    Returns the signed `url`, the object `key` to reference after upload, and
+    the URL's `expires_in` TTL in seconds. Does not touch the database.
+    """,
+)
+async def get_presigned_upload_url(
+    filename: str = Query(..., min_length=1, description="Original filename"),
+    content_type: str = Query(..., description="MIME type (image/png|image/jpeg)"),
+    _trainer: dict = Depends(get_current_trainer),
+):
+    """Generate a trainer-only presigned PUT URL for a question image."""
+    try:
+        return create_presigned_upload(filename=filename, content_type=content_type)
+    except InvalidContentTypeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e),
+        ) from e
+    except InvalidFilenameError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while generating the upload URL: {str(e)}",
+        ) from e
 
 
 @router.post(
