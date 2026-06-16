@@ -4,7 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.session import get_db
 from src.schemas.answer_schema import AnswerCreate, AnswerResponse
-from src.schemas.session_schema import SessionCreate, SessionResponse
+from src.schemas.session_schema import (
+    DraftSave,
+    DraftSaveResult,
+    SessionCreate,
+    SessionResponse,
+)
 from src.services.session_service import SessionService
 from src.utils.dependencies import get_current_user_from_headers
 
@@ -53,4 +58,29 @@ async def submit_answer(
         body=body,
         idempotency_key=idempotency_key,
         correlation_id=x_correlation_id,
+    )
+
+
+@router.patch(
+    "/{session_id}/draft",
+    response_model=DraftSaveResult,
+    status_code=status.HTTP_200_OK,
+)
+async def save_draft(
+    session_id: str,
+    body: DraftSave,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_headers),
+):
+    """Autosave the candidate's in-progress answers (W3-F4).
+
+    Persists a last-write-wins crash-recovery snapshot WITHOUT scoring or
+    advancing the session — ``current_index``/``status`` are returned unchanged.
+    Terminal/expired sessions reject with 409 (a semantic error the client must
+    surface and halt on, never retry)."""
+    return await SessionService.save_draft(
+        db,
+        session_id=session_id,
+        user_id=current_user["id"],
+        answers=body.answers,
     )

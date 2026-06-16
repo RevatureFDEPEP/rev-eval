@@ -50,6 +50,12 @@ class QuizSession(Base):
     # the session is still ACTIVE or was EXPIRED before completion (W3-F2).
     submitted_at = Column(DateTime, nullable=True)
 
+    # Last-write-wins autosave snapshot of in-progress answers, keyed by question
+    # id ({question_id: [option_id, ...]}). Advisory crash-recovery only: written
+    # by PATCH /sessions/{id}/draft, never scored, and does not advance the
+    # session. NULL until the first autosave (W3-F4).
+    draft_answers = Column(JSON, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

@@ -119,6 +119,19 @@ export const api = {
   },
 
   /**
+   * PATCH request. `headers` allows per-call headers if a caller needs them.
+   */
+  async patch<T>(endpoint: string, data: unknown, headers?: HeadersInit): Promise<T> {
+    const response = await fetchApi(endpoint, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+      headers,
+    });
+
+    return response.json();
+  },
+
+  /**
    * PUT request
    */
   async put<T>(endpoint: string, data: unknown): Promise<T> {

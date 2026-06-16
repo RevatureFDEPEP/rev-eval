@@ -14,7 +14,11 @@ from src.repositories.answer_repository import AnswerRepository
 from src.repositories.session_repository import SessionRepository
 from src.repositories.test_repository import TestRepository
 from src.schemas.answer_schema import AnswerCreate, AnswerResponse
-from src.schemas.session_schema import SanitizedQuestion, SessionResponse
+from src.schemas.session_schema import (
+    DraftSaveResult,
+    SanitizedQuestion,
+    SessionResponse,
+)
 from src.scoring import partial_credit
 from src.scoring.result import ScoreResult
 from src.utils.http_client import get_http_client
@@ -325,6 +329,69 @@ class SessionService:
             question_ids, new_index, correlation_id
         )
         return response
+
+    @staticmethod
+    async def save_draft(
+        db: AsyncSession,
+        session_id: str,
+        user_id: int,
+        answers: dict,
+    ) -> DraftSaveResult:
+        """Persist an advisory autosave snapshot of in-progress answers (W3-F4).
+
+        Last-write-wins: ``answers`` is stored verbatim on ``draft_answers`` and
+        never scored. The session is NOT advanced — ``current_index`` and
+        ``status`` are returned unchanged so the client can confirm the autosave
+        was non-mutating.
+
+        State gate (all semantic — the client must surface and halt, never
+        retry): 404 if the session is missing, 403 if it belongs to another
+        user, 409 if the session is terminal (SUBMITTED/EXPIRED) or its
+        ``expires_at`` has passed (you cannot autosave a finished exam). An
+        expired-but-still-ACTIVE row is lazily flipped to EXPIRED, mirroring
+        ``submit_answer``.
+
+        No row lock: a draft write touches only ``draft_answers`` (disjoint from
+        the ``current_index``/``status`` that ``submit_answer`` locks), and
+        last-write-wins is the intended semantics for autosave, so concurrent
+        drafts need not serialize.
+        """
+        session = await SessionRepository.get_by_id(db, session_id)
+        if session is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Session {session_id} not found",
+            )
+        if session.user_id != user_id:
+            # Don't leak existence to other users.
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This session belongs to another user",
+            )
+
+        now = datetime.utcnow()
+        # Lazily finalize an expired-but-still-ACTIVE session before rejecting.
+        if session.status == SessionStatus.ACTIVE and session.expires_at < now:
+            session.status = SessionStatus.EXPIRED
+            await db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Session has expired",
+            )
+        if session.status != SessionStatus.ACTIVE:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Session is {session.status.value}; autosave rejected",
+            )
+
+        session.draft_answers = answers
+        await db.commit()
+        return DraftSaveResult(
+            session_id=session.session_id,
+            status=session.status.value,
+            current_index=session.current_index,
+            saved_at=now,
+        )
 
     @staticmethod
     async def _fetch_question(question_id: str, correlation_id: str | None) -> dict:
