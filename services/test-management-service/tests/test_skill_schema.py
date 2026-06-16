@@ -5,7 +5,6 @@ First tests under the W2-F2 pytest scaffold for test-management-service.
 
 import pytest
 from pydantic import ValidationError
-
 from src.schemas.skill_schema import SkillCreate, SkillOut, SkillUpdate
 
 
