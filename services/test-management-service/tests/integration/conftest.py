@@ -65,10 +65,13 @@ IT_DATABASE_URL = os.getenv(
 IT_MONGO_URI = os.getenv(
     "IT_MONGO_URI", "mongodb://admin:admin@localhost:27017/?authSource=admin"
 )
-# Must match the database question-management-service is pinned to (compose
-# MONGO_DB), since the cross-service $sample reads from QMS's own connection —
-# an isolated DB name here would make seeded questions invisible to QMS.
-IT_MONGO_DB = os.getenv("IT_MONGO_DB", "evalai")
+# Must match the database question-management-service reads from: the
+# cross-service $sample uses QMS's own connection, so an isolated DB name here
+# would make seeded questions invisible to it. Default off the SAME MONGO_DB env
+# var the QMS container is configured with (compose: `MONGO_DB: ${MONGO_DB:-evalai}`)
+# so the two can't silently drift apart; IT_MONGO_DB still overrides for unusual
+# setups. The seed fixture also preflights QMS to catch any residual mismatch loudly.
+IT_MONGO_DB = os.getenv("IT_MONGO_DB") or os.getenv("MONGO_DB", "evalai")
 IT_QUESTION_SERVICE_URL = os.getenv("IT_QUESTION_SERVICE_URL", "http://localhost:8003")
 
 # Stable tag on every seeded question doc so a session-scoped sweep can remove
@@ -302,6 +305,27 @@ async def seed_quiz(it_db, question_service):
             db.add(TestSkill(test_id=test.id, skill_id=skill.id))
             await db.commit()
             test_id = test.id
+
+        # Loud preflight: confirm QMS actually sees what we just seeded. The docs
+        # go into IT_MONGO_DB, but the cross-service $sample reads from QMS's own
+        # MONGO_DB; if those drift, the docs are invisible and session creation
+        # would later fail with a confusing "not enough questions" 409. Asserting
+        # it here turns a silent DB-name mismatch into a clear, actionable failure.
+        # The skill tag is a fresh UUID, so $sample can only ever return our n docs.
+        async with httpx.AsyncClient(timeout=10) as client:
+            probe = await client.get(
+                f"{IT_QUESTION_SERVICE_URL}/v1/api/questions/sample",
+                params=[("skills", skill_name), ("count", str(n))],
+            )
+        visible = probe.json() if probe.status_code == 200 else []
+        if probe.status_code != 200 or len(visible) != n:
+            pytest.fail(
+                f"QMS saw {len(visible)}/{n} freshly-seeded questions for skill "
+                f"'{skill_name}' (HTTP {probe.status_code}). The suite seeded into "
+                f"Mongo DB '{IT_MONGO_DB}', but question-management-service reads "
+                f"its own MONGO_DB — if those differ the seeded docs are invisible "
+                f"to $sample. Align IT_MONGO_DB / MONGO_DB."
+            )
 
         return {
             "test_id": test_id,

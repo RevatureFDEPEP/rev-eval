@@ -112,7 +112,7 @@ async def test_draft_rejected_on_terminal_session(app_client, start_session, it_
 
     resp = await app_client.patch(
         f"/v1/api/sessions/{session_id}/draft",
-        json={"answers": {question_id: [1]}},
+        json={"answers": {question_id: [1]}, "client_version": 1},
     )
     assert resp.status_code == 409, resp.text
 

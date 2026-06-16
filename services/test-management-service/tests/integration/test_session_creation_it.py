@@ -24,10 +24,11 @@ async def test_create_session_persists_server_authoritative_timing(
 ):
     quiz = await seed_quiz(n=3, duration=DURATION)
 
-    # Naive UTC to match the server's datetime.now(UTC).replace(tzinfo=None).
-    before = datetime.now(UTC).replace(tzinfo=None)
+    # Server timestamps serialize offset-aware (UTC), so bracket the call in
+    # aware UTC and compare aware-to-aware.
+    before = datetime.now(UTC)
     resp = await app_client.post("/v1/api/sessions", json={"test_id": quiz["test_id"]})
-    after = datetime.now(UTC).replace(tzinfo=None)
+    after = datetime.now(UTC)
 
     assert resp.status_code == 201, resp.text
     body = resp.json()
@@ -61,7 +62,8 @@ async def test_create_session_persists_server_authoritative_timing(
     assert row.status == QuizSessionStatus.ACTIVE
     assert row.current_index == 0
     assert len(row.question_ids) == 3
-    assert row.expires_at == expires_at
+    # The row stores naive UTC; the wire value is the same instant tagged +00:00.
+    assert row.expires_at == expires_at.replace(tzinfo=None)
 
 
 @pytest.mark.asyncio
