@@ -3,7 +3,6 @@ import logging
 import os
 
 from sqlalchemy import text
-from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -30,7 +29,12 @@ else:
 logger = logging.getLogger(__name__)
 
 # ===== Async Engine =====
-engine = create_async_engine(ASYNC_DATABASE_URL, echo=False, future=True)
+# Bound connect timeout so an unreachable/black-hole DB fails fast instead of
+# hanging startup forever (asyncpg honours connect_args["timeout"]).
+_connect_args = {"timeout": 5} if "asyncpg" in ASYNC_DATABASE_URL else {}
+engine = create_async_engine(
+    ASYNC_DATABASE_URL, echo=False, future=True, connect_args=_connect_args
+)
 
 # ===== Async Session Factory =====
 AsyncSessionLocal = sessionmaker(
@@ -57,5 +61,9 @@ async def verify_db_connection() -> None:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         logger.info("Async DB connection verified (read-only).")
-    except OperationalError as e:
-        logger.error("Async DB connection failed: %s", e, exc_info=True)
+    except Exception as e:
+        # Catch broadly on purpose: a refused/black-hole DB raises OSError
+        # (ConnectionRefusedError, TimeoutError), not just SQLAlchemy's
+        # OperationalError. Swallow all of them so a database that is still
+        # coming up cannot crash startup — this check is advisory only.
+        logger.error("Async DB connection check failed (continuing): %s", e)
