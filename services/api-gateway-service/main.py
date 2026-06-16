@@ -1,10 +1,12 @@
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 import httpx
 import uvicorn
 import re
 import logging
+import uuid
 from os import getenv
 from typing import Optional, Dict
 from dotenv import load_dotenv
@@ -20,6 +22,23 @@ load_dotenv()
 from src.middleware.auth import verify_jwt_token, add_user_context_headers  # noqa: E402
 
 app = FastAPI(title="API Gateway")
+
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    """
+    Accept X-Request-Id from incoming requests or generate a UUID.
+    Echo it in every response so callers can correlate logs across services.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers["X-Request-Id"] = request_id
+        return response
+
+
+app.add_middleware(RequestIdMiddleware)
 
 # Configure CORS
 origins = getenv("ALLOW_ORIGINS", "http://localhost:3000").split(",")
@@ -136,6 +155,7 @@ async def public_auth_proxy(auth_path: str, request: Request):
     headers = dict(request.headers)
     for h in ("host", "content-length", "x-forwarded-proto", "x-forwarded-scheme"):
         headers.pop(h, None)
+    headers["X-Request-Id"] = getattr(request.state, "request_id", None) or str(uuid.uuid4())
 
     async with httpx.AsyncClient(follow_redirects=True) as client:
         resp = await client.request(
@@ -203,6 +223,7 @@ async def smart_gateway(
 
             # Add user context headers for downstream services
             headers = add_user_context_headers(headers, user_context)
+            headers["X-Request-Id"] = getattr(request.state, "request_id", None) or str(uuid.uuid4())
 
             resp = await client.request(
                 method,

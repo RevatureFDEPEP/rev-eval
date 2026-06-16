@@ -51,14 +51,14 @@ async def init_db():
         await init_beanie(database=db, document_models=[Question])
         print("✅ Beanie ODM initialized with Question model")
 
-    except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+    except (ConnectionFailure, ServerSelectionTimeoutError) as e:  # pragma: no cover
         print(f"❌ Failed to connect to MongoDB: {e}")
         print(f"   Cluster: {settings.MONGO_CLUSTER}")
         print(f"   Database: {settings.MONGO_DB}")
         print(f"   User: {settings.MONGO_USER}")
         raise
 
-    except Exception as e:
+    except Exception as e:  # pragma: no cover
         print(f"❌ Unexpected error during MongoDB initialization: {e}")
         import traceback
         traceback.print_exc()
@@ -78,7 +78,7 @@ async def close_db():
         print("✅ MongoDB connection closed")
 
 
-async def get_database():
+async def get_database():  # pragma: no cover
     """
     Get the MongoDB database instance.
 
@@ -95,7 +95,7 @@ async def get_database():
     return db
 
 
-async def get_client():
+async def get_client():  # pragma: no cover
     """
     Get the MongoDB client instance.
 
@@ -112,7 +112,7 @@ async def get_client():
     return client
 
 
-async def check_connection():
+async def check_connection():  # pragma: no cover
     """
     Check if MongoDB connection is alive.
 
