@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import ValidationError
@@ -67,6 +67,26 @@ async def get_all_questions():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while fetching questions: {str(e)}"
+        ) from e
+
+
+@router.get(
+    "/sample",
+    response_model=List[Dict[str, Any]],
+    summary="Randomly sample questions",
+    description="Return n randomly sampled questions using MongoDB $sample. Optionally scoped to given skills.",
+)
+async def sample_questions(
+    n: int = Query(20, ge=1, le=100, description="Number of questions to sample"),
+    skills: Optional[str] = Query(None, description="Comma-separated skill names to scope the sample"),
+):
+    skill_list = [s.strip() for s in skills.split(",")] if skills else None
+    try:
+        return await QuestionService.sample_questions(n=n, skills=skill_list)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred: {str(e)}",
         ) from e
 
 

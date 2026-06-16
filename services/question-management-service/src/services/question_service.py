@@ -421,3 +421,21 @@ class QuestionService:
             results = await Question.find(And(*conditions)).limit(limit).to_list()
 
         return results
+
+    @staticmethod
+    async def sample_questions(n: int, skills: Optional[List[str]] = None) -> List[dict]:
+        """
+        Return n randomly sampled questions using MongoDB $sample aggregation.
+        Optionally scoped to questions that include at least one of the given skills.
+        correct_answers are included here; the caller (quiz session route) must strip them.
+        """
+        pipeline: list = []
+        if skills:
+            pipeline.append({"$match": {"skills": {"$in": skills}}})
+        pipeline.append({"$sample": {"size": n}})
+
+        results = await Question.aggregate(pipeline).to_list()
+        for doc in results:
+            if "_id" in doc and not isinstance(doc["_id"], str):
+                doc["_id"] = str(doc["_id"])
+        return results
