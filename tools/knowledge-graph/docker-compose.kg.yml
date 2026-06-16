@@ -1,0 +1,24 @@
+# Knowledge-graph dev tool — model runtime ONLY.
+# Deliberately separate from the repo-root docker-compose.yml: this is not part of
+# the deployed rev-eval stack. Gated behind the `kg` profile so `docker compose up`
+# at the repo root never starts it. Toggle via `python kg.py up|down`.
+name: rev-eval-kg
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: rev-eval-kg-ollama
+    profiles: ["kg"]
+    ports:
+      - "11434:11434"
+    environment:
+      # Unload the model from RAM immediately after each request → ~0 idle footprint.
+      # Trade-off: a cold-start reload on the next call. See README "Memory".
+      OLLAMA_KEEP_ALIVE: "0"
+    volumes:
+      # Persist pulled models across on/off cycles so we don't re-download.
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  ollama-models:
