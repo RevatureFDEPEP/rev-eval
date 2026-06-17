@@ -1,7 +1,8 @@
-import { expect, vi } from 'vitest'
-import * as matchers from '@testing-library/jest-dom/matchers'
-
-expect.extend(matchers)
+import { vi } from 'vitest'
+// `/vitest` both extends `expect` at runtime AND augments vitest's `Assertion`
+// type globally, so jest-dom matchers (toBeInTheDocument, toBeDisabled, …) are
+// typed in every *.test.tsx without a per-file import.
+import '@testing-library/jest-dom/vitest'
 
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

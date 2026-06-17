@@ -37,7 +37,7 @@ export function Timer({ timeRemaining, formatTime, isWarning, isCritical }: Time
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full" data-testid="exam-timer">
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>

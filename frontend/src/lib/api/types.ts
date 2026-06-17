@@ -433,6 +433,23 @@ export interface AuthIdentity {
   role: string;
 }
 
+// ===== W3-F4: Autosave + error classification =====
+
+/** Response of PATCH /v1/api/sessions/{id}/draft — index/status unchanged. */
+export interface DraftSaveResult {
+  session_id: string;
+  status: string;
+  current_index: number;
+  saved_at: string;
+}
+
+/**
+ * Exam-client error policy: `transient` (network blip, 502/503/504) is safe to
+ * retry with backoff; `semantic` (409/410/422 — session locked/expired/invalid)
+ * is a definitive server decision the client must surface and halt on (W3-F4).
+ */
+export type ExamErrorKind = 'transient' | 'semantic';
+
 // ===== TYPE ALIASES (for backwards compatibility) =====
 
 /** @deprecated Use SubmissionStatus instead */
