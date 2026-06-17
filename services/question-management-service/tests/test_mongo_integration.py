@@ -32,14 +32,6 @@ pytestmark = pytest.mark.skipif(
 
 from fastapi.testclient import TestClient  # noqa: E402
 from main import app  # noqa: E402
-from src.utils.dependencies import verify_jwt  # noqa: E402
-
-
-def _fake_trainer():
-    return {"sub": "1", "role": "TRAINER", "email": "trainer@ci.test"}
-
-
-app.dependency_overrides[verify_jwt] = _fake_trainer
 
 _MONGO_URL = "mongodb://localhost:27017"
 _TEST_DB = "test_questions"
@@ -73,13 +65,15 @@ class TestQuestionCrudMongo:
 
     @classmethod
     def setup_class(cls):
-        # TestClient as context manager triggers @app.on_event("startup")
-        # which calls init_db() → beanie initialized with MONGO_URI + MONGO_DB.
+        from src.utils.dependencies import verify_jwt
+        app.dependency_overrides[verify_jwt] = lambda: {"sub": "1", "role": "TRAINER", "email": "trainer@ci.test"}
         cls._tc = TestClient(app)
         cls.client = cls._tc.__enter__()
 
     @classmethod
     def teardown_class(cls):
+        from src.utils.dependencies import verify_jwt
+        app.dependency_overrides.pop(verify_jwt, None)
         cls._tc.__exit__(None, None, None)
         asyncio.run(_drop_test_db())
 
