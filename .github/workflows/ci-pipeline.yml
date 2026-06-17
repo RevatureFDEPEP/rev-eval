@@ -111,6 +111,12 @@ jobs:
       - name: Run integration tests
         if: matrix.service == 'reporting-and-analytics-service'
         working-directory: services/reporting-and-analytics-service
+        # IT_REQUIRE_SCHEMA makes a missing quiz_sessions table a hard failure
+        # (not a skip), so a table-level mirror/schema divergence fails CI here
+        # instead of silently opting out — the suite has just brought up
+        # test-management, so the tables MUST exist unless the contract drifted.
+        env:
+          IT_REQUIRE_SCHEMA: "1"
         run: pytest --integration -m integration -v
 
       - name: Dump integration container logs

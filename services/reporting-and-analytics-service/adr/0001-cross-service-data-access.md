@@ -82,3 +82,25 @@ Derived from `session_answers` because there is no stored per-session score colu
   fractions and rounds once, so it stays consistent with the per-attempt scores.
 - Attempt-history **date filters apply to `created_at`** (always present) and are
   interpreted in **UTC**, matching test-management's tz-naive UTC timestamps.
+
+## Verification
+
+The schema-coupling risk this ADR accepts is guarded by the cross-schema
+`--integration` suite (`tests/integration/test_reporting_real_pg.py`), which runs
+reporting's real queries against a Postgres whose schema test-management migrated
+(`docker compose up -d --wait postgres test-management-service`). It seeds rows
+with raw SQL straight into test-management's own migrated tables — never via
+reporting's `tms_readonly` mirror — so a renamed/dropped column or a changed enum
+surfaces as a failed query, not a green test against a mirror that drifted.
+
+This guard was confirmed to have teeth: renaming a mirror column
+(`points_earned` → a non-existent name) left the **hermetic** suite green (it
+builds its schema from the mirror, so the mirror agreed with itself) while the
+**integration** suite failed with `column "…" does not exist` on real Postgres —
+the exact drift the suite exists to catch. Reverted; both suites green.
+
+Coverage as of W4-F1: 26 hermetic + 5 cross-schema integration tests; the
+integration step runs in CI gated on the reporting matrix entry. The endpoints
+were additionally live-smoked against the running stack — summary figures, the
+native-enum `status` filter, and the `require_self_or_trainer` gate (participant
+self → 200, cross-user → 403, trainer → 200) through the gateway.

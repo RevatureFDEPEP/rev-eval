@@ -48,15 +48,25 @@ async def real_engine():
             present = await conn.scalar(
                 text("SELECT to_regclass('public.quiz_sessions')")
             )
-    except Exception as e:  # connection refused, auth, etc.
+    except Exception as e:  # connection refused, auth, etc. — no stack at all
         await engine.dispose()
         pytest.skip(f"Postgres not reachable at {IT_DATABASE_URL}: {e}")
     if present is None:
         await engine.dispose()
+        msg = (
+            "Postgres is reachable but table 'quiz_sessions' is absent — the "
+            "reporting mirror and the real test-management schema have diverged "
+            "(or test-management did not migrate). "
+        )
+        # Skipping here is exactly how a table-level schema drift would slip
+        # through green, so in CI (IT_REQUIRE_SCHEMA set, after compose brings up
+        # test-management) this is a hard FAILURE, not a skip. Locally, where a
+        # dev may have started only Postgres, we skip with instructions.
+        if os.getenv("IT_REQUIRE_SCHEMA"):
+            pytest.fail(msg + "Failing because IT_REQUIRE_SCHEMA is set.")
         pytest.skip(
-            "quiz_sessions not found — start test-management-service so it "
-            "migrates the schema (docker compose up -d --wait postgres "
-            "test-management-service)"
+            msg + "Start it: docker compose up -d --wait postgres "
+            "test-management-service"
         )
     yield engine
     await engine.dispose()
