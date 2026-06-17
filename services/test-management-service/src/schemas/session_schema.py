@@ -18,3 +18,18 @@ class SessionOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AnswerSubmit(BaseModel):
+    question_id: str
+    submitted_answers: list[str]
+
+
+class AnswerResponse(BaseModel):
+    question_id: str
+    earned_points: float
+    max_points: float
+    is_correct: bool
+    next_question: dict[str, Any] | None
+    session_status: str
+    current_index: int
