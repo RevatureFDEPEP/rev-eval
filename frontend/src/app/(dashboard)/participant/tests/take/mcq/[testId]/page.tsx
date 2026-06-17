@@ -279,10 +279,14 @@ export default function QuizTestPage({ params }: QuizTestPageProps) {
       localStorage.removeItem(`quiz-draft-${sessionId}`);
 
       setState('completed');
-      toast.success('Quiz submitted successfully! Redirecting to your tests...');
+      toast.success('Quiz submitted successfully! Redirecting to results...');
 
       setTimeout(() => {
-        router.push('/participant/tests');
+        router.push(
+          sessionId
+            ? `/participant/tests/results/${sessionId}`
+            : '/participant/tests'
+        );
       }, 2000);
     } catch (err) {
       if (err instanceof ApiError) {

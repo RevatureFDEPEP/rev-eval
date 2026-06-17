@@ -476,6 +476,37 @@ export interface SubmissionReviewDetails {
   transcript: InterviewTranscript | null;
 }
 
+// ===== REPORTING =====
+
+export interface UserSessionEntry {
+  session_id: string;
+  test_id?: number;
+  test_name?: string;
+  status: string;
+  started_at?: string;
+  completed_at?: string;
+  percentage_score?: number;
+  total_questions?: number;
+  time_spent_seconds?: number;
+}
+
+export interface UserSummaryResponse {
+  user_id: number;
+  total_attempts: number;
+  avg_score?: number;
+  best_score?: number;
+  total_time_spent_seconds?: number;
+  most_recent?: UserSessionEntry;
+}
+
+export interface AttemptsResponse {
+  user_id: number;
+  total: number;
+  page: number;
+  page_size: number;
+  attempts: UserSessionEntry[];
+}
+
 // ===== TYPE ALIASES (for backwards compatibility) =====
 
 /** @deprecated Use SubmissionStatus instead */
