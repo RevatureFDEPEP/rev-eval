@@ -1,0 +1,19 @@
+from collections.abc import Sequence
+
+from src.scoring import ScoreResult
+
+
+def score_question(
+    question_type: str,
+    correct_answers: Sequence[str],
+    submitted_answers: Sequence[str],
+    max_points: float = 1.0,
+) -> ScoreResult:
+    correct = set(correct_answers)
+    submitted = set(submitted_answers)
+    is_correct = correct == submitted and bool(correct)
+    return ScoreResult(
+        earned=max_points if is_correct else 0.0,
+        max_points=max_points,
+        is_correct=is_correct,
+    )

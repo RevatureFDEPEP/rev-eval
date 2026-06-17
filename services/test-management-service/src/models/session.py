@@ -3,6 +3,8 @@ import uuid
 
 from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.types import JSON
+
 from src.db.session import Base
 
 
@@ -23,3 +25,5 @@ class Session(Base):
     expires_at = Column(DateTime, nullable=False)
     status = Column(Enum(SessionStatus, name="sessionstatus"), nullable=False, default=SessionStatus.ACTIVE)
     current_index = Column(Integer, nullable=False, default=0)
+    question_ids = Column(JSON, nullable=False, default=list)
+    submitted_at = Column(DateTime, nullable=True)
