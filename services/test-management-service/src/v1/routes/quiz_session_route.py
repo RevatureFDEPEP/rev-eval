@@ -34,6 +34,7 @@ from src.schemas.quiz_session_schema import (
     SessionCreate,
     SessionRead,
 )
+from src.scoring import score_question
 from src.services.quiz_session_helpers import (
     build_sample_query,
     compute_expires_at,
