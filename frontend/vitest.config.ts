@@ -16,6 +16,10 @@ export default defineConfig({
         'src/lib/schemas/**',
         'src/lib/utils.ts',
         'src/lib/utils/date.ts',
+        // W4-F2 candidate results page
+        'src/components/results/**',
+        'src/lib/results/**',
+        'src/lib/api/reports.ts',
       ],
       thresholds: {
         lines: 70,

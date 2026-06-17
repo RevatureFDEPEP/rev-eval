@@ -140,6 +140,9 @@ describe('TestRunner', () => {
 
     expect(await screen.findByText('Quiz submitted')).toBeInTheDocument()
     expect(screen.queryByText('Capital of France?')).not.toBeInTheDocument()
+    // W4-F2: the submit screen links into the candidate results page.
+    const resultsLink = screen.getByRole('link', { name: /view your results/i })
+    expect(resultsLink).toHaveAttribute('href', '/results/s1')
   })
 
   it('locks inputs and the submit button optimistically while submitting', async () => {
