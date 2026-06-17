@@ -185,11 +185,6 @@ jobs:
         run: pnpm build
 
       - name: Attest build provenance
-        # OIDC id-tokens are only provisioned for push events; on pull_request
-        # (and manual dispatch) the token is withheld and attest-build-provenance
-        # fails with "error retrieving identity token". Provenance is only
-        # meaningful for published artifacts, so run it only on push to main.
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/attest-build-provenance@v1
         with:
           subject-path: 'frontend/.next/**/*'
