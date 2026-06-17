@@ -7,7 +7,13 @@ import 'server-only';
 import { getSession } from '@/lib/session';
 import type { AuthUser } from '@/lib/auth/useAuth';
 import { mapUserServiceUser } from '@/lib/auth/mapUser';
-import { SessionResponse, TrainerDashboardStats, TrainerTestInfo } from './types';
+import {
+  PaginatedAttempts,
+  SessionResponse,
+  TrainerDashboardStats,
+  TrainerTestInfo,
+  UserReportSummary,
+} from './types';
 
 const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://api-gateway:8000';
 
@@ -72,6 +78,45 @@ export async function getCurrentUserServer(): Promise<AuthUser | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * Candidate results summary (W4-F1). GET /reports/user/{id}. Authorization is
+ * header-trust at the reporting service: a participant may read only their own
+ * report, so callers pass the authenticated user's own id.
+ */
+export async function getUserReportSummaryServer(
+  userId: number,
+): Promise<UserReportSummary> {
+  const response = await authedFetch(`/v1/api/reports/user/${userId}`);
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new ServerApiError(response.status, response.statusText, detail);
+  }
+  return response.json();
+}
+
+/**
+ * Paginated attempt history (W4-F1). GET /reports/user/{id}/attempts. The
+ * results page requests a single large page (default sort submitted_at:desc)
+ * to drive both the breakdown table and the score-per-attempt chart.
+ */
+export async function getUserAttemptsServer(
+  userId: number,
+  opts?: { page?: number; size?: number },
+): Promise<PaginatedAttempts> {
+  const params = new URLSearchParams();
+  if (opts?.page !== undefined) params.set('page', String(opts.page));
+  if (opts?.size !== undefined) params.set('size', String(opts.size));
+  const query = params.toString();
+  const response = await authedFetch(
+    `/v1/api/reports/user/${userId}/attempts${query ? `?${query}` : ''}`,
+  );
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new ServerApiError(response.status, response.statusText, detail);
+  }
+  return response.json();
 }
 
 /**
