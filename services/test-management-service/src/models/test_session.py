@@ -23,4 +23,5 @@ class TestSession(Base):
     server_now = Column(DateTime, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     status = Column(Enum(SessionStatus), nullable=False, default=SessionStatus.ACTIVE)
+    current_position = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)

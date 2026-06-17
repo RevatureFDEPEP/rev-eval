@@ -23,6 +23,8 @@ class SessionResponse(BaseModel):
     test_id: int
     server_now: datetime
     expires_at: datetime
+    total_questions: int
+    current_position: int
     first_question: QuestionOut | None = None
 
     class Config:

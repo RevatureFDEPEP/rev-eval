@@ -5,13 +5,13 @@ from urllib.parse import quote
 
 import httpx
 from fastapi import HTTPException, status
-from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.settings import settings
 from src.models.test import TestType
 from src.models.test_session import SessionStatus, TestSession
 from src.models.test_submission import SubmissionStatus
+from src.repositories.session_question_repository import SessionQuestionRepository
 from src.repositories.session_repository import SessionRepository
 from src.repositories.skill_repository import SkillRepository
 from src.repositories.test_repository import TestRepository
@@ -59,29 +59,39 @@ async def create_session(
             detail=f"Submission is in terminal status '{submission.status}'; cannot create session",
         )
 
-    # 3. Idempotency — return existing active session if one exists
+    # 3. Idempotency — return existing ACTIVE non-expired session if one exists
     existing = await SessionRepository.get_by_submission_id(db, submission.id)
-    if existing and existing.status == SessionStatus.ACTIVE:
-        first_question = await _fetch_question(existing.first_question_id, correlation_id)
-        return SessionResponse(
-            session_token=existing.token,
-            submission_id=existing.submission_id,
-            test_id=existing.test_id,
-            server_now=existing.server_now,
-            expires_at=existing.expires_at,
-            first_question=first_question,
-        )
+    if existing:
+        if existing.status == SessionStatus.ACTIVE and existing.expires_at > datetime.utcnow():
+            sq = await SessionQuestionRepository.list_by_session(db, existing.id)
+            first_question = await _fetch_question(existing.first_question_id, correlation_id)
+            return SessionResponse(
+                session_token=existing.token,
+                submission_id=existing.submission_id,
+                test_id=existing.test_id,
+                server_now=existing.server_now,
+                expires_at=existing.expires_at,
+                total_questions=len(sq),
+                current_position=existing.current_position,
+                first_question=first_question,
+            )
+        # Expired or non-active — mark EXPIRED so a fresh session can be minted
+        if existing.status == SessionStatus.ACTIVE:
+            existing.status = SessionStatus.EXPIRED
+            await db.commit()
 
     # 4. Mint token and compute timestamps (server-side only)
     token = str(uuid.uuid4())
     server_now = datetime.utcnow()
     expires_at = server_now + (test.duration if test.duration else timedelta(hours=1))
 
-    # 5. Fetch first question before writing to DB so we can store first_question_id atomically
+    # 5. Sample question set from question-service before writing to DB
+    question_count = test.number_of_questions or 20
     skill_name = await _resolve_first_skill(db, quiz_id)
-    first_question_id, first_question = await _fetch_first_question(skill_name, correlation_id)
+    question_ids, first_question = await _sample_questions(question_count, skill_name, correlation_id)
 
-    # 6. Persist session in one commit (no second commit needed)
+    # 6. Persist session + question list in one transaction
+    first_question_id = question_ids[0] if question_ids else None
     session_obj = TestSession(
         token=token,
         submission_id=submission.id,
@@ -91,8 +101,16 @@ async def create_session(
         server_now=server_now,
         expires_at=expires_at,
         status=SessionStatus.ACTIVE,
+        current_position=0,
     )
-    session_obj = await SessionRepository.create(db, session_obj)
+    db.add(session_obj)
+    await db.flush()  # get session_obj.id without committing
+
+    if question_ids:
+        await SessionQuestionRepository.bulk_create(db, session_obj.id, question_ids)
+
+    await db.commit()
+    await db.refresh(session_obj)
 
     # 7. Transition submission to IN_PROGRESS
     if submission.status == SubmissionStatus.ASSIGNED:
@@ -108,6 +126,8 @@ async def create_session(
         test_id=session_obj.test_id,
         server_now=session_obj.server_now,
         expires_at=session_obj.expires_at,
+        total_questions=len(question_ids),
+        current_position=0,
         first_question=first_question,
     )
 
@@ -120,26 +140,30 @@ async def _resolve_first_skill(db: AsyncSession, test_id: int) -> str | None:
     return skill.name if skill else None
 
 
-async def _fetch_first_question(
+async def _sample_questions(
+    count: int,
     skill_name: str | None,
     correlation_id: str,
-) -> tuple[str | None, QuestionOut | None]:
-    """Fetch the first question from question-service. Returns (id, QuestionOut) or (None, None) on degradation."""
+) -> tuple[list[str], QuestionOut | None]:
+    """
+    Call /sample on question-service and return (question_id_list, first_QuestionOut).
+    Returns ([], None) on degradation — session is still created without questions.
+    """
     try:
+        params = f"count={count}"
         if skill_name:
-            url = f"{settings.QUESTION_SERVICE_URL}/v1/api/questions/by-skill/{quote(skill_name, safe='')}?limit=1"
-        else:
-            url = f"{settings.QUESTION_SERVICE_URL}/v1/api/questions/?limit=1"
+            params += f"&skill={quote(skill_name, safe='')}"
+        url = f"{settings.QUESTION_SERVICE_URL}/v1/api/questions/sample?{params}"
 
         response = await call_service(url, correlation_id=correlation_id)
 
         if response.status_code == 200:
             questions = response.json()
             if questions:
+                ids = [str(q.get("id") or q.get("_id")) for q in questions]
                 q = questions[0]
-                qid = q.get("id") or q.get("_id")
-                return str(qid), QuestionOut(
-                    id=str(qid),
+                first = QuestionOut(
+                    id=ids[0],
                     type=q.get("type", ""),
                     question_text=q.get("question_text", ""),
                     options=q.get("options"),
@@ -147,12 +171,13 @@ async def _fetch_first_question(
                     skills=q.get("skills", []),
                     tags=q.get("tags", []),
                 )
+                return ids, first
     except (httpx.ConnectError, httpx.NetworkError) as exc:
         logger.warning("[%s] Question-service unavailable: %s", correlation_id, exc)
     except Exception as exc:
-        logger.warning("[%s] Unexpected error fetching first question: %s", correlation_id, exc)
+        logger.warning("[%s] Unexpected error sampling questions: %s", correlation_id, exc)
 
-    return None, None
+    return [], None
 
 
 async def _fetch_question(question_id: str | None, correlation_id: str) -> QuestionOut | None:

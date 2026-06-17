@@ -70,6 +70,23 @@ async def get_all_questions():
 
 
 @router.get(
+    "/sample",
+    response_model=list[QuestionResponse],
+    summary="Sample random questions",
+    description="Return randomly sampled questions using MongoDB $sample. Optionally filter by skill first."
+)
+async def sample_questions(
+    skill: str | None = Query(None, description="Filter by skill before sampling"),
+    count: int = Query(20, ge=1, le=100, description="Number of questions to return"),
+):
+    try:
+        questions = await QuestionService.sample_questions(count=count, skill=skill)
+        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.get(
     "/{id}",
     response_model=QuestionResponse,
     summary="Get question by ID",
