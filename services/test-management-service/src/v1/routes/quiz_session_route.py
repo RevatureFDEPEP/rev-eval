@@ -444,15 +444,31 @@ async def submit_answer(
             detail=f"Session is {session.status}; no further answers accepted",
         )
 
-    # 4) Score against the server-fetched answer key (never trusted from client).
+    # 4) The client may only answer the question at the server-authoritative
+    # cursor. If a retry lands after another request advanced the index, refuse
+    # instead of scoring the stale question against the wrong slot.
+    question_ids = session.question_ids or []
+    current_index = session.current_index or 0
+    if not question_ids or current_index >= len(question_ids):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Session has no remaining questions",
+        )
+    expected_question_id = str(question_ids[current_index])
+    if body.question_id != expected_question_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Answer submitted for wrong question index",
+        )
+
+    # 5) Score against the server-fetched answer key (never trusted from client).
     qtype, correct_answers = await _fetch_correct_answers(
         body.question_id, correlation_id
     )
     result = score_question(qtype, correct_answers, body.submitted_answers)
 
-    # 5) Persist the answer + advance the cursor; flip to submitted on the last
+    # 6) Persist the answer + advance the cursor; flip to submitted on the last
     # question. One commit so the answer and the cursor move atomically.
-    question_ids = session.question_ids or []
     answer = Answer(
         session_id=session_id,
         question_id=body.question_id,
@@ -474,7 +490,9 @@ async def submit_answer(
         # idempotency key, or this question was already answered). Roll back and
         # return the winning row's result rather than 500.
         await db.rollback()
-        winner = await _existing_answer(db, session_id, body.question_id, idempotency_key)
+        winner = await _existing_answer(
+            db, session_id, body.question_id, idempotency_key
+        )
         if winner is not None:
             fresh = (
                 (

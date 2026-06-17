@@ -34,14 +34,17 @@ the response (the ``QuizQuestionOut`` projection drops them).
 """
 
 import uuid
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
+import src.v1.routes.quiz_session_route as _answer_route_mod
 from fastapi.testclient import TestClient
 from main import app
 from sqlalchemy.exc import SQLAlchemyError
 from src.db.session import get_db
+from src.models.answer import Answer
+from src.models.quiz_session import QuizSession
 from src.services.quiz_session_helpers import hash_session_token
 from src.utils import http_client
 from src.utils.dependencies import get_current_user_from_headers
@@ -653,10 +656,6 @@ def test_qms_client_is_lazy_singleton_and_closes():
 # POST /v1/api/test-sessions/{session_id}/answer  (W3-F2)
 # ===========================================================================
 
-import src.v1.routes.quiz_session_route as _answer_route_mod
-from src.models.answer import Answer
-from src.models.quiz_session import QuizSession
-
 
 class _AnswerScalarResult:
     """``db.execute(...).scalars().first()`` for the answer flow."""
@@ -754,8 +753,6 @@ def _make_quiz_session(
     expired). The object is plain Python until flushed, which is all the route
     needs since the fake session never flushes.
     """
-    from datetime import UTC, datetime
-
     qs = QuizSession(
         session_token_hash="x" * 64,
         test_id=1,
@@ -938,9 +935,7 @@ def test_submit_answer_does_not_leak_correct_answer_key(
     qs = _make_quiz_session(current_index=0, question_ids=("q-alpha", "q-beta"))
     session = _AnswerSession(quiz_session=qs)
     _override_answer_db(session)
-    fetch = _patch_fetch_correct_answers(
-        monkeypatch, qtype="mcq", correct_answers=[2]
-    )
+    fetch = _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[2])
 
     try:
         resp = client.post(
@@ -980,9 +975,7 @@ def test_submit_answer_idempotency_replay_returns_prior_without_rescoring(
     prior = _make_prior_answer(
         question_id="q-alpha", score=0.5, is_correct=False, idempotency_key="key-1"
     )
-    session = _AnswerSession(
-        quiz_session=qs, prior_answer=prior, with_idempotency=True
-    )
+    session = _AnswerSession(quiz_session=qs, prior_answer=prior, with_idempotency=True)
     _override_answer_db(session)
     # patch the fetch so we can prove it is NEVER called on a replay
     fetch = _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[2])
@@ -1008,6 +1001,56 @@ def test_submit_answer_idempotency_replay_returns_prior_without_rescoring(
     assert fetch.calls == 0
     assert session.added == []
     assert session.committed is False
+
+
+# ---------------------------------------------------------------------------
+# 409 when the submitted question is not the server-authoritative current slot
+# ---------------------------------------------------------------------------
+def test_submit_answer_wrong_question_index_409_before_scoring(
+    client, override_user, monkeypatch
+):
+    # The session has already advanced to q-beta. A retry/stale tab trying to
+    # answer q-alpha must not be scored or advance the cursor again.
+    qs = _make_quiz_session(current_index=1, question_ids=("q-alpha", "q-beta"))
+    session = _AnswerSession(quiz_session=qs)
+    _override_answer_db(session)
+    fetch = _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[2])
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/sess-1/answer",
+            json={"question_id": "q-alpha", "submitted_answers": [2]},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 409, resp.text
+    assert "wrong question" in resp.json()["detail"].lower()
+    assert fetch.calls == 0
+    assert session.added == []
+    assert qs.current_index == 1
+
+
+def test_submit_answer_no_remaining_questions_409_before_scoring(
+    client, override_user, monkeypatch
+):
+    qs = _make_quiz_session(current_index=2, question_ids=("q-alpha", "q-beta"))
+    session = _AnswerSession(quiz_session=qs)
+    _override_answer_db(session)
+    fetch = _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[2])
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/sess-1/answer",
+            json={"question_id": "q-beta", "submitted_answers": [2]},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 409, resp.text
+    assert "no remaining questions" in resp.json()["detail"].lower()
+    assert fetch.calls == 0
+    assert session.added == []
 
 
 # ---------------------------------------------------------------------------
@@ -1340,13 +1383,11 @@ def test_submit_answer_naive_expires_at_still_expires_409(
     tz-aware ``now`` — without that branch the comparison would raise. A naive
     timestamp in the past must still lazily flip the session to ``expired`` and
     return 409."""
-    from datetime import UTC, datetime, timedelta as _td
-
     qs = _make_quiz_session(status="in_progress")
     # Overwrite with a NAIVE past timestamp (no tzinfo), as SQLite would yield
     # a DateTime column read-back. Build it tz-aware then drop tzinfo so it is
     # genuinely naive without using the deprecated utcnow().
-    qs.expires_at = (datetime.now(UTC) - _td(minutes=5)).replace(tzinfo=None)
+    qs.expires_at = (datetime.now(UTC) - timedelta(minutes=5)).replace(tzinfo=None)
     assert qs.expires_at.tzinfo is None  # precondition: genuinely naive
     session = _AnswerSession(quiz_session=qs)
     _override_answer_db(session)
@@ -1390,9 +1431,7 @@ def _call_fetch(monkeypatch, *, response=None, raises=None):
     fake = _FakeQmsClient(response=response, raises=raises)
     monkeypatch.setattr(http_client, "get_qms_client", lambda: fake)
     monkeypatch.setattr(_answer_route_mod, "get_qms_client", lambda: fake)
-    return asyncio.run(
-        _answer_route_mod._fetch_correct_answers("q-alpha", "corr-1")
-    )
+    return asyncio.run(_answer_route_mod._fetch_correct_answers("q-alpha", "corr-1"))
 
 
 UPSTREAM_LEAK = "UPSTREAM-LEAK-do-not-echo"
