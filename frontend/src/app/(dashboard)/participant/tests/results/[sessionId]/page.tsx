@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import ResultsSkeleton from '@/components/results/ResultsSkeleton';
 import ResultsChart from '@/components/results/ResultsChart';
+import SectionErrorBoundary from '@/components/results/SectionErrorBoundary';
 import type { UserSummaryResponse, AttemptsResponse, UserSessionEntry } from '@/lib/api/types';
 
 const API_GATEWAY = process.env.API_GATEWAY_URL ?? 'http://localhost:8000';
@@ -34,24 +35,35 @@ interface Props {
   params: Promise<{ sessionId: string }>;
 }
 
-async function ResultsContent({ sessionId }: { sessionId: string }) {
-  const session = await getSession();
-  if (!session) redirect('/');
+// session_id from the API is a numeric PK serialised as a number; the URL
+// param is always a string. String() normalises before comparison so the
+// highlight does not silently fall back to attempts[0].
+function findCurrent(attempts: UserSessionEntry[], sessionId: string): UserSessionEntry | undefined {
+  return attempts.find((a) => String(a.session_id) === sessionId) ?? attempts[0];
+}
 
+async function SummarySection({
+  sessionId,
+  userId,
+  token,
+}: {
+  sessionId: string;
+  userId: number;
+  token: string;
+}) {
   const [summary, attemptsData] = await Promise.all([
-    fetchSummary(session.userId, session.token),
-    fetchAttempts(session.userId, session.token),
+    fetchSummary(userId, token),
+    fetchAttempts(userId, token),
   ]);
 
   const attempts: UserSessionEntry[] = attemptsData.attempts ?? [];
-  const current = attempts.find((a) => a.session_id === sessionId) ?? attempts[0];
-
+  const current = findCurrent(attempts, sessionId);
   const score = current?.percentage_score ?? 0;
   const passed = score >= 70;
   const completedAt = current?.completed_at;
 
   return (
-    <div className="space-y-6">
+    <>
       {/* Page header */}
       <section className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
@@ -85,9 +97,7 @@ async function ResultsContent({ sessionId }: { sessionId: string }) {
           <div className="flex flex-wrap items-center gap-6">
             <div
               className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-full text-2xl font-bold ${
-                passed
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-red-100 text-red-700'
+                passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
               }`}
               aria-label={`Score: ${Math.round(score)} percent`}
             >
@@ -96,11 +106,6 @@ async function ResultsContent({ sessionId }: { sessionId: string }) {
             <div className="space-y-1">
               <p className="text-sm font-medium text-slate-500">This Attempt</p>
               <p className="text-4xl font-bold text-slate-900">{Math.round(score)}%</p>
-              {current?.total_questions != null && (
-                <p className="text-sm text-slate-500">
-                  {current.total_questions} questions
-                </p>
-              )}
             </div>
             <div className="ml-auto flex gap-6 text-sm text-slate-600">
               {summary.best_score != null && (
@@ -123,23 +128,66 @@ async function ResultsContent({ sessionId }: { sessionId: string }) {
           </div>
         </CardContent>
       </Card>
+    </>
+  );
+}
 
-      {/* Per-attempt history chart */}
-      {attempts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Score History</CardTitle>
-            <CardDescription>
-              Green bars = passed (≥70%) &nbsp;·&nbsp; Red bars = failed &nbsp;·&nbsp; Highlighted = this attempt
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResultsChart attempts={attempts} currentSessionId={sessionId} />
-          </CardContent>
-        </Card>
-      )}
+async function ChartSection({
+  sessionId,
+  userId,
+  token,
+}: {
+  sessionId: string;
+  userId: number;
+  token: string;
+}) {
+  const attemptsData = await fetchAttempts(userId, token);
+  const attempts: UserSessionEntry[] = attemptsData.attempts ?? [];
 
-      {/* Actions */}
+  if (attempts.length === 0) return null;
+
+  return (
+    // Per-question is_correct is deliberately never exposed by the backend.
+    // The chart shows score per attempt (pass/fail coloring) as the closest
+    // available substitute for a per-question breakdown.
+    <Card>
+      <CardHeader>
+        <CardTitle>Score History</CardTitle>
+        <CardDescription>
+          Green = passed (≥70%) · Red = failed · Dark = this attempt · Dashed line = pass threshold
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ResultsChart attempts={attempts} currentSessionId={sessionId} />
+      </CardContent>
+    </Card>
+  );
+}
+
+async function ResultsContent({ sessionId }: { sessionId: string }) {
+  const session = await getSession();
+  if (!session) redirect('/');
+
+  const { userId, token } = session;
+
+  return (
+    <div className="space-y-6">
+      <SectionErrorBoundary
+        fallback={
+          <p className="text-sm text-red-600 py-4">Failed to load your results summary.</p>
+        }
+      >
+        <SummarySection sessionId={sessionId} userId={userId} token={token} />
+      </SectionErrorBoundary>
+
+      <SectionErrorBoundary
+        fallback={
+          <p className="text-sm text-red-600 py-4">Failed to load attempt history chart.</p>
+        }
+      >
+        <ChartSection sessionId={sessionId} userId={userId} token={token} />
+      </SectionErrorBoundary>
+
       <div className="flex gap-3">
         <Button asChild variant="default">
           <Link href="/participant/tests">Back to Tests</Link>

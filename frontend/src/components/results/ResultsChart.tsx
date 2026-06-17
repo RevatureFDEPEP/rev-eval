@@ -8,6 +8,8 @@ import {
   CartesianGrid,
   Tooltip,
   Cell,
+  ReferenceLine,
+  Legend,
   ResponsiveContainer,
 } from 'recharts';
 import type { UserSessionEntry } from '@/lib/api/types';
@@ -22,13 +24,19 @@ interface ChartEntry {
   score: number;
   passed: boolean;
   isCurrent: boolean;
-  completedAt?: string;
 }
 
 const PASS_COLOR = '#22c55e';
 const FAIL_COLOR = '#ef4444';
 const CURRENT_PASS_COLOR = '#15803d';
 const CURRENT_FAIL_COLOR = '#b91c1c';
+
+// session_id from the API is a numeric PK; currentSessionId comes from the
+// URL param as a string. String() normalises both sides before comparison.
+function isCurrent(attempt: UserSessionEntry, currentSessionId?: string): boolean {
+  if (!currentSessionId) return false;
+  return String(attempt.session_id) === currentSessionId;
+}
 
 export default function ResultsChart({ attempts, currentSessionId }: ResultsChartProps) {
   const ordered = [...attempts].reverse();
@@ -37,8 +45,7 @@ export default function ResultsChart({ attempts, currentSessionId }: ResultsChar
     label: `#${i + 1}`,
     score: Math.round(a.percentage_score ?? 0),
     passed: (a.percentage_score ?? 0) >= 70,
-    isCurrent: a.session_id === currentSessionId,
-    completedAt: a.completed_at,
+    isCurrent: isCurrent(a, currentSessionId),
   }));
 
   if (data.length === 0) {
@@ -50,7 +57,7 @@ export default function ResultsChart({ attempts, currentSessionId }: ResultsChar
   }
 
   return (
-    <ResponsiveContainer width="100%" height={240} aria-label="Score per attempt colored by pass or fail">
+    <ResponsiveContainer width="100%" height={280} aria-label="Score per attempt colored by pass or fail">
       <BarChart
         data={data}
         margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
@@ -71,11 +78,27 @@ export default function ResultsChart({ attempts, currentSessionId }: ResultsChar
           axisLine={false}
           width={40}
         />
+        <ReferenceLine
+          y={70}
+          stroke="#94a3b8"
+          strokeDasharray="4 3"
+          label={{ value: 'Pass (70%)', position: 'insideTopRight', fontSize: 10, fill: '#94a3b8' }}
+        />
         <Tooltip
           formatter={(value: number) => [`${value}%`, 'Score']}
           labelFormatter={(label) => `Attempt ${label}`}
         />
-        <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+        <Legend
+          verticalAlign="bottom"
+          height={28}
+          formatter={(value) => value}
+          payload={[
+            { value: 'Passed', type: 'square', color: PASS_COLOR },
+            { value: 'Failed', type: 'square', color: FAIL_COLOR },
+            { value: 'This attempt', type: 'square', color: CURRENT_PASS_COLOR },
+          ]}
+        />
+        <Bar dataKey="score" radius={[4, 4, 0, 0]} name="Score">
           {data.map((entry, index) => (
             <Cell
               key={index}

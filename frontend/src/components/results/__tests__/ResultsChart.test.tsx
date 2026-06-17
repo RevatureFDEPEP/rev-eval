@@ -65,4 +65,16 @@ describe('ResultsChart', () => {
       render(<ResultsChart attempts={attempts} currentSessionId="current" />)
     ).not.toThrow();
   });
+
+  it('matches numeric session_id against string currentSessionId (type coercion)', () => {
+    // API returns session_id as a number; URL param is always a string.
+    // String() normalisation must make these equal so the highlight works.
+    const attempts = [
+      makeAttempt({ session_id: 42 as unknown as string, percentage_score: 88 }),
+      makeAttempt({ session_id: 43 as unknown as string, percentage_score: 55 }),
+    ];
+    expect(() =>
+      render(<ResultsChart attempts={attempts} currentSessionId="42" />)
+    ).not.toThrow();
+  });
 });
