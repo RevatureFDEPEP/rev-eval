@@ -10,49 +10,47 @@ import {
   Cell,
   ResponsiveContainer,
 } from 'recharts';
-import type { GradedQuizQuestion } from '@/lib/api/types';
+import type { UserSessionEntry } from '@/lib/api/types';
 
 interface ResultsChartProps {
-  partA: GradedQuizQuestion[];
-  partB: GradedQuizQuestion[];
+  attempts: UserSessionEntry[];
+  currentSessionId?: string;
 }
 
 interface ChartEntry {
   label: string;
-  time: number;
-  correct: boolean;
-  part: 'A' | 'B';
+  score: number;
+  passed: boolean;
+  isCurrent: boolean;
+  completedAt?: string;
 }
 
-const CORRECT_COLOR = '#22c55e';
-const INCORRECT_COLOR = '#ef4444';
+const PASS_COLOR = '#22c55e';
+const FAIL_COLOR = '#ef4444';
+const CURRENT_PASS_COLOR = '#15803d';
+const CURRENT_FAIL_COLOR = '#b91c1c';
 
-export default function ResultsChart({ partA, partB }: ResultsChartProps) {
-  const data: ChartEntry[] = [
-    ...partA.map((q, i) => ({
-      label: `A${i + 1}`,
-      time: Math.max(q.time_spent_seconds ?? 0, 1),
-      correct: q.is_correct ?? false,
-      part: 'A' as const,
-    })),
-    ...partB.map((q, i) => ({
-      label: `B${i + 1}`,
-      time: Math.max(q.time_spent_seconds ?? 0, 1),
-      correct: q.is_correct ?? false,
-      part: 'B' as const,
-    })),
-  ];
+export default function ResultsChart({ attempts, currentSessionId }: ResultsChartProps) {
+  const ordered = [...attempts].reverse();
+
+  const data: ChartEntry[] = ordered.map((a, i) => ({
+    label: `#${i + 1}`,
+    score: Math.round(a.percentage_score ?? 0),
+    passed: (a.percentage_score ?? 0) >= 70,
+    isCurrent: a.session_id === currentSessionId,
+    completedAt: a.completed_at,
+  }));
 
   if (data.length === 0) {
     return (
       <p className="text-sm text-slate-500 text-center py-8">
-        No question-level data available.
+        No attempt data available.
       </p>
     );
   }
 
   return (
-    <ResponsiveContainer width="100%" height={240} aria-label="Per-question time spent colored by correctness">
+    <ResponsiveContainer width="100%" height={240} aria-label="Score per attempt colored by pass or fail">
       <BarChart
         data={data}
         margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
@@ -66,21 +64,26 @@ export default function ResultsChart({ partA, partB }: ResultsChartProps) {
           axisLine={false}
         />
         <YAxis
-          tickFormatter={(v) => `${v}s`}
+          domain={[0, 100]}
+          tickFormatter={(v) => `${v}%`}
           tick={{ fontSize: 11 }}
           tickLine={false}
           axisLine={false}
-          width={36}
+          width={40}
         />
         <Tooltip
-          formatter={(value: number) => [`${value}s`, 'Time spent']}
-          labelFormatter={(label) => `Question ${label}`}
+          formatter={(value: number) => [`${value}%`, 'Score']}
+          labelFormatter={(label) => `Attempt ${label}`}
         />
-        <Bar dataKey="time" radius={[4, 4, 0, 0]}>
+        <Bar dataKey="score" radius={[4, 4, 0, 0]}>
           {data.map((entry, index) => (
             <Cell
               key={index}
-              fill={entry.correct ? CORRECT_COLOR : INCORRECT_COLOR}
+              fill={
+                entry.isCurrent
+                  ? entry.passed ? CURRENT_PASS_COLOR : CURRENT_FAIL_COLOR
+                  : entry.passed ? PASS_COLOR : FAIL_COLOR
+              }
             />
           ))}
         </Bar>

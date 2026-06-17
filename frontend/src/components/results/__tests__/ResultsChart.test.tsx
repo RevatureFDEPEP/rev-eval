@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import ResultsChart from '../ResultsChart';
-import type { GradedQuizQuestion } from '@/lib/api/types';
+import type { UserSessionEntry } from '@/lib/api/types';
 
 // recharts uses ResizeObserver internally — polyfill for jsdom
 beforeAll(() => {
@@ -12,51 +12,57 @@ beforeAll(() => {
   }));
 });
 
-const makeQuestion = (overrides: Partial<GradedQuizQuestion> = {}): GradedQuizQuestion => ({
-  question_id: 'q1',
-  question_text: 'What is 2+2?',
-  question_type: 'mcq',
-  difficulty: 'easy',
-  is_correct: true,
-  time_spent_seconds: 30,
+const makeAttempt = (overrides: Partial<UserSessionEntry> = {}): UserSessionEntry => ({
+  session_id: 'sess1',
+  test_id: 1,
+  test_name: 'Test',
+  status: 'COMPLETED',
+  completed_at: '2026-06-01T10:00:00Z',
+  percentage_score: 80,
+  total_questions: 20,
+  time_spent_seconds: 600,
   ...overrides,
 });
 
 describe('ResultsChart', () => {
-  it('renders without crashing when given questions', () => {
-    const partA = [makeQuestion({ question_id: 'a1', is_correct: true, time_spent_seconds: 20 })];
-    const partB = [makeQuestion({ question_id: 'b1', is_correct: false, time_spent_seconds: 45 })];
+  it('renders without crashing when given attempts', () => {
+    const attempts = [
+      makeAttempt({ session_id: 'a1', percentage_score: 85 }),
+      makeAttempt({ session_id: 'b1', percentage_score: 55 }),
+    ];
 
-    const { container } = render(<ResultsChart partA={partA} partB={partB} />);
+    const { container } = render(<ResultsChart attempts={attempts} />);
     expect(container.firstChild).not.toBeNull();
   });
 
-  it('shows empty state when no questions provided', () => {
-    render(<ResultsChart partA={[]} partB={[]} />);
-    expect(screen.getByText(/no question-level data available/i)).toBeTruthy();
+  it('shows empty state when no attempts provided', () => {
+    render(<ResultsChart attempts={[]} />);
+    expect(screen.getByText(/no attempt data available/i)).toBeTruthy();
   });
 
-  it('renders a container div for combined part A + B questions', () => {
-    const partA = [
-      makeQuestion({ question_id: 'a1', is_correct: true, time_spent_seconds: 10 }),
-      makeQuestion({ question_id: 'a2', is_correct: false, time_spent_seconds: 25 }),
-    ];
-    const partB = [
-      makeQuestion({ question_id: 'b1', is_correct: true, time_spent_seconds: 15 }),
+  it('renders a container div for multiple attempts', () => {
+    const attempts = [
+      makeAttempt({ session_id: 'a1', percentage_score: 90 }),
+      makeAttempt({ session_id: 'a2', percentage_score: 65 }),
+      makeAttempt({ session_id: 'a3', percentage_score: 75 }),
     ];
 
-    // ResponsiveContainer renders a div wrapper in jsdom (no SVG — zero dimensions)
-    const { container } = render(<ResultsChart partA={partA} partB={partB} />);
+    const { container } = render(<ResultsChart attempts={attempts} currentSessionId="a3" />);
     expect(container.firstChild).not.toBeNull();
   });
 
-  it('handles missing time_spent_seconds gracefully (defaults to 1)', () => {
-    const partA = [makeQuestion({ question_id: 'a1', time_spent_seconds: undefined })];
-    expect(() => render(<ResultsChart partA={partA} partB={[]} />)).not.toThrow();
+  it('handles missing percentage_score gracefully (defaults to 0)', () => {
+    const attempts = [makeAttempt({ session_id: 'a1', percentage_score: undefined })];
+    expect(() => render(<ResultsChart attempts={attempts} />)).not.toThrow();
   });
 
-  it('handles missing is_correct gracefully (defaults to false)', () => {
-    const partA = [makeQuestion({ question_id: 'a1', is_correct: undefined })];
-    expect(() => render(<ResultsChart partA={partA} partB={[]} />)).not.toThrow();
+  it('highlights the current session when currentSessionId is provided', () => {
+    const attempts = [
+      makeAttempt({ session_id: 'current', percentage_score: 72 }),
+      makeAttempt({ session_id: 'other', percentage_score: 60 }),
+    ];
+    expect(() =>
+      render(<ResultsChart attempts={attempts} currentSessionId="current" />)
+    ).not.toThrow();
   });
 });

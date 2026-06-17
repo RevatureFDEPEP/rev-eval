@@ -7,19 +7,27 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import ResultsSkeleton from '@/components/results/ResultsSkeleton';
 import ResultsChart from '@/components/results/ResultsChart';
-import type { TestSession, GradedQuizQuestion } from '@/lib/api/types';
+import type { UserSummaryResponse, AttemptsResponse, UserSessionEntry } from '@/lib/api/types';
 
 const API_GATEWAY = process.env.API_GATEWAY_URL ?? 'http://localhost:8000';
 
-async function fetchSession(sessionId: string, token: string): Promise<TestSession> {
-  const res = await fetch(`${API_GATEWAY}/v1/api/test-sessions/${sessionId}`, {
+async function fetchSummary(userId: number, token: string): Promise<UserSummaryResponse> {
+  const res = await fetch(`${API_GATEWAY}/v1/api/reports/user/${userId}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   });
   if (res.status === 404) notFound();
-  if (!res.ok) throw new Error(`Session fetch failed: ${res.status}`);
-  const raw = await res.json();
-  return { ...raw, session_id: raw.id ?? raw.session_id };
+  if (!res.ok) throw new Error(`Summary fetch failed: ${res.status}`);
+  return res.json();
+}
+
+async function fetchAttempts(userId: number, token: string): Promise<AttemptsResponse> {
+  const res = await fetch(`${API_GATEWAY}/v1/api/reports/user/${userId}/attempts?size=50&sort=completed_at:desc`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`Attempts fetch failed: ${res.status}`);
+  return res.json();
 }
 
 interface Props {
@@ -30,20 +38,17 @@ async function ResultsContent({ sessionId }: { sessionId: string }) {
   const session = await getSession();
   if (!session) redirect('/');
 
-  const data = await fetchSession(sessionId, session.token);
+  const [summary, attemptsData] = await Promise.all([
+    fetchSummary(session.userId, session.token),
+    fetchAttempts(session.userId, session.token),
+  ]);
 
-  const partA: GradedQuizQuestion[] = data.part_a?.questions ?? [];
-  const partB: GradedQuizQuestion[] = data.part_b?.questions ?? [];
-  const allQuestions = [...partA, ...partB];
+  const attempts: UserSessionEntry[] = attemptsData.attempts ?? [];
+  const current = attempts.find((a) => a.session_id === sessionId) ?? attempts[0];
 
-  const totalCount = allQuestions.length;
-  const correctCount = allQuestions.filter((q) => q.is_correct).length;
-  const incorrectCount = totalCount - correctCount;
-  const score = data.percentage_score ?? 0;
+  const score = current?.percentage_score ?? 0;
   const passed = score >= 70;
-
-  const partAScore = data.part_a?.score;
-  const partBScore = data.part_b?.score;
+  const completedAt = current?.completed_at;
 
   return (
     <div className="space-y-6">
@@ -58,9 +63,9 @@ async function ResultsContent({ sessionId }: { sessionId: string }) {
             <span className="text-slate-400">Results</span>
           </div>
           <h1 className="text-3xl font-semibold text-slate-900">Quiz Results</h1>
-          {data.completed_at && (
+          {completedAt && (
             <p className="text-sm text-slate-500">
-              Completed {new Date(data.completed_at).toLocaleDateString('en-US', {
+              Completed {new Date(completedAt).toLocaleDateString('en-US', {
                 year: 'numeric', month: 'long', day: 'numeric',
               })}
             </p>
@@ -89,71 +94,47 @@ async function ResultsContent({ sessionId }: { sessionId: string }) {
               {Math.round(score)}%
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-medium text-slate-500">Overall Score</p>
+              <p className="text-sm font-medium text-slate-500">This Attempt</p>
               <p className="text-4xl font-bold text-slate-900">{Math.round(score)}%</p>
-              <p className="text-sm text-slate-500">
-                {correctCount} of {totalCount} questions correct
-              </p>
+              {current?.total_questions != null && (
+                <p className="text-sm text-slate-500">
+                  {current.total_questions} questions
+                </p>
+              )}
             </div>
-            {(partAScore != null || partBScore != null) && (
-              <div className="ml-auto flex gap-4 text-sm text-slate-600">
-                {partAScore != null && (
-                  <div className="text-center">
-                    <p className="font-semibold text-slate-900">{Math.round(partAScore * 100)}%</p>
-                    <p className="text-xs text-slate-500">Part A</p>
-                  </div>
-                )}
-                {partBScore != null && (
-                  <div className="text-center">
-                    <p className="font-semibold text-slate-900">{Math.round(partBScore * 100)}%</p>
-                    <p className="text-xs text-slate-500">Part B</p>
-                  </div>
-                )}
+            <div className="ml-auto flex gap-6 text-sm text-slate-600">
+              {summary.best_score != null && (
+                <div className="text-center">
+                  <p className="font-semibold text-slate-900">{Math.round(summary.best_score)}%</p>
+                  <p className="text-xs text-slate-500">Best</p>
+                </div>
+              )}
+              {summary.avg_score != null && (
+                <div className="text-center">
+                  <p className="font-semibold text-slate-900">{Math.round(summary.avg_score)}%</p>
+                  <p className="text-xs text-slate-500">Average</p>
+                </div>
+              )}
+              <div className="text-center">
+                <p className="font-semibold text-slate-900">{summary.total_attempts}</p>
+                <p className="text-xs text-slate-500">Attempts</p>
               </div>
-            )}
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Summary stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Total Questions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <span className="text-3xl font-semibold text-slate-900">{totalCount}</span>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-green-600">Correct</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <span className="text-3xl font-semibold text-green-700">{correctCount}</span>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-red-500">Incorrect</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <span className="text-3xl font-semibold text-red-600">{incorrectCount}</span>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Per-question chart */}
-      {totalCount > 0 && (
+      {/* Per-attempt history chart */}
+      {attempts.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Time Per Question</CardTitle>
+            <CardTitle>Score History</CardTitle>
             <CardDescription>
-              Green bars = correct &nbsp;·&nbsp; Red bars = incorrect
+              Green bars = passed (≥70%) &nbsp;·&nbsp; Red bars = failed &nbsp;·&nbsp; Highlighted = this attempt
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ResultsChart partA={partA} partB={partB} />
+            <ResultsChart attempts={attempts} currentSessionId={sessionId} />
           </CardContent>
         </Card>
       )}
