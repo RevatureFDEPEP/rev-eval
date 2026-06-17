@@ -16,7 +16,8 @@ This file stays at summary level only.
 
 Work completed across `tianyac-feat-nginx` (merged), `tianyac-feat-unit-test`
 (PR #45 merged), `tianyac` CI pipeline commits, `tianyac-feat-session`
-(W3-F1), and `tianyac-alembic-migrations` (W2-F7). Documentation system added
+(W3-F1), `tianyac-alembic-migrations` (W2-F7), `tianyac-scoring-engine` (W3-F2),
+and `tianyac-reporting-endpoints` (W4-F1). Documentation system added
 on `tianyac-feat-doc`: `docs/FEATURE_STATUS.md` + `docs/features/` detail files
 for all 21 features, replacing `docs/plans/`.
 
@@ -26,10 +27,16 @@ excluded by MongoDB `$project`. W2-F7 (Alembic + Category domain + reporting
 scaffold) ✅ complete on `tianyac-alembic-migrations` — migration `0005_add_categories`,
 full Category CRUD stack at `/v1/api/categories`, reporting-and-analytics-service
 scaffold with `reporting-postgres` + Alembic baseline, three defects fixed
-(skill-500, user-service dual-engine, Pydantic v2 audit). W2-F1 (nginx TLS +
+(skill-500, user-service dual-engine, Pydantic v2 audit). W3-F2 (scoring engine)
+✅ complete on `tianyac-scoring-engine` (commit `5fc9c05`) — answer submission,
+score calculation, session state machine. W4-F1 (candidate results reporting
+endpoints) ✅ complete on `tianyac-reporting-endpoints` (commit `058d45c`) —
+`GET /reports/user/{id}` summary + `GET /reports/user/{id}/attempts` paginated
+history; direct-read approach documented in `docs/adr/w4-f1-reporting-data-access.md`;
+15 pytest tests passing; gateway routing added. W2-F1 (nginx TLS +
 basic routing), W2-F2 (frontend + backend unit tests), W2-F4 (Ruff/ESLint CI
 gates), W2-F6 (question authoring schema + tests) partially done (🟡). All
-other W2, remaining W3, and all W4 features not yet started on this branch.
+other W2, remaining W3, and all remaining W4 features not yet started on this branch.
 
 **W2-F1** — nginx reverse proxy live: :80→:443 redirect, TLS, `/_next/` WebSocket
 routing, `/→frontend`. Remaining: step 4 BFF bearer pattern (direct
@@ -83,13 +90,14 @@ Spec: `days_6_10_features.md`.
 ## Days 11–15 (Week 3 — quiz-taking vertical slice)
 
 Spec: `days_11_15_features.md`. W3-F1 complete (`tianyac-feat-session`, commit
-`ca6877d`). W2-F7 landed on `tianyac-alembic-migrations` — Alembic at head
-`0005` on test-management-service. W3-F2 through W3-F7 not yet started.
+`ca6877d`). W3-F2 complete (`tianyac-scoring-engine`, commit `5fc9c05`). W2-F7
+landed on `tianyac-alembic-migrations` — Alembic at head `0005` on
+test-management-service. W3-F3 through W3-F7 not yet started.
 
 | # | Feature | Day | Status | Detail |
 |---|---|---|---|---|
 | W3-F1 | Quiz session creation backend (`POST /sessions`, httpx integration) | 11 | ✅ Completed | [w3-f1-quiz-session-backend.md](features/w3-f1-quiz-session-backend.md) |
-| W3-F2 | Scoring engine + attempt locking (idempotency, state machine) | 12 | ❌ Not Started | [w3-f2-scoring-engine-locking.md](features/w3-f2-scoring-engine-locking.md) |
+| W3-F2 | Scoring engine + attempt locking (idempotency, state machine) | 12 | ✅ Completed | [w3-f2-scoring-engine-locking.md](features/w3-f2-scoring-engine-locking.md) |
 | W3-F3 | Test-taking frontend skeleton (`/take/[testId]`, AuthContext) | 13 | ❌ Not Started | [w3-f3-test-taking-frontend-skeleton.md](features/w3-f3-test-taking-frontend-skeleton.md) |
 | W3-F4 | Auto-saving exam client (server timer, autosave, submit-lock) | 14 | ❌ Not Started | [w3-f4-autosave-exam-client.md](features/w3-f4-autosave-exam-client.md) |
 | W3-F5 | Integration tests vs. real Postgres/Mongo | 15 | ❌ Not Started | [w3-f5-integration-tests-real-db.md](features/w3-f5-integration-tests-real-db.md) |
@@ -100,11 +108,12 @@ Spec: `days_11_15_features.md`. W3-F1 complete (`tianyac-feat-session`, commit
 
 Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 → trainer aggregate reporting → role-based authorization. Dependency order
-(W4-F1 first, W4-F5 last).
+(W4-F1 first, W4-F5 last). W4-F1 complete (`tianyac-reporting-endpoints`,
+commit `058d45c`).
 
 | # | Feature | Day | Status | Detail |
 |---|---|---|---|---|
-| W4-F1 | Candidate results reporting endpoints (filtering + pagination) | 16 | ❌ Not Started | [w4-f1-results-reporting-endpoints.md](features/w4-f1-results-reporting-endpoints.md) |
+| W4-F1 | Candidate results reporting endpoints (filtering + pagination) | 16 | ✅ Completed | [w4-f1-results-reporting-endpoints.md](features/w4-f1-results-reporting-endpoints.md) |
 | W4-F2 | Candidate results page (Suspense, error boundaries, chart) | 17 | ❌ Not Started | [w4-f2-candidate-results-page.md](features/w4-f2-candidate-results-page.md) |
 | W4-F3 | Role-based authz (API) + aggregate reporting queries | 18 | ❌ Not Started | [w4-f3-rbac-aggregate-queries.md](features/w4-f3-rbac-aggregate-queries.md) |
 | W4-F4 | Trainer dashboard frontend (server RBAC, URL-synced filters) | 19 | ❌ Not Started | [w4-f4-trainer-dashboard-frontend.md](features/w4-f4-trainer-dashboard-frontend.md) |
@@ -137,6 +146,6 @@ Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 10. **W3-F5 + W3-F6** — integration tests (real Postgres/Mongo) + Playwright E2E.
 11. **W3-F7** — review-remediation items (timer fix, session reuse, role gate,
     error boundaries).
-12. **W4-F1 → W4-F3** — reporting endpoints then RBAC gate.
+12. ~~**W4-F1**~~ ✅ done on `tianyac-reporting-endpoints` (commit `058d45c`). **W4-F3** — RBAC gate + aggregate endpoints extend the reporting scaffold.
 13. **W4-F2 → W4-F4** — results page then trainer dashboard.
 14. **W4-F5 last** — debt audit + ADRs; needs a substantially complete codebase.
