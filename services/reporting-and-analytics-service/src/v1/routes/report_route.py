@@ -14,7 +14,7 @@ from src.schemas.report_schema import (
     UserSummaryResponse,
 )
 from src.services.report_service import ReportService
-from src.utils.dependencies import get_current_user, require_role, verify_jwt
+from src.utils.dependencies import get_current_user, require_role
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 

@@ -12,8 +12,10 @@ os.environ.setdefault("SERVICE_HOSTNAME", "reporting-and-analytics-service")
 os.environ.setdefault("PASS_THRESHOLD", "70.0")
 
 import asyncio
+import time as _time
 from datetime import datetime
 
+import jwt as _jwt
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -246,9 +248,6 @@ def test_18_rankings_empty_test():
 # RBAC — now tests the JWT layer (require_role / verify_jwt)
 # ---------------------------------------------------------------------------
 
-import time as _time
-import jwt as _jwt
-
 _SECRET = os.environ.get("JWT_SECRET", "change-me-in-production")
 
 
@@ -310,7 +309,6 @@ def test_22_rbac_invalid_token_returns_401():
 # GET /v1/api/reports/user/{user_id}
 # ---------------------------------------------------------------------------
 
-from src.utils.dependencies import get_current_user  # noqa: E402
 
 
 async def override_get_current_user_10():

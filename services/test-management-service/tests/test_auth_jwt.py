@@ -75,7 +75,14 @@ class TestVerifyJwt:
         assert exc_info.value.status_code == 401
 
     def test_valid_trainer_token_returns_payload(self):
-        token = _make_token(role="TRAINER")
+        from src.config.settings import settings as s
+        import jwt as _jwt2
+        import time as _t
+        token = _jwt2.encode(
+            {"sub": "1", "role": "TRAINER", "exp": int(_t.time()) + 3600},
+            s.JWT_SECRET,
+            algorithm="HS256",
+        )
         payload = verify_jwt(_creds(token))
         assert payload["role"] == "TRAINER"
 
