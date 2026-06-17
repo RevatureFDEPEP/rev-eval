@@ -125,10 +125,13 @@ export default function TrainerTestsPage() {
       }
     };
 
-    loadUser();
-    loadTests();
-    loadEvaluatedSubmissions();
-    loadGradedSubmissions();
+    queueMicrotask(() => {
+      if (cancelled) return;
+      loadUser();
+      loadTests();
+      loadEvaluatedSubmissions();
+      loadGradedSubmissions();
+    });
 
     return () => {
       cancelled = true;

@@ -93,8 +93,10 @@ export function GradedSubmissionSheet({
 
   useEffect(() => {
     if (!submission || !open) {
-      setDetails(null);
-      setError(null);
+      queueMicrotask(() => {
+        setDetails(null);
+        setError(null);
+      });
       return;
     }
 
@@ -102,7 +104,7 @@ export function GradedSubmissionSheet({
       try {
         setLoading(true);
         setError(null);
-        const data = await getSubmissionReviewDetails(submission.id);
+        const data = await getSubmissionReviewDetails<ReviewDetails>(submission.id);
         setDetails(data);
       } catch (err) {
         console.error('Failed to load review details:', err);

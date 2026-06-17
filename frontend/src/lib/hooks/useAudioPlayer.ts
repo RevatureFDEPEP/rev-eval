@@ -25,6 +25,11 @@ interface UseAudioPlayerReturn {
   error: string | null;
 }
 
+type AudioWindow = Window &
+  typeof globalThis & {
+    webkitAudioContext?: typeof AudioContext;
+  };
+
 export function useAudioPlayer(): UseAudioPlayerReturn {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -48,7 +53,12 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     try {
       // Create audio context if it doesn't exist
       if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioContextCtor =
+          window.AudioContext || (window as AudioWindow).webkitAudioContext;
+        if (!AudioContextCtor) {
+          throw new Error('AudioContext is not supported in this browser');
+        }
+        audioContextRef.current = new AudioContextCtor();
       }
 
       const audioContext = audioContextRef.current;
