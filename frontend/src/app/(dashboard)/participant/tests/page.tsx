@@ -61,9 +61,12 @@ export default function ParticipantTestsPage() {
         test.status === SubmissionStatus.EVALUATED ||
         test.status === SubmissionStatus.GRADED
     ).length;
-    // Only show scores for GRADED tests (COMPLETED/EVALUATED tests are still awaiting trainer review)
+    // Include COMPLETED (auto-scored quizzes finalize here with a final_score)
+    // as well as GRADED so quiz scores are reflected in the average.
     const completedWithScores = tests.filter(
-      (test) => test.status === SubmissionStatus.GRADED && (test.final_score != null || test.ai_score != null),
+      (test) =>
+        (test.status === SubmissionStatus.COMPLETED || test.status === SubmissionStatus.GRADED) &&
+        test.final_score != null,
     );
     const avgScore = completedWithScores.length > 0
       ? Math.round(

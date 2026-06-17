@@ -4,11 +4,12 @@ Read-only aggregation over test-management submission data. No answer keys or
 secrets are read or logged — only submission scores and statuses.
 """
 import logging
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Query
 
 from src.analytics.stats import (
+    COMPLETED_STATUSES,
     completion_rate,
     effective_score,
     score_stats,
@@ -16,13 +17,28 @@ from src.analytics.stats import (
 )
 from src.clients import test_management_client as tm
 from src.schemas.report_schema import (
+    AttemptEntry,
+    CandidateReport,
     OverviewReport,
+    PaginatedAttempts,
     ParticipantReport,
     ParticipantTestEntry,
     ScoreStats,
     TestReport,
 )
-from src.utils.dependencies import require_trainer_or_admin
+from src.utils.dependencies import (
+    require_self_or_privileged,
+    require_trainer_or_admin,
+)
+
+# Attempt sort keys -> the AttemptEntry field they read.
+_SORT_FIELDS = {
+    "submitted_at": "submitted_at",
+    "assigned_at": "assigned_at",
+    "score": "score",
+    "test_name": "test_name",
+    "status": "status",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -134,4 +150,108 @@ async def participant_report(
         completed=sum(1 for s in mine if str(s.get("status")) in {"COMPLETED", "EVALUATED", "GRADED"}),
         average_final_score=avg,
         tests=entries,
+    )
+
+
+# --- Candidate-facing reporting (self-read or trainer/admin) ------------------
+
+
+def _attempt_entry(submission: Dict[str, Any]) -> AttemptEntry:
+    return AttemptEntry(
+        submission_id=submission.get("id"),
+        test_id=submission.get("test_id"),
+        test_name=_test_name(submission),
+        status=str(submission.get("status")) if submission.get("status") is not None else None,
+        score=effective_score(submission),
+        assigned_at=submission.get("assigned_at"),
+        submitted_at=submission.get("submitted_at"),
+    )
+
+
+def _sort_attempts(items: List[AttemptEntry], field: str, descending: bool) -> List[AttemptEntry]:
+    """Stable sort that always pushes missing values to the end.
+
+    None never compares against a real value (TypeError on mixed types and the
+    sort would be meaningless anyway), so we partition first.
+    """
+    attr = _SORT_FIELDS[field]
+    present = [i for i in items if getattr(i, attr) is not None]
+    missing = [i for i in items if getattr(i, attr) is None]
+    present.sort(key=lambda i: getattr(i, attr), reverse=descending)
+    return present + missing
+
+
+@router.get(
+    "/user/{user_id}",
+    response_model=CandidateReport,
+    summary="Candidate report (self or trainer/admin)",
+)
+async def candidate_report(
+    user_id: int,
+    user: Dict = Depends(require_self_or_privileged),
+    x_correlation_id: Optional[str] = Header(None, alias="X-Correlation-Id"),
+    x_request_id: Optional[str] = Header(None, alias="X-Request-Id"),
+) -> CandidateReport:
+    headers = _forward_headers(user, x_correlation_id, x_request_id)
+    submissions = await tm.list_submissions(headers)
+    mine = [s for s in submissions if s.get("user_id") == user_id]
+
+    scores = [effective_score(s) for s in mine]
+    stats = score_stats(scores)
+
+    return CandidateReport(
+        user_id=user_id,
+        assigned=len(mine),
+        completed=sum(1 for s in mine if str(s.get("status")) in COMPLETED_STATUSES),
+        in_progress=sum(1 for s in mine if str(s.get("status")) == "IN_PROGRESS"),
+        by_status=status_breakdown(mine),
+        average_final_score=stats["average"],
+        best_score=stats["max"],
+        score=ScoreStats(**stats),
+    )
+
+
+@router.get(
+    "/user/{user_id}/attempts",
+    response_model=PaginatedAttempts,
+    summary="Candidate attempts — paginated, filterable, sortable",
+)
+async def candidate_attempts(
+    user_id: int,
+    user: Dict = Depends(require_self_or_privileged),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status: Optional[str] = Query(None, description="Filter by submission status"),
+    sort: str = Query("submitted_at"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
+    x_correlation_id: Optional[str] = Header(None, alias="X-Correlation-Id"),
+    x_request_id: Optional[str] = Header(None, alias="X-Request-Id"),
+) -> PaginatedAttempts:
+    sort_key = sort if sort in _SORT_FIELDS else "submitted_at"
+
+    headers = _forward_headers(user, x_correlation_id, x_request_id)
+    submissions = await tm.list_submissions(headers)
+    mine = [s for s in submissions if s.get("user_id") == user_id]
+
+    if status:
+        wanted = status.upper()
+        mine = [s for s in mine if str(s.get("status")).upper() == wanted]
+
+    entries = _sort_attempts(
+        [_attempt_entry(s) for s in mine], sort_key, descending=(order == "desc")
+    )
+
+    total = len(entries)
+    start = (page - 1) * page_size
+    items = entries[start : start + page_size]
+
+    return PaginatedAttempts(
+        user_id=user_id,
+        total=total,
+        page=page,
+        page_size=page_size,
+        sort=sort_key,
+        order=order,
+        status=status,
+        items=items,
     )

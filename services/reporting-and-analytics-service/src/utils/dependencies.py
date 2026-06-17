@@ -40,3 +40,35 @@ async def require_trainer_or_admin(
             detail="Reporting endpoints require trainer or admin role",
         )
     return user
+
+
+def _same_user(user: Dict[str, Any], user_id: int) -> bool:
+    """True when the caller's verified id matches the requested participant."""
+    raw = user.get("id")
+    if raw is None:
+        return False
+    try:
+        return int(raw) == int(user_id)
+    except (TypeError, ValueError):
+        return False
+
+
+async def require_self_or_privileged(
+    user_id: int,
+    user: Dict[str, Any] = Depends(get_user_context),
+) -> Dict[str, Any]:
+    """Authorize a candidate report read.
+
+    Participants may read only their own report (``user_id`` must match the
+    gateway-verified ``X-User-Id``). Trainers and admins may read any
+    participant's report. Any other case is a 403 — we never confirm whether a
+    different participant id exists.
+    """
+    if user["role"] in _PRIVILEGED_ROLES:
+        return user
+    if _same_user(user, user_id):
+        return user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You may only read your own candidate report",
+    )

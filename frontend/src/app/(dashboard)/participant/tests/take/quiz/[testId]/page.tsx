@@ -70,6 +70,8 @@ export default function QuizTakePage({ params }: PageProps) {
         setResult(res);
         setPhase('done');
         if (auto) toast.warning('Time expired — your quiz was submitted automatically.');
+        // Land on the durable, deep-linkable results page for this attempt.
+        router.push(`/participant/tests/results/${sessionId}`);
       } catch (err) {
         const code = quizErrorStatus(err);
         if (code === 409) {
@@ -88,6 +90,7 @@ export default function QuizTakePage({ params }: PageProps) {
               total_questions: state.total_questions,
             });
             setPhase('done');
+            router.push(`/participant/tests/results/${sessionId}`);
             return;
           } catch {
             /* fall through */
@@ -97,7 +100,7 @@ export default function QuizTakePage({ params }: PageProps) {
         setPhase('active');
       }
     },
-    [sessionId],
+    [sessionId, router],
   );
 
   const handleSubmitRef = useRef(handleSubmitSession);
