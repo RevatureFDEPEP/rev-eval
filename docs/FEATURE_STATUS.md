@@ -68,3 +68,51 @@ Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 | W4-F3 | Role-based authz (API) + aggregate reporting queries | 18 | ✅ Completed | [detail](features/w4-f3-rbac-aggregate-queries.md) | PR #109: reporting re-verifies the JWT itself (defense-in-depth) — `require_trainer` 401/403, TRAINER-only, ignores `X-User-*`. `GET /reports/aggregate` (GROUP BY test, pass rate, `percentile_cont` median) + `/reports/test/{id}/questions`. |
 | W4-F4 | Trainer dashboard frontend (server RBAC, URL-synced filters) | 19 | ✅ Completed | [detail](features/w4-f4-trainer-dashboard-frontend.md) | PR #120: `/admin/dashboard` parallel-route — per-panel `loading`/`error`, server RBAC via shared `resolveAccess` (Edge middleware + `getSession`), new `GET /reports/timeseries` line chart, URL-synced debounced filters. |
 | W4-F5 | Technical debt audit + ADR documentation | 20 | ✅ Completed | [detail](features/w4-f5-tech-debt-audit-adrs.md) | Branch `richardh-feat-W4F5`: debt inventory + repayment backlog (`docs/technical-debt.md`), ADR 0002 (ADR 0001 landed in W4-F1), AI-assistance disclosure/annotations, technical narrative. **Program complete.** |
+
+## Days 21+ (Week 5 — Remediation & tech-debt)
+
+Non-catalog, trainer-defined remediation (same pattern as W2-F8 / W3-F7). Source:
+the 2026-06-17 deferral sweep of the completed program (functionality punted from
+earlier features but never built) plus a full reconciliation against
+[`technical-debt.md`](technical-debt.md). The 22-feature catalog program stays
+complete; these pay down what it deferred. Ordered by urgency, not feature number:
+security first → correctness → med debt → low. Every `technical-debt.md` item /
+repayment-backlog entry now maps to a W5 feature (see the coverage map below).
+
+| # | Feature | Origin | Status | Detail | Notes |
+|---|---|---|---|---|---|
+| W5-F1 | Free-text answer scoring & manual grading flow | W3-F2 | ❌ Not Started | [detail](features/w5-f1-free-text-manual-grading.md) | `text` answers fall through `score()` to a hardcoded `0.0` "manual review (W4)" that was never built — `scoring/__init__.py:33-43`. Add a PENDING_REVIEW state + trainer grade endpoint/UI. |
+| W5-F2 | Fix `TestRepository.get_by_id` None-row crash | W3-F1 | ❌ Not Started | [detail](features/w5-f2-test-repository-none-crash.md) | `else` branch derefs `None` when the id is missing → AttributeError/500 instead of 404 — `test_repository.py:13-21`. |
+| W5-F3 | Render legacy option-less `true_false` questions | W3-F6 / debt §7 | ❌ Not Started | [detail](features/w5-f3-legacy-true-false-rendering.md) | Pre-W2-F6 docs (no `options`) render "No options available" — `SingleSelectQuestion.tsx:30-31`. Dedicated widget or data normalization. |
+| W5-F4 | Auto-seed the question bank in Docker Compose | W3-F1 | ❌ Not Started | [detail](features/w5-f4-compose-question-bank-seed.md) | Fresh `compose up` leaves the bank empty → `POST /sessions` 422; only the E2E job seeds. Add a guarded idempotent startup seed. |
+| W5-F5 | Timezone-aware submission timestamps | debt §8 | ❌ Not Started | [detail](features/w5-f5-timezone-aware-timestamps.md) | POC TODO — naive datetimes skew cross-TZ ordering + reporting day-buckets — `test_submission_schema.py:25,30`. |
+| W5-F6 | user-service repository layer + unit tests | debt §5 | ❌ Not Started | [detail](features/w5-f6-user-service-repository-layer.md) | `user_repository.py` is an empty stub; no `tests/` dir so CI skips coverage. Extract repo + add hermetic suite. |
+| W5-F7 | Per-question drill-down on the trainer dashboard | W4-F4 | ❌ Not Started | [detail](features/w5-f7-per-question-drilldown-dashboard.md) | W4-F3's `GET /reports/test/{id}/questions` exists but no frontend consumes it. Add a per-question region reusing `<ChartWrapper>`. |
+| W5-F8 | Central pagination config + dead-code / cruft cleanup | debt §1/§8 | ❌ Not Started | [detail](features/w5-f8-pagination-config-and-cruft-cleanup.md) | Track A: central page-size config (replace `100`/`500`/`20` magic). Track B: remove dead invite/notification blocks, `dev.db`, stale scripts. |
+| W5-F9 | Security defaults hardening (JWT / CORS / MinIO / presign) | debt §1 (repay 1,2) | ❌ Not Started | [detail](features/w5-f9-security-defaults-hardening.md) | **High.** `JWT_SECRET` fail-fast for non-local, CORS closed-by-default, MinIO creds off-default, presign expiry to config. |
+| W5-F10 | Paginate the return-all-rows list endpoints | debt §2 (repay 4) | ❌ Not Started | [detail](features/w5-f10-paginate-list-endpoints.md) | Adopt the W4 `{items,total,page,size}` envelope on the unpaginated `tests`/`categories`/`skills`/`submissions`/`questions` lists. After W5-F8. |
+| W5-F11 | Input validation hardening (filter enums + presign content-type) | debt §3 (repay 7) | ❌ Not Started | [detail](features/w5-f11-input-validation-hardening.md) | Enum-validate `by-type`/`by-difficulty`/`filter` (422 not silent-empty); enforce presign `content_type` at the boundary — `question_routes.py`. |
+| W5-F12 | Schema migration coverage (user Alembic + question-doc shape) | debt §4 (repay 3) | ❌ Not Started | [detail](features/w5-f12-schema-migration-coverage.md) | Bring user-service under Alembic (stop `create_all`); define a question-doc shape migration story. |
+| W5-F13 | Harden the auth boundary (downstream JWT re-verify) | debt §6 (repay 5) | ❌ Not Started | [detail](features/w5-f13-downstream-jwt-reverify.md) | Extend W4-F3's reporting JWT re-verify pattern to TMS/user/question so spoofed `X-User-*` direct calls are rejected. Needs W5-F9's in-sync secret. |
+| W5-F14 | Idempotency body-fingerprint + shorten lock window | debt §5 (repay 6) | ❌ Not Started | [detail](features/w5-f14-idempotency-fingerprint-lock-window.md) | Fingerprint the body into the dedup row (422 on same-key/diff-body); move the QMS fetch out of the `SELECT FOR UPDATE` window. |
+
+### Technical-debt coverage map
+
+Every item in [`technical-debt.md`](technical-debt.md) is owned by a W5 feature:
+
+| Debt | Repayment item | Owning feature |
+|---|---|---|
+| §1 JWT_SECRET / CORS / MinIO / presign expiry | 1, 2 | W5-F9 |
+| §1 page-size magic numbers | — | W5-F8 (Track A) |
+| §2 unpaginated list endpoints | 4 | W5-F10 |
+| §3 filter enum validation + presign content-type | 7 | W5-F11 |
+| §4 user-service Alembic + question-doc shape | 3 | W5-F12 |
+| §5 user-service no `tests/` | — | W5-F6 |
+| §5 idempotency body-fingerprint + lock window | 6 | W5-F14 |
+| §6 downstream header-trust (JWT re-verify) | 5 | W5-F13 |
+| §7 legacy `true_false` render | 9 | W5-F3 |
+| §8 POC TZ-naive TODO | 8 | W5-F5 |
+| §8 `dev.db` + stale scripts | 8 | W5-F8 (Track B) |
+
+§4 reporting empty Alembic `0001` is an intentional recorded decision (ADR 0001),
+not debt — excluded by design.
