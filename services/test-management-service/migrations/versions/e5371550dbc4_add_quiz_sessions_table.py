@@ -26,7 +26,7 @@ def upgrade() -> None:
     op.create_table(
         "quiz_sessions",
         sa.Column("id", sa.String(length=32), nullable=False),
-        sa.Column("session_token", sa.String(length=128), nullable=False),
+        sa.Column("session_token_hash", sa.String(length=64), nullable=False),
         sa.Column("test_id", sa.Integer(), nullable=False),
         sa.Column("submission_id", sa.Integer(), nullable=True),
         sa.Column("user_id", sa.Integer(), nullable=False),
@@ -42,6 +42,11 @@ def upgrade() -> None:
     )
     with op.batch_alter_table("quiz_sessions", schema=None) as batch_op:
         batch_op.create_index(
+            batch_op.f("ix_quiz_sessions_session_token_hash"),
+            ["session_token_hash"],
+            unique=False,
+        )
+        batch_op.create_index(
             batch_op.f("ix_quiz_sessions_test_id"), ["test_id"], unique=False
         )
         batch_op.create_index(
@@ -53,5 +58,6 @@ def downgrade() -> None:
     with op.batch_alter_table("quiz_sessions", schema=None) as batch_op:
         batch_op.drop_index(batch_op.f("ix_quiz_sessions_user_id"))
         batch_op.drop_index(batch_op.f("ix_quiz_sessions_test_id"))
+        batch_op.drop_index(batch_op.f("ix_quiz_sessions_session_token_hash"))
 
     op.drop_table("quiz_sessions")

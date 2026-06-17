@@ -31,6 +31,7 @@ from src.schemas.quiz_session_schema import SessionCreate, SessionRead
 from src.services.quiz_session_helpers import (
     build_sample_query,
     compute_expires_at,
+    hash_session_token,
     map_sample_to_question,
     mint_session_token,
     resolve_duration_seconds,
@@ -96,7 +97,40 @@ async def create_session(
                 detail="Submission not found",
             )
 
-    # 3) Resolve the test's skills (drives the sampling filter).
+    # 3) Idempotency / anti-re-sampling guard. Before any cross-service sampling
+    # call, refuse a second active session for the same (user, test, submission):
+    # without this a candidate could re-POST to re-roll the dice and keep the
+    # easiest sampled set. We re-read the wall clock here (tz-aware UTC) and only
+    # treat a row as blocking if it is still in_progress AND not yet expired — an
+    # expired/abandoned attempt does not lock the candidate out.
+    #
+    # This check-then-act is not race-proof (two concurrent POSTs can both pass
+    # the lookup). Closing the window needs a partial-unique constraint on
+    # (user_id, test_id) WHERE status='in_progress' plus an Idempotency-Key —
+    # tracked as a W3-F2/F5 follow-up.
+    guard_now = datetime.now(UTC)
+    active_session = (
+        (
+            await db.execute(
+                select(QuizSession).where(
+                    QuizSession.user_id == user_id,
+                    QuizSession.test_id == body.test_id,
+                    QuizSession.submission_id == body.submission_id,
+                    QuizSession.status == "in_progress",
+                    QuizSession.expires_at > guard_now,
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if active_session is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An active session already exists for this test",
+        )
+
+    # 4) Resolve the test's skills (drives the sampling filter).
     skill_rows = (
         await db.execute(
             select(Skill.name)
@@ -106,7 +140,7 @@ async def create_session(
     ).all()
     skills = [row[0] for row in skill_rows if row[0]]
 
-    # 4) Sample questions from question-management-service.
+    # 5) Sample questions from question-management-service.
     params = build_sample_query(test.number_of_questions, skills)
     client = get_qms_client()
     try:
@@ -174,7 +208,7 @@ async def create_session(
     questions = [map_sample_to_question(doc) for doc in sampled]
     question_ids = [q.question_id for q in questions]
 
-    # 5) Server-authoritative timing. Timezone-aware UTC (never naive utcnow) so
+    # 6) Server-authoritative timing. Timezone-aware UTC (never naive utcnow) so
     # server_now/expires_at carry an explicit offset and the client's countdown
     # math is unambiguous; the two share one ``server_now`` read so the window is
     # exactly ``duration`` wide.
@@ -182,15 +216,16 @@ async def create_session(
     duration_seconds = resolve_duration_seconds(test.duration)
     expires_at = compute_expires_at(server_now, duration_seconds)
 
-    # 6) Mint opaque token + persist.
-    # DEFER (W3-F2): the session_token is stored raw here; it should be hashed at
-    # rest (SHA-256) so a DB dump can't be replayed, and returned raw exactly once.
+    # 7) Mint opaque token + persist. The raw token is held in a local and
+    # returned to the client exactly once; only its SHA-256 hash is stored, so a
+    # DB dump cannot be replayed as a bearer token. ``raw_token`` never touches
+    # the ORM row, so ``db.refresh`` (which reloads persisted columns) cannot
+    # clobber it.
     # DEFER (W3-F2): this service trusts the gateway X-User-* headers and does not
     # re-verify the Bearer JWT; per-service JWT re-verification is a follow-up.
-    # DEFER (W3-F2): multiple attempts per (user, test) are allowed for now — no
-    # uniqueness/idempotency. Idempotency-key handling lands in W3-F2.
+    raw_token = mint_session_token()
     session = QuizSession(
-        session_token=mint_session_token(),
+        session_token_hash=hash_session_token(raw_token),
         test_id=body.test_id,
         submission_id=body.submission_id,
         user_id=user_id,
@@ -220,7 +255,8 @@ async def create_session(
 
     return SessionRead(
         session_id=str(session.id),
-        session_token=session.session_token,
+        # The RAW token, returned exactly once; the DB holds only its hash.
+        session_token=raw_token,
         test_id=session.test_id,
         user_id=session.user_id,
         status=session.status,

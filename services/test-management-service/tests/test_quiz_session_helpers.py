@@ -7,6 +7,7 @@ duration/expiry math, token minting, and the sampled-dict -> QuizQuestionOut
 mapping (answer-key never carried).
 """
 
+import hashlib
 import re
 from datetime import datetime, timedelta
 
@@ -16,6 +17,7 @@ from src.services.quiz_session_helpers import (
     MAX_SAMPLE_QUERY_SIZE,
     build_sample_query,
     compute_expires_at,
+    hash_session_token,
     map_sample_to_question,
     mint_session_token,
     resolve_duration_seconds,
@@ -122,6 +124,36 @@ def test_token_is_64_hex_chars():
 
 def test_tokens_are_unique():
     assert mint_session_token() != mint_session_token()
+
+
+# ---------------------------------------------------------------------------
+# hash_session_token
+# ---------------------------------------------------------------------------
+
+
+def test_hash_is_sha256_hex_of_raw():
+    raw = "sess_example_raw_token"
+    assert hash_session_token(raw) == hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def test_hash_is_64_hex_chars():
+    digest = hash_session_token(mint_session_token())
+    assert len(digest) == 64
+    assert re.fullmatch(r"[0-9a-f]{64}", digest)
+
+
+def test_hash_is_deterministic():
+    raw = mint_session_token()
+    assert hash_session_token(raw) == hash_session_token(raw)
+
+
+def test_hash_differs_from_raw_and_is_not_reversible_format():
+    # The stored digest must not equal the raw token (it is hashed at rest), and
+    # distinct tokens hash to distinct digests.
+    raw_a = mint_session_token()
+    raw_b = mint_session_token()
+    assert hash_session_token(raw_a) != raw_a
+    assert hash_session_token(raw_a) != hash_session_token(raw_b)
 
 
 # ---------------------------------------------------------------------------

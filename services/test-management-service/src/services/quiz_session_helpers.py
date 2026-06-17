@@ -9,6 +9,7 @@ returned dicts through ``map_sample_to_question``, compute ``expires_at`` from
 the test duration, and mint the opaque ``session_token``.
 """
 
+import hashlib
 import secrets
 from datetime import datetime, timedelta
 
@@ -70,6 +71,19 @@ def compute_expires_at(server_now: datetime, duration_seconds: int) -> datetime:
 def mint_session_token() -> str:
     """Mint an opaque session bearer token (256 bits of entropy, hex-encoded)."""
     return secrets.token_hex(SESSION_TOKEN_BYTES)
+
+
+def hash_session_token(raw: str) -> str:
+    """Hash a raw session token for storage at rest (SHA-256 hex).
+
+    The opaque token is returned to the client raw exactly once; only this
+    SHA-256 digest is persisted, so a DB dump cannot be replayed as a bearer
+    token. SHA-256 hex is 64 chars, matching the ``session_token_hash`` column
+    width. (Plain SHA-256, not a slow KDF: the token is 256 bits of CSPRNG
+    entropy, not a low-entropy human password, so it is not brute-forceable and
+    needs no per-row salt.)
+    """
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def map_sample_to_question(doc: dict) -> QuizQuestionOut:
