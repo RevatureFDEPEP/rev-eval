@@ -3,7 +3,7 @@ from src.db.session import Base
 
 _session_status = Enum(
     "STARTED", "PART_A_IN_PROGRESS", "PART_A_COMPLETED",
-    "PART_B_IN_PROGRESS", "PART_B_COMPLETED", "COMPLETED", "ABANDONED",
+    "PART_B_IN_PROGRESS", "PART_B_COMPLETED", "COMPLETED", "EXPIRED", "ABANDONED",
     name="sessionstatus", create_type=False,
 )
 
