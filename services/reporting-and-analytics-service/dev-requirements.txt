@@ -1,0 +1,4 @@
+# to be kept separate from production docker image
+ruff
+pytest-asyncio
+aiosqlite
