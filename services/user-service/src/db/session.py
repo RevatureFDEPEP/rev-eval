@@ -2,6 +2,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from src.db.init_db import Base, SessionLocal, engine
 
+
 # ===== Dependency for FastAPI =====
 def get_db():
     """Dependency to get database session"""
