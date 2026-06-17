@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pydantic import BaseModel
 
@@ -31,3 +31,19 @@ class SessionRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AnswerSubmit(BaseModel):
+    question_id: str
+    submitted_answers: List[Union[int, bool, str]]
+
+
+class AnswerResponse(BaseModel):
+    session_id: str
+    question_id: str
+    question_index: int
+    score: Optional[float]
+    algorithm: str
+    session_status: str
+    current_index: int
+    next_question: Optional[QuizQuestionOut]

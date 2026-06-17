@@ -16,7 +16,9 @@ os.environ.setdefault("PORT", "8001")
 os.environ.setdefault("SERVICE_HOSTNAME", "localhost")
 
 import src.models.category  # noqa: F401, E402
+import src.models.idempotency_key  # noqa: F401, E402
 import src.models.quiz_session  # noqa: F401, E402
+import src.models.session_answer  # noqa: F401, E402
 import src.models.skill  # noqa: F401, E402
 
 # Register all models with Base.metadata so autogenerate sees them
