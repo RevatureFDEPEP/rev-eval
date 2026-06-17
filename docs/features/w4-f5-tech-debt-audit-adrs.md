@@ -15,8 +15,8 @@ prioritized repayment backlog.
 - [ ] **1. Structured walkthrough** — inventory shortcuts: inline TODOs, missing
       input validation, hardcoded magic values, unpaginated all-rows endpoints,
       mocks where integration tests would give more confidence, schema columns
-      added without a migration. *(This repo's [W2-F8](w2-f8-pre-existing-defects.md)
-      defect log is a starting seed.)*
+      added without a migration. *(Known defects surfaced during W2-F7
+      verification — skill-500, dual-engine, Pydantic v2 — are a starting seed.)*
 - [ ] **2. Debt inventory** — `docs/technical-debt.md`. Per item: name, code
       location, the condition under which it matters (e.g. "fine at 50 users,
       breaks at 5,000"), and urgency (low/med/high vs. current scale).

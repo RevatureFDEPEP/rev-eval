@@ -1,7 +1,7 @@
 # W3-F7 — Week-3 Review-Findings Remediation (trainer-defined)
 
 **Status:** ❌ Not Started
-**Spec:** trainer-defined, non-catalog (same pattern as [W2-F8](w2-f8-pre-existing-defects.md)).
+**Spec:** trainer-defined, non-catalog (review findings from merged W3 PRs).
 **Depends on:** W3-F1..F4 merged and reviewed
 **Last updated:** 2026-06-12
 

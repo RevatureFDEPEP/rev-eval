@@ -52,8 +52,7 @@ Remaining: extract `QuestionForm.tsx` shared component, wire gateway submit,
 add file-upload field (blocked on W2-F5), edit page.
 
 All W2-F3 (Loki/Grafana), W2-F5 (MinIO presigned), W2-F7 (Alembic/Category),
-W2-F8 (defect cleanup), W2-M10 (reporting scaffold), and the full W3 and W4
-slices are not yet started on Tianya's branch.
+and the full W3 and W4 slices are not yet started on Tianya's branch.
 
 ## Status values
 
@@ -75,9 +74,7 @@ Spec: `days_6_10_features.md`.
 | W2-F4 | CI quality gates (Ruff / ESLint / Trivy / coverage) | REQUIRED | 🟡 In Progress | [w2-f4-ci-quality-gates.md](features/w2-f4-ci-quality-gates.md) |
 | W2-F5 | Direct-to-MinIO diagram uploads (pre-signed URLs) | — | ❌ Not Started | [w2-f5-minio-presigned-uploads.md](features/w2-f5-minio-presigned-uploads.md) |
 | W2-F6 | Structured question authoring interface | — | 🟡 In Progress | [w2-f6-question-authoring-ui.md](features/w2-f6-question-authoring-ui.md) |
-| W2-F7 | Alembic migrations & Category domain | — | ❌ Not Started | [w2-f7-alembic-category-domain.md](features/w2-f7-alembic-category-domain.md) |
-| W2-F8 | Pre-existing defect cleanup (found during W2-F7) | — | ❌ Not Started | [w2-f8-pre-existing-defects.md](features/w2-f8-pre-existing-defects.md) |
-| W2-M10 | Day 10 milestone: reporting service scaffold | milestone | ❌ Not Started | [w2-m10-reporting-service-scaffold.md](features/w2-m10-reporting-service-scaffold.md) |
+| W2-F7 | Alembic migrations & Category domain + reporting service scaffold | — | ❌ Not Started | [w2-f7-alembic-category-domain.md](features/w2-f7-alembic-category-domain.md) |
 
 ## Days 11–15 (Week 3 — quiz-taking vertical slice)
 
@@ -121,25 +118,24 @@ Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 3. **W2-F4 finish** — add Trivy container scan step to each backend matrix job
    (CRITICAL/HIGH, `exit-code: 1`, `ignore-unfixed: true`); add per-service
    `.coveragerc` with `fail_under` ratchets.
-4. **W2-F7 Alembic + Category** — strict prerequisite for all of Week 3; must
-   land as Alembic `0001–0003` on test-management-service before W3-F1 adds `0004`.
+4. **W2-F7 Alembic + Category + reporting scaffold** — strict prerequisite for
+   all of Week 3; must land as Alembic `0001–0003` on test-management-service
+   before W3-F1 adds `0004`. Also: scaffold `reporting-and-analytics-service`
+   (FastAPI layout, dedicated `reporting-postgres` container, Alembic baseline)
+   and fix surfaces defects: skill-500, user-service dual-engine removal, Pydantic v2 migration.
 5. **W2-F5 pre-signed uploads** — MinIO boto3 pre-signed PUT endpoint + frontend
    file input; unblocks W2-F6 file upload step.
 6. **W2-F6 finish** — extract `QuestionForm` component, wire file upload (W2-F5),
    add edit page.
 7. **W2-F3 Loki/Grafana** — `observability/` compose stack (Loki + Promtail +
    Grafana); JSON log format + `X-Correlation-Id` in nginx and services.
-8. **W2-F8 defect cleanup** — skill-500 fix, user-service dual-engine removal,
-   Pydantic v2 migration; surface naturally during W2-F7 verification.
-9. **W2-M10 reporting scaffold** — FastAPI scaffold + dedicated `reporting-postgres`
-   + Alembic baseline; pairs with W2-F7's Alembic pattern.
-10. **W3-F1 sessions backend** — `POST /sessions` + Alembic `0004`; first
-    cross-service httpx call.
-11. **W3-F2 → W3-F3 → W3-F4** — scoring engine, take-page skeleton, exam client;
-    in dependency order.
-12. **W3-F5 + W3-F6** — integration tests (real Postgres/Mongo) + Playwright E2E.
-13. **W3-F7** — review-remediation items (timer fix, session reuse, role gate,
+8. **W3-F1 sessions backend** — `POST /sessions` + Alembic `0004`; first
+   cross-service httpx call.
+9. **W3-F2 → W3-F3 → W3-F4** — scoring engine, take-page skeleton, exam client;
+   in dependency order.
+10. **W3-F5 + W3-F6** — integration tests (real Postgres/Mongo) + Playwright E2E.
+11. **W3-F7** — review-remediation items (timer fix, session reuse, role gate,
     error boundaries).
-14. **W4-F1 → W4-F3** — reporting endpoints then RBAC gate.
-15. **W4-F2 → W4-F4** — results page then trainer dashboard.
-16. **W4-F5 last** — debt audit + ADRs; needs a substantially complete codebase.
+12. **W4-F1 → W4-F3** — reporting endpoints then RBAC gate.
+13. **W4-F2 → W4-F4** — results page then trainer dashboard.
+14. **W4-F5 last** — debt audit + ADRs; needs a substantially complete codebase.
