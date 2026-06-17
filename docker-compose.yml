@@ -71,7 +71,6 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
     networks:
-      - public-net
       - backend-net
     depends_on:
       frontend:
@@ -260,17 +259,13 @@ services:
       - /app/node_modules
       - /app/.next
     networks:
-      - public-net
       - backend-net
     depends_on:
       - api-gateway
 
 networks:
-  public-net:
-    driver: bridge
   backend-net:
     driver: bridge
-    internal: true
 
 volumes:
   postgres_data:
