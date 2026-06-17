@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     MONGO_APPNAME: str = "EvalAI"
     MONGO_DB: str = "evalai"
 
+    JWT_SECRET: str = "change-me-in-production"
+
     # Service Configuration
     ALLOW_ORIGINS: str = "*"
     SERVICE_NAME: str

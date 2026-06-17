@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     SERVICE_NAME: str = "reporting-and-analytics-service"
     PORT: int = 8004
     SERVICE_HOSTNAME: str = "reporting-and-analytics-service"
+    JWT_SECRET: str = "change-me-in-production"
     PASS_THRESHOLD: float = 70.0
 
     @property

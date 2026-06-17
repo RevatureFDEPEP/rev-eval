@@ -21,7 +21,7 @@ from sqlalchemy.orm import sessionmaker
 from main import app
 from src.db.session import Base, engine, get_db
 from src.models.reporting_models import QuizSession, Test, TestSubmission  # noqa: F401
-from src.utils.dependencies import get_current_trainer
+from src.utils.dependencies import get_current_user, verify_jwt
 
 TestingAsyncSession = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
@@ -70,15 +70,20 @@ async def override_get_db():
         yield db
 
 
-FAKE_TRAINER = {"id": 1, "email": "trainer@test.com", "role": "TRAINER"}
+FAKE_TRAINER = {"sub": "1", "id": 1, "email": "trainer@test.com", "role": "TRAINER"}
+FAKE_USER = {"sub": "10", "id": 10, "email": "user@test.com", "role": "PARTICIPANT"}
 
 
-async def override_get_current_trainer():
+def override_verify_jwt_trainer():
     return FAKE_TRAINER
 
 
+def override_verify_jwt_user():
+    return FAKE_USER
+
+
 app.dependency_overrides[get_db] = override_get_db
-app.dependency_overrides[get_current_trainer] = override_get_current_trainer
+app.dependency_overrides[verify_jwt] = override_verify_jwt_trainer
 
 client = TestClient(app)
 
@@ -238,44 +243,67 @@ def test_18_rankings_empty_test():
 
 
 # ---------------------------------------------------------------------------
-# RBAC
+# RBAC — now tests the JWT layer (require_role / verify_jwt)
 # ---------------------------------------------------------------------------
 
-def test_19_rbac_forbidden_participant():
-    del app.dependency_overrides[get_current_trainer]
+import time as _time
+import jwt as _jwt
+
+_SECRET = os.environ.get("JWT_SECRET", "change-me-in-production")
+
+
+def _token(role: str) -> str:
+    return _jwt.encode(
+        {"sub": "1", "role": role, "exp": int(_time.time()) + 3600},
+        _SECRET,
+        algorithm="HS256",
+    )
+
+
+def test_19_rbac_participant_jwt_returns_403():
+    # Remove override so the real JWT dep runs
+    del app.dependency_overrides[verify_jwt]
+    from src.config import settings as cfg
+    cfg.settings.JWT_SECRET = _SECRET
     r = client.get(
         "/v1/api/reports/tests/1",
-        headers={"X-User-Id": "1", "X-User-Role": "PARTICIPANT"},
+        headers={"Authorization": f"Bearer {_token('PARTICIPANT')}"},
     )
     assert r.status_code == 403
-    app.dependency_overrides[get_current_trainer] = override_get_current_trainer
+    app.dependency_overrides[verify_jwt] = override_verify_jwt_trainer
 
 
-def test_20_rbac_missing_user_id():
-    del app.dependency_overrides[get_current_trainer]
+def test_20_rbac_no_token_returns_401():
+    del app.dependency_overrides[verify_jwt]
+    from src.config import settings as cfg
+    cfg.settings.JWT_SECRET = _SECRET
     r = client.get("/v1/api/reports/tests/1")
     assert r.status_code == 401
-    app.dependency_overrides[get_current_trainer] = override_get_current_trainer
+    app.dependency_overrides[verify_jwt] = override_verify_jwt_trainer
 
 
-def test_21_rbac_trainer_header_accepted():
-    del app.dependency_overrides[get_current_trainer]
+def test_21_rbac_trainer_jwt_accepted():
+    del app.dependency_overrides[verify_jwt]
+    from src.config import settings as cfg
+    cfg.settings.JWT_SECRET = _SECRET
     r = client.get(
         "/v1/api/reports/tests/1",
-        headers={"X-User-Id": "1", "X-User-Role": "TRAINER"},
+        headers={"Authorization": f"Bearer {_token('TRAINER')}"},
     )
     assert r.status_code == 200
-    app.dependency_overrides[get_current_trainer] = override_get_current_trainer
+    app.dependency_overrides[verify_jwt] = override_verify_jwt_trainer
 
 
-def test_22_rbac_non_numeric_user_id_returns_401():
-    del app.dependency_overrides[get_current_trainer]
+def test_22_rbac_invalid_token_returns_401():
+    del app.dependency_overrides[verify_jwt]
+    from src.config import settings as cfg
+    cfg.settings.JWT_SECRET = _SECRET
     r = client.get(
         "/v1/api/reports/tests/1",
-        headers={"X-User-Id": "not-a-number", "X-User-Role": "TRAINER"},
+        headers={"Authorization": "Bearer notavalidtoken"},
     )
     assert r.status_code == 401
-    app.dependency_overrides[get_current_trainer] = override_get_current_trainer
+    app.dependency_overrides[verify_jwt] = override_verify_jwt_trainer
 
 
 # ---------------------------------------------------------------------------

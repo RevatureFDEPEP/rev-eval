@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     PORT: int
     SERVICE_HOSTNAME: str
 
+    JWT_SECRET: str = "change-me-in-production"
+
     # Service-to-Service Communication
     USER_SERVICE_URL: str = "http://localhost:8003"
     INTERVIEW_SERVICE_URL: Optional[str] = None

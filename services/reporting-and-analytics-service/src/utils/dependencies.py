@@ -1,7 +1,74 @@
-from typing import Any, Dict, Optional
+"""
+FastAPI auth dependencies for reporting-and-analytics-service.
 
-from fastapi import Header, HTTPException, status
+Two layers (defense-in-depth):
+  1. verify_jwt / require_role — service-level JWT decode; catches direct
+     calls that bypass the API gateway.
+  2. get_current_trainer / get_current_user — legacy header-based helpers
+     kept for backward compatibility with tests that mock the gateway.
+"""
+import time
+from typing import Any, Callable, Dict, Optional
 
+import jwt
+from fastapi import Depends, Header, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from src.config.settings import settings
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+# ---------------------------------------------------------------------------
+# JWT layer (service-level, defense-in-depth)
+# ---------------------------------------------------------------------------
+
+def verify_jwt(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+) -> Dict[str, Any]:
+    """Decode and validate Bearer JWT. Raises 401 if missing / invalid / expired."""
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            settings.JWT_SECRET,
+            algorithms=["HS256"],
+            options={"require": ["exp", "sub", "role"]},
+        )
+    except jwt.PyJWTError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid or expired token: {exc}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if payload["exp"] < time.time():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired",
+        )
+    return payload
+
+
+def require_role(role: str) -> Callable:
+    """Factory: returns a FastAPI dependency that enforces a specific JWT role."""
+    def _dependency(payload: Dict = Depends(verify_jwt)) -> Dict:
+        if (payload.get("role") or "").upper() != role.upper():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"{role.capitalize()} role required",
+            )
+        return payload
+    return _dependency
+
+
+# ---------------------------------------------------------------------------
+# Header layer (gateway-injected X-User-* headers)
+# ---------------------------------------------------------------------------
 
 def _parse_user_id(x_user_id: Optional[str]) -> int:
     if not x_user_id:

@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel
 from pydantic import ValidationError
-from typing import List, Optional
+from typing import Dict, List, Optional
 from src.schemas.question import QuestionCreate, QuestionUpdate, QuestionResponse
 from src.services.question_service import QuestionService
+from src.utils.dependencies import require_role
 from src.utils.s3_client import generate_presigned_get_url, generate_presigned_put_url, ensure_bucket
 from src.config.settings import settings
 
@@ -31,7 +32,10 @@ router = APIRouter(prefix="/questions", tags=["Questions"])
     - TEXT: Requires sample_answer, no options or correct_answers
     """
 )
-async def create_question(question: QuestionCreate):
+async def create_question(
+    question: QuestionCreate,
+    _: Dict = Depends(require_role("TRAINER")),
+):
     """Create a new question with comprehensive validation."""
     try:
         question_id = await QuestionService.create_question(question)
@@ -192,7 +196,11 @@ async def get_question_by_id(id: str):
     - Only provide fields you want to update (partial updates supported)
     """
 )
-async def update_question(id: str, question_update: QuestionUpdate):
+async def update_question(
+    id: str,
+    question_update: QuestionUpdate,
+    _: Dict = Depends(require_role("TRAINER")),
+):
     """Update an existing question with validation."""
     try:
         updated = await QuestionService.update_question(id, question_update)
@@ -226,7 +234,10 @@ async def update_question(id: str, question_update: QuestionUpdate):
     summary="Delete question",
     description="Delete a question by its MongoDB _id."
 )
-async def delete_question(id: str):
+async def delete_question(
+    id: str,
+    _: Dict = Depends(require_role("TRAINER")),
+):
     """Delete a question by ID."""
     try:
         deleted = await QuestionService.delete_question(id)

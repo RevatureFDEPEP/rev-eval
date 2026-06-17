@@ -126,9 +126,15 @@ class ReportRepository:
         return total, tests
 
     async def get_rankings(self, test_id: int, params: QueryParams) -> List[dict]:
+        # rank()         — ordinal with gaps (1, 1, 3 for two tied firsts)
+        # percent_rank() — (rank - 1) / (total - 1), range [0.0, 1.0]
+        #                  null-safe: single-row result returns 0.0 from Postgres
         rank_col = func.rank().over(
             order_by=QuizSession.percentage_score.desc()
         ).label("rank")
+        pct_rank_col = func.percent_rank().over(
+            order_by=QuizSession.percentage_score.asc()
+        ).label("pct_rank")
 
         stmt = (
             select(
@@ -136,6 +142,7 @@ class ReportRepository:
                 QuizSession.percentage_score.label("score"),
                 QuizSession.completed_at,
                 rank_col,
+                pct_rank_col,
             )
             .where(
                 QuizSession.test_id == test_id,
@@ -153,6 +160,9 @@ class ReportRepository:
                 "rank": row.rank,
                 "user_id": row.user_id,
                 "score": float(row.score),
+                # percent_rank ascending = percentile of the candidate's score
+                # multiply by 100 and round for human-readable 0–100 scale
+                "percentile": round(float(row.pct_rank) * 100, 1) if row.pct_rank is not None else None,
                 "completed_at": row.completed_at,
             }
             for row in rows

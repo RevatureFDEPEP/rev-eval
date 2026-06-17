@@ -9,6 +9,7 @@ psycopg2-binary
 asyncpg
 aiosqlite
 httpx
+pyjwt
 pytest
 pytest-asyncio
 pytest-cov

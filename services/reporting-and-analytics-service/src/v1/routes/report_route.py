@@ -14,9 +14,13 @@ from src.schemas.report_schema import (
     UserSummaryResponse,
 )
 from src.services.report_service import ReportService
-from src.utils.dependencies import get_current_trainer, get_current_user
+from src.utils.dependencies import get_current_user, require_role, verify_jwt
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
+
+# Trainer-only endpoints use require_role("TRAINER") — service-level JWT
+# decode (defense-in-depth) plus role enforcement in one dependency.
+_trainer = require_role("TRAINER")
 
 
 @router.get(
@@ -27,7 +31,7 @@ router = APIRouter(prefix="/reports", tags=["Reports"])
 async def get_test_report(
     test_id: int,
     db: AsyncSession = Depends(get_db),
-    _: Dict = Depends(get_current_trainer),
+    _: Dict = Depends(_trainer),
 ):
     result = await ReportService.get_test_summary(db, test_id)
     if result is None:
@@ -43,7 +47,7 @@ async def get_test_report(
 async def get_aggregate_reports(
     params: QueryParams = Depends(),
     db: AsyncSession = Depends(get_db),
-    _: Dict = Depends(get_current_trainer),
+    _: Dict = Depends(_trainer),
 ):
     total, tests = await ReportService.get_aggregate_reports(db, params)
     return AggregateReportResponse(
@@ -63,7 +67,7 @@ async def get_test_rankings(
     test_id: int,
     params: QueryParams = Depends(),
     db: AsyncSession = Depends(get_db),
-    _: Dict = Depends(get_current_trainer),
+    _: Dict = Depends(_trainer),
 ):
     rankings = await ReportService.get_rankings(db, test_id, params)
     return RankingsResponse(
@@ -76,7 +80,7 @@ async def get_test_rankings(
 
 def _check_ownership(current: Dict, user_id: int) -> None:
     role = (current.get("role") or "").upper()
-    if role != "TRAINER" and current["id"] != user_id:
+    if role != "TRAINER" and current.get("id") != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied: can only view your own results",

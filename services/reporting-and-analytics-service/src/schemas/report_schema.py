@@ -49,6 +49,7 @@ class RankingEntry(BaseModel):
     rank: int
     user_id: int
     score: float
+    percentile: Optional[float]  # percent_rank() * 100; null when only one row
     completed_at: Optional[datetime]
 
 
