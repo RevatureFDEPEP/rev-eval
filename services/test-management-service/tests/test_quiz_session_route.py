@@ -647,3 +647,477 @@ def test_qms_client_is_lazy_singleton_and_closes():
     c3 = http_client.get_qms_client()
     assert c3 is not c1
     asyncio.run(http_client.close_qms_client())
+
+
+# ===========================================================================
+# POST /v1/api/test-sessions/{session_id}/answer  (W3-F2)
+# ===========================================================================
+
+import src.v1.routes.quiz_session_route as _answer_route_mod
+from src.models.answer import Answer
+from src.models.quiz_session import QuizSession
+
+
+class _AnswerScalarResult:
+    """``db.execute(...).scalars().first()`` for the answer flow."""
+
+    def __init__(self, first):
+        self._first = first
+
+    def scalars(self):
+        return self
+
+    def first(self):
+        return self._first
+
+
+class _AnswerSession:
+    """Mocked ``AsyncSession`` for ``submit_answer``.
+
+    Replays the scripted ``execute`` results in the exact order the route issues
+    them:
+
+    1. the ``select(QuizSession).where(id==...).with_for_update()`` row lock,
+    2. (only when an ``Idempotency-Key`` header is present) the prior-answer
+       lookup,
+
+    and then the route scores + persists (``add``/``commit``/``refresh``). The
+    fake never needs a real driver: ``with_for_update`` is a no-op here, and the
+    QuizSession stand-in is mutated in place so ``current_index``/``status``
+    changes are observable after the call.
+    """
+
+    def __init__(self, *, quiz_session, prior_answer=None, with_idempotency=False):
+        self.quiz_session = quiz_session
+        self._results = [_AnswerScalarResult(quiz_session)]
+        if with_idempotency:
+            self._results.append(_AnswerScalarResult(prior_answer))
+        self.added: list = []
+        self.committed = False
+        self.refreshed: list = []
+        self.rolled_back = False
+
+    async def execute(self, *args, **kwargs):
+        if not self._results:  # pragma: no cover - defensive
+            raise AssertionError("unexpected extra db.execute call")
+        return self._results.pop(0)
+
+    def add(self, obj):
+        self.added.append(obj)
+
+    async def commit(self):
+        self.committed = True
+
+    async def refresh(self, obj):
+        self.refreshed.append(obj)
+
+    async def rollback(self):
+        self.rolled_back = True
+
+
+def _make_quiz_session(
+    *,
+    id="sess-1",
+    user_id=42,
+    status="in_progress",
+    current_index=0,
+    question_ids=("q-alpha", "q-beta"),
+    expires_in=timedelta(minutes=10),
+):
+    """Build a real ``QuizSession`` ORM instance in memory (no DB).
+
+    ``expires_at`` is tz-aware UTC offset by ``expires_in`` (negative -> already
+    expired). The object is plain Python until flushed, which is all the route
+    needs since the fake session never flushes.
+    """
+    from datetime import UTC, datetime
+
+    qs = QuizSession(
+        session_token_hash="x" * 64,
+        test_id=1,
+        submission_id=None,
+        user_id=user_id,
+        question_ids=list(question_ids),
+        server_now=datetime.now(UTC),
+        expires_at=datetime.now(UTC) + expires_in,
+        status=status,
+        current_index=current_index,
+    )
+    qs.id = id
+    return qs
+
+
+def _make_prior_answer(
+    *, question_id="q-alpha", score=0.5, is_correct=False, idempotency_key="key-1"
+):
+    """A previously-persisted ``Answer`` row for the idempotency-replay path."""
+    a = Answer(
+        session_id="sess-1",
+        question_id=question_id,
+        submitted_answers=["a"],
+        score=score,
+        is_correct=is_correct,
+        idempotency_key=idempotency_key,
+    )
+    a.id = "ans-prior"
+    return a
+
+
+def _override_answer_db(session: _AnswerSession):
+    async def _get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = _get_db
+
+
+def _patch_fetch_correct_answers(monkeypatch, *, qtype, correct_answers):
+    """Patch the server-side answer-key fetch so no network is made.
+
+    Returns a counter object exposing ``.calls`` so a test can assert the fetch
+    was (or was NOT) invoked — the idempotency-replay test relies on this to
+    prove the scoring path is skipped on a replay.
+    """
+
+    class _Counter:
+        def __init__(self):
+            self.calls = 0
+
+    counter = _Counter()
+
+    async def _fake_fetch(question_id, correlation_id):
+        counter.calls += 1
+        return qtype, correct_answers
+
+    monkeypatch.setattr(_answer_route_mod, "_fetch_correct_answers", _fake_fetch)
+    return counter
+
+
+# ---------------------------------------------------------------------------
+# Happy path -> 200, score 1.0, cursor advances, still in_progress
+# ---------------------------------------------------------------------------
+def test_submit_answer_happy_path_correct(client, override_user, monkeypatch):
+    qs = _make_quiz_session(current_index=0, question_ids=("q-alpha", "q-beta"))
+    session = _AnswerSession(quiz_session=qs)
+    _override_answer_db(session)
+    fetch = _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[2])
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/sess-1/answer",
+            json={"question_id": "q-alpha", "submitted_answers": [2]},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["question_id"] == "q-alpha"
+    assert body["score"] == 1.0
+    assert body["is_correct"] is True
+    # cursor advanced from 0 -> 1, NOT the last question (2 total) -> still open
+    assert body["current_index"] == 1
+    assert body["status"] == "in_progress"
+    # the answer key was fetched server-side exactly once
+    assert fetch.calls == 1
+    # the answer row was persisted with the server-computed score
+    assert session.added and session.added[0].score == 1.0
+    assert session.added[0].is_correct is True
+
+
+# ---------------------------------------------------------------------------
+# Multi-select partial credit flows through to the response
+# ---------------------------------------------------------------------------
+def test_submit_answer_multi_partial_credit(client, override_user, monkeypatch):
+    qs = _make_quiz_session(current_index=0, question_ids=("q-alpha", "q-beta"))
+    session = _AnswerSession(quiz_session=qs)
+    _override_answer_db(session)
+    # correct {1,2,3}; submit {1,2} -> Jaccard 2/3
+    _patch_fetch_correct_answers(monkeypatch, qtype="multi", correct_answers=[1, 2, 3])
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/sess-1/answer",
+            json={"question_id": "q-alpha", "submitted_answers": [1, 2]},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["score"] == pytest.approx(2 / 3)
+    assert body["is_correct"] is False
+    assert body["current_index"] == 1
+    assert body["status"] == "in_progress"
+
+
+# ---------------------------------------------------------------------------
+# Wrong answer -> 200 with score 0.0 (the answer is still recorded)
+# ---------------------------------------------------------------------------
+def test_submit_answer_wrong_is_recorded_with_zero_score(
+    client, override_user, monkeypatch
+):
+    qs = _make_quiz_session(current_index=0, question_ids=("q-alpha", "q-beta"))
+    session = _AnswerSession(quiz_session=qs)
+    _override_answer_db(session)
+    _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[2])
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/sess-1/answer",
+            json={"question_id": "q-alpha", "submitted_answers": [1]},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["score"] == 0.0
+    assert body["is_correct"] is False
+    # a wrong answer is still durably recorded
+    assert session.added and session.added[0].is_correct is False
+
+
+# ---------------------------------------------------------------------------
+# Last-question path -> answering the final question flips status to submitted
+# ---------------------------------------------------------------------------
+def test_submit_answer_last_question_flips_to_submitted(
+    client, override_user, monkeypatch
+):
+    # current_index already at the last slot (1 of a 2-question list); answering
+    # advances to 2 == len -> status flips to submitted.
+    qs = _make_quiz_session(current_index=1, question_ids=("q-alpha", "q-beta"))
+    session = _AnswerSession(quiz_session=qs)
+    _override_answer_db(session)
+    _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[2])
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/sess-1/answer",
+            json={"question_id": "q-beta", "submitted_answers": [2]},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["current_index"] == 2
+    assert body["status"] == "submitted"
+
+
+# ---------------------------------------------------------------------------
+# Server-authoritative key: correct answers are fetched server-side and the
+# response NEVER leaks a correct-answer field.
+# ---------------------------------------------------------------------------
+def test_submit_answer_does_not_leak_correct_answer_key(
+    client, override_user, monkeypatch
+):
+    qs = _make_quiz_session(current_index=0, question_ids=("q-alpha", "q-beta"))
+    session = _AnswerSession(quiz_session=qs)
+    _override_answer_db(session)
+    fetch = _patch_fetch_correct_answers(
+        monkeypatch, qtype="mcq", correct_answers=[2]
+    )
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/sess-1/answer",
+            # the client does NOT send a key, and even if it did it is ignored;
+            # the server fetches the key itself.
+            json={"question_id": "q-alpha", "submitted_answers": [2]},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    # the key came from the server-side fetch, not the request body
+    assert fetch.calls == 1
+    # the response carries ONLY the candidate-safe outcome shape
+    assert set(body) == {
+        "question_id",
+        "score",
+        "is_correct",
+        "current_index",
+        "status",
+    }
+    assert "correct_answers" not in body
+    assert "correct_answer" not in body
+    assert "sample_answer" not in body
+
+
+# ---------------------------------------------------------------------------
+# Idempotency replay -> returns the prior result WITHOUT re-scoring
+# (returns before the scoring step, so this is a HARD assertion, not xfail)
+# ---------------------------------------------------------------------------
+def test_submit_answer_idempotency_replay_returns_prior_without_rescoring(
+    client, override_user, monkeypatch
+):
+    qs = _make_quiz_session(current_index=1, question_ids=("q-alpha", "q-beta"))
+    prior = _make_prior_answer(
+        question_id="q-alpha", score=0.5, is_correct=False, idempotency_key="key-1"
+    )
+    session = _AnswerSession(
+        quiz_session=qs, prior_answer=prior, with_idempotency=True
+    )
+    _override_answer_db(session)
+    # patch the fetch so we can prove it is NEVER called on a replay
+    fetch = _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[2])
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/sess-1/answer",
+            json={"question_id": "q-alpha", "submitted_answers": [2]},
+            headers={"Idempotency-Key": "key-1"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    # the PRIOR row's outcome is echoed verbatim, scored exactly once
+    assert body["question_id"] == "q-alpha"
+    assert body["score"] == 0.5
+    assert body["is_correct"] is False
+    # the cursor/status are read from the (unmutated) session
+    assert body["current_index"] == 1
+    # the scoring path was NOT re-entered: no key fetch, no new answer persisted
+    assert fetch.calls == 0
+    assert session.added == []
+    assert session.committed is False
+
+
+# ---------------------------------------------------------------------------
+# 409 when the session is already submitted (returns before scoring)
+# ---------------------------------------------------------------------------
+def test_submit_answer_409_when_session_submitted(client, override_user, monkeypatch):
+    qs = _make_quiz_session(status="submitted")
+    session = _AnswerSession(quiz_session=qs)
+    _override_answer_db(session)
+    fetch = _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[2])
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/sess-1/answer",
+            json={"question_id": "q-alpha", "submitted_answers": [2]},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 409
+    assert "submitted" in resp.json()["detail"].lower()
+    # the gate short-circuits before any scoring / persist
+    assert fetch.calls == 0
+    assert session.added == []
+
+
+# ---------------------------------------------------------------------------
+# 409 when the session has expired by the wall clock (lazy expire -> 409)
+# ---------------------------------------------------------------------------
+def test_submit_answer_409_when_session_expired(client, override_user, monkeypatch):
+    # in_progress but expires_at is in the past -> the route lazily flips it to
+    # 'expired', commits that, then refuses with 409.
+    qs = _make_quiz_session(status="in_progress", expires_in=timedelta(minutes=-5))
+    session = _AnswerSession(quiz_session=qs)
+    _override_answer_db(session)
+    fetch = _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[2])
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/sess-1/answer",
+            json={"question_id": "q-alpha", "submitted_answers": [2]},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 409
+    assert "expired" in resp.json()["detail"].lower()
+    # the session was flipped to expired and that flip was committed
+    assert qs.status == "expired"
+    assert session.committed is True
+    # no scoring / answer persist happened
+    assert fetch.calls == 0
+    assert session.added == []
+
+
+# ---------------------------------------------------------------------------
+# 403 when the session belongs to a different candidate (returns before scoring)
+# ---------------------------------------------------------------------------
+def test_submit_answer_403_when_not_owner(client, override_user, monkeypatch):
+    qs = _make_quiz_session(user_id=999)  # owned by someone else; FAKE_USER is 42
+    session = _AnswerSession(quiz_session=qs)
+    _override_answer_db(session)
+    fetch = _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[2])
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/sess-1/answer",
+            json={"question_id": "q-alpha", "submitted_answers": [2]},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 403
+    assert "belong" in resp.json()["detail"].lower()
+    assert fetch.calls == 0
+
+
+# ---------------------------------------------------------------------------
+# 404 when the session does not exist (returns before scoring)
+# ---------------------------------------------------------------------------
+def test_submit_answer_404_when_session_missing(client, override_user, monkeypatch):
+    session = _AnswerSession(quiz_session=None)
+    _override_answer_db(session)
+    fetch = _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[2])
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/does-not-exist/answer",
+            json={"question_id": "q-alpha", "submitted_answers": [2]},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 404
+    assert "not found" in resp.json()["detail"].lower()
+    assert fetch.calls == 0
+
+
+# ---------------------------------------------------------------------------
+# 401 when identity headers are missing (real dependency, not overridden)
+# ---------------------------------------------------------------------------
+def test_submit_answer_missing_identity_401(client, monkeypatch):
+    # Do NOT override get_current_user_from_headers: the real dependency 401s
+    # before the route body runs (no DB override needed).
+    fetch = _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[2])
+
+    resp = client.post(
+        "/v1/api/test-sessions/sess-1/answer",
+        json={"question_id": "q-alpha", "submitted_answers": [2]},
+    )
+
+    assert resp.status_code == 401
+    assert "authentication" in resp.json()["detail"].lower()
+    assert fetch.calls == 0
+
+
+# ---------------------------------------------------------------------------
+# 401 when the resolved identity carries no id (defense-in-depth)
+# ---------------------------------------------------------------------------
+def test_submit_answer_identity_without_id_401(client, monkeypatch):
+    fetch = _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[2])
+
+    async def _user_no_id():
+        return {"email": "x@example.com", "role": "PARTICIPANT"}
+
+    app.dependency_overrides[get_current_user_from_headers] = _user_no_id
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/sess-1/answer",
+            json={"question_id": "q-alpha", "submitted_answers": [2]},
+        )
+    finally:
+        app.dependency_overrides.pop(get_current_user_from_headers, None)
+
+    assert resp.status_code == 401
+    assert "user id" in resp.json()["detail"].lower()
+    assert fetch.calls == 0
