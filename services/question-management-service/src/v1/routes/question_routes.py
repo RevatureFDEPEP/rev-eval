@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import ValidationError
 from src.schemas.question import (
@@ -14,6 +16,8 @@ from src.services.upload_service import (
 )
 from src.utils.auth import get_current_trainer
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/questions", tags=["Questions"])
 
 
@@ -22,7 +26,7 @@ router = APIRouter(prefix="/questions", tags=["Questions"])
     response_model=PresignedUploadResponse,
     summary="Get a presigned upload URL for a question image",
     description="""
-    Issue a short-lived presigned PUT URL the client can use to upload a
+    Issue a short-lived presigned POST policy the client uses to upload a
     question image directly to MinIO/S3 (no bytes flow through this service).
 
     **Auth:** trainer-only. The caller's role is read from the gateway-injected
@@ -31,8 +35,13 @@ router = APIRouter(prefix="/questions", tags=["Questions"])
 
     **Content types:** only `image/png` and `image/jpeg` are allowed.
 
-    Returns the signed `url`, the object `key` to reference after upload, and
-    the URL's `expires_in` TTL in seconds. Does not touch the database.
+    **Size cap:** the policy binds a `content-length-range` condition so the
+    object store rejects any upload over `max_bytes` (5 MiB) server-side.
+
+    The client POSTs multipart form-data to `url`: every entry in `fields`
+    first, then the `file` part. Returns `url`, `fields`, the object `key` to
+    reference after upload, the policy `expires_in` TTL (seconds), and
+    `max_bytes`. Does not touch the database.
     """,
 )
 async def get_presigned_upload_url(
@@ -40,7 +49,7 @@ async def get_presigned_upload_url(
     content_type: str = Query(..., description="MIME type (image/png|image/jpeg)"),
     _trainer: dict = Depends(get_current_trainer),
 ):
-    """Generate a trainer-only presigned PUT URL for a question image."""
+    """Generate a trainer-only presigned POST policy for a question image."""
     try:
         return create_presigned_upload(filename=filename, content_type=content_type)
     except InvalidContentTypeError as e:
@@ -54,9 +63,12 @@ async def get_presigned_upload_url(
             detail=str(e),
         ) from e
     except Exception as e:
+        # Log the real cause server-side; never echo the exception text to the
+        # client (it can leak bucket names, endpoints, credentials in tracebacks).
+        logger.exception("Failed to generate presigned upload URL")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred while generating the upload URL: {str(e)}",
+            detail="Failed to generate upload URL",
         ) from e
 
 

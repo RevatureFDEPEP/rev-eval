@@ -320,16 +320,25 @@ class QuestionUpdate(BaseModel):
 
 class PresignedUploadResponse(BaseModel):
     """
-    Response for a question-image presigned upload URL.
+    Response for a question-image presigned POST upload.
 
-    The client PUTs the file bytes directly to `url` (with the same
-    Content-Type it requested), then references `key` when attaching the image
-    to a question. `expires_in` is the TTL (seconds) of the signed URL.
+    The client POSTs multipart form-data to `url`: every entry in `fields`
+    (sent first, in order) followed by the `file` part. The object store
+    enforces the Content-Type and a `content-length-range` size cap server-side,
+    so uploads over `max_bytes` are rejected at upload time. After a successful
+    upload the client references `key` when attaching the image to a question.
+    `expires_in` is the TTL (seconds) of the signed policy.
     """
 
-    url: str = Field(..., description="Presigned S3/MinIO PUT URL")
+    url: str = Field(..., description="Presigned S3/MinIO POST endpoint")
+    fields: dict[str, str] = Field(
+        ..., description="Form fields to POST before the file part"
+    )
     key: str = Field(..., description="Object key to reference after upload")
-    expires_in: int = Field(..., description="URL validity in seconds")
+    expires_in: int = Field(..., description="Policy validity in seconds")
+    max_bytes: int = Field(
+        ..., description="Server-enforced maximum upload size in bytes"
+    )
 
 
 class QuestionResponse(BaseModel):

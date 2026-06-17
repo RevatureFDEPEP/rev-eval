@@ -74,10 +74,15 @@ def create_presigned_upload(
     ensure_bucket: bool = True,
 ) -> dict[str, object]:
     """
-    Validate inputs, build a unique key, and return a presigned PUT URL.
+    Validate inputs, build a unique key, and return a presigned POST policy.
+
+    A presigned POST (not PUT) is used so the ``content-length-range`` condition
+    enforces the 5 MiB ceiling server-side — a PUT URL only binds Content-Type.
 
     Does NOT touch Mongo. Returns a dict matching the response contract:
-    ``{"url": str, "key": str, "expires_in": int}``.
+    ``{"url": str, "fields": dict, "key": str, "expires_in": int,
+    "max_bytes": int}``. The client POSTs multipart form-data (``fields`` plus
+    the file) to ``url``.
 
     Raises:
         InvalidContentTypeError: content_type is not in the allowlist.
@@ -94,10 +99,18 @@ def create_presigned_upload(
         s3_client.ensure_bucket()
 
     expires_in = settings.S3_PRESIGN_EXPIRY_SECONDS
-    url = s3_client.generate_presigned_put_url(
+    max_bytes = s3_client.MAX_UPLOAD_BYTES
+    presigned = s3_client.generate_presigned_post(
         key=key,
         content_type=content_type,
         expires_in=expires_in,
+        max_bytes=max_bytes,
     )
 
-    return {"url": url, "key": key, "expires_in": expires_in}
+    return {
+        "url": presigned["url"],
+        "fields": presigned["fields"],
+        "key": key,
+        "expires_in": expires_in,
+        "max_bytes": max_bytes,
+    }

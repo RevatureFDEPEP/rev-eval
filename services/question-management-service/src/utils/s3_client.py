@@ -19,6 +19,11 @@ from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
+# Server-enforced upload size ceiling for question images.
+# A presigned PUT only binds the Content-Type; a presigned POST can also bind a
+# content-length-range condition, which S3/MinIO enforces at upload time. 5 MiB.
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+
 
 def _build_client():
     return boto3.client(
@@ -63,6 +68,35 @@ def generate_presigned_put_url(
             "Key": key,
             "ContentType": content_type,
         },
+        ExpiresIn=expires_in or settings.S3_PRESIGN_EXPIRY_SECONDS,
+    )
+
+
+def generate_presigned_post(
+    key: str,
+    content_type: str,
+    expires_in: int | None = None,
+    bucket_name: str | None = None,
+    max_bytes: int = MAX_UPLOAD_BYTES,
+) -> dict:
+    """Generate a presigned POST policy clients submit as multipart form-data.
+
+    Unlike a presigned PUT (which only binds Content-Type), the POST policy also
+    binds a ``content-length-range`` condition so the object store rejects any
+    upload over ``max_bytes`` server-side — the size cap is not enforceable on
+    the client.
+
+    Returns the boto3 shape ``{"url": str, "fields": dict[str, str]}`` that the
+    caller layers the object key, expiry, and max size on top of.
+    """
+    return s3_client.generate_presigned_post(
+        Bucket=bucket_name or settings.S3_BUCKET_NAME,
+        Key=key,
+        Fields={"Content-Type": content_type},
+        Conditions=[
+            {"Content-Type": content_type},
+            ["content-length-range", 1, max_bytes],
+        ],
         ExpiresIn=expires_in or settings.S3_PRESIGN_EXPIRY_SECONDS,
     )
 

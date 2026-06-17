@@ -3,8 +3,10 @@
 SYNC only — the async auth coroutines are driven with `asyncio.run`, boto3 is
 mocked, and nothing imports the route module / models, so the suite needs only
 pytest + the service requirements (no TestClient, no live MinIO or Mongo):
-- service-level tests mock `generate_presigned_put_url` / `ensure_bucket` so the
+- service-level tests mock `generate_presigned_post` / `ensure_bucket` so the
   pure helper is exercised without any network call;
+- the upload now mints a presigned POST policy (not a PUT URL) so a
+  `content-length-range` condition can cap the object size server-side;
 - auth-dependency tests call the dependencies directly and assert the auth matrix
   (401 missing identity, 403 wrong role, trainer pass).
 """
@@ -23,47 +25,106 @@ from src.services.upload_service import (
 )
 from src.utils.auth import get_current_trainer, get_current_user_from_headers
 
+# 5 MiB — must match s3_client.MAX_UPLOAD_BYTES (the server-enforced cap).
+MAX_BYTES = 5 * 1024 * 1024
+
 # ---------------------------------------------------------------------------
 # Service-level unit tests (pure helper, S3 mocked)
 # ---------------------------------------------------------------------------
 
 
 def _fake_presigner(captured):
-    """Return a stub for generate_presigned_put_url that records its kwargs."""
+    """Stub for generate_presigned_post recording kwargs + returning boto3 shape.
 
-    def _gen(*, key, content_type, expires_in):
-        captured.update(key=key, content_type=content_type, expires_in=expires_in)
-        return f"https://minio.local/{key}?sig=fake&ct={content_type}"
+    Mirrors boto3's ``generate_presigned_post`` return: ``{"url", "fields"}``.
+    The signed policy fields normally include the Content-Type and the encoded
+    policy/signature; the stub returns just enough to exercise the contract.
+    """
+
+    def _gen(*, key, content_type, expires_in, max_bytes):
+        captured.update(
+            key=key,
+            content_type=content_type,
+            expires_in=expires_in,
+            max_bytes=max_bytes,
+        )
+        return {
+            "url": "https://minio.local/question-images",
+            "fields": {
+                "key": key,
+                "Content-Type": content_type,
+                "policy": "fake-base64-policy",
+                "x-amz-signature": "fakesig",
+            },
+        }
 
     return _gen
 
 
-def test_create_presigned_upload_returns_url_key_expires(monkeypatch):
+def test_create_presigned_upload_returns_post_contract(monkeypatch):
     captured: dict = {}
     monkeypatch.setattr(
         upload_service.s3_client,
-        "generate_presigned_put_url",
+        "generate_presigned_post",
         _fake_presigner(captured),
     )
     monkeypatch.setattr(upload_service.s3_client, "ensure_bucket", lambda *a, **k: None)
 
     result = create_presigned_upload("diagram.png", "image/png")
 
-    assert set(result) == {"url", "key", "expires_in"}
+    # Presigned POST contract: url + fields + key + expires_in + max_bytes.
+    assert set(result) == {"url", "fields", "key", "expires_in", "max_bytes"}
     assert result["key"].startswith("questions/")
     assert result["key"].endswith("/diagram.png")
     assert result["url"].startswith("https://")
+    # `fields` is the multipart form-data the client must POST before the file.
+    assert isinstance(result["fields"], dict)
+    assert result["fields"]["Content-Type"] == "image/png"
     assert isinstance(result["expires_in"], int) and result["expires_in"] > 0
-    # the helper passed the validated content_type straight through to the signer
+    # The 5 MiB cap is surfaced to the client and enforced server-side.
+    assert result["max_bytes"] == MAX_BYTES
+    # the helper passed the validated content_type + cap through to the signer
     assert captured["content_type"] == "image/png"
     assert captured["key"] == result["key"]
+    assert captured["max_bytes"] == MAX_BYTES
+
+
+def test_max_bytes_cap_is_5_mib():
+    """The server-enforced ceiling must be exactly 5 MiB."""
+    assert upload_service.s3_client.MAX_UPLOAD_BYTES == 5 * 1024 * 1024
+
+
+def test_presigned_post_binds_content_length_range(monkeypatch):
+    """The real signer must set a content-length-range condition capped at 5 MiB.
+
+    Exercises s3_client.generate_presigned_post against a stub boto3 client so
+    the Conditions list is asserted without any network/MinIO.
+    """
+    captured: dict = {}
+
+    class _StubBoto:
+        def generate_presigned_post(self, **kwargs):
+            captured.update(kwargs)
+            return {"url": "https://minio.local/question-images", "fields": {}}
+
+    monkeypatch.setattr(upload_service.s3_client, "s3_client", _StubBoto())
+
+    upload_service.s3_client.generate_presigned_post(
+        key="questions/abc/diagram.png",
+        content_type="image/png",
+    )
+
+    conditions = captured["Conditions"]
+    assert ["content-length-range", 1, MAX_BYTES] in conditions
+    assert {"Content-Type": "image/png"} in conditions
+    assert captured["Fields"]["Content-Type"] == "image/png"
 
 
 def test_create_presigned_upload_calls_ensure_bucket(monkeypatch):
     calls = {"n": 0}
     monkeypatch.setattr(
         upload_service.s3_client,
-        "generate_presigned_put_url",
+        "generate_presigned_post",
         _fake_presigner({}),
     )
 
@@ -78,7 +139,7 @@ def test_create_presigned_upload_calls_ensure_bucket(monkeypatch):
 
 def test_ensure_bucket_skipped_when_disabled(monkeypatch):
     monkeypatch.setattr(
-        upload_service.s3_client, "generate_presigned_put_url", _fake_presigner({})
+        upload_service.s3_client, "generate_presigned_post", _fake_presigner({})
     )
 
     def _boom(*a, **k):  # pragma: no cover - must never run
@@ -98,7 +159,7 @@ def test_disallowed_content_type_rejected(bad_type, monkeypatch):
     monkeypatch.setattr(upload_service.s3_client, "ensure_bucket", lambda *a, **k: None)
     monkeypatch.setattr(
         upload_service.s3_client,
-        "generate_presigned_put_url",
+        "generate_presigned_post",
         _fake_presigner({}),
     )
     with pytest.raises(InvalidContentTypeError):
@@ -110,7 +171,7 @@ def test_allowed_content_types_accepted(good_type, monkeypatch):
     monkeypatch.setattr(upload_service.s3_client, "ensure_bucket", lambda *a, **k: None)
     monkeypatch.setattr(
         upload_service.s3_client,
-        "generate_presigned_put_url",
+        "generate_presigned_post",
         _fake_presigner({}),
     )
     result = create_presigned_upload("img", good_type)
