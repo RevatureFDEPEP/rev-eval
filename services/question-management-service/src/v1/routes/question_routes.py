@@ -11,7 +11,11 @@ from src.schemas.question import (
 )
 from src.schemas.sample import QuizSampleQuestion
 from src.services.question_service import QuestionService
-from src.services.sample_service import build_sample_pipeline, map_question_to_sample
+from src.services.sample_service import (
+    MAX_SAMPLE_SIZE,
+    build_sample_pipeline,
+    map_question_to_sample,
+)
 from src.services.upload_service import (
     InvalidContentTypeError,
     InvalidFilenameError,
@@ -150,7 +154,7 @@ async def get_all_questions():
     candidate will see.
 
     **Query params:**
-    - `n` — number of questions to draw (default 20, capped server-side).
+    - `n` — number of questions to draw (default 20, range 1-200).
     - `skills` — optional comma-separated skill filter (e.g. `python,sql`);
       the random draw is taken from the filtered pool.
 
@@ -160,7 +164,12 @@ async def get_all_questions():
     """,
 )
 async def sample_questions(
-    n: int = Query(20, description="Number of random questions to draw"),
+    n: int = Query(
+        20,
+        ge=1,
+        le=MAX_SAMPLE_SIZE,
+        description="Number of random questions to draw (1-200)",
+    ),
     skills: str | None = Query(
         None, description="Optional comma-separated skill filter (e.g. python,sql)"
     ),

@@ -42,6 +42,7 @@ from fastapi.testclient import TestClient
 from main import app
 from sqlalchemy.exc import SQLAlchemyError
 from src.db.session import get_db
+from src.services.quiz_session_helpers import hash_session_token
 from src.utils import http_client
 from src.utils.dependencies import get_current_user_from_headers
 
@@ -98,6 +99,28 @@ class _FakeTest:
         self.test_skills = list(test_skills)
 
 
+class _FakeSubmission:
+    """Stand-in for a TestSubmission row linked to a candidate/test."""
+
+    def __init__(self, *, id=100, test_id=1, user_id=42):
+        self.id = id
+        self.test_id = test_id
+        self.user_id = user_id
+
+
+class _FakeActiveQuizSession:
+    """Stand-in for an existing in_progress, non-expired ``QuizSession`` row.
+
+    Returned by the idempotency lookup to drive the 409 branch. Only ``id`` is
+    read (it isn't, by the route — the route only checks existence), but it's
+    carried so the shape mirrors a real row.
+    """
+
+    def __init__(self, *, id="existing-session-hex", status="in_progress"):
+        self.id = id
+        self.status = status
+
+
 class _ScalarResult:
     """What ``db.execute(select(Test)...)`` returns: ``.scalars().first()``."""
 
@@ -125,16 +148,36 @@ class _RowsResult:
 class _FakeSession:
     """Mocked ``AsyncSession``.
 
-    ``execute`` replays a scripted sequence of results (the route issues two
-    queries: the Test lookup, then the skills join). ``add`` records the object;
+    ``execute`` replays a scripted sequence of results, in the exact order the
+    route issues them: the Test lookup, an optional submission lookup, the
+    *active-session* idempotency lookup (``select(QuizSession)...`` -> 409 when
+    a row comes back), then the skills join. ``add`` records the object;
     ``commit`` is a no-op (or raises, to drive the rollback path); ``refresh``
     populates the PK the way a real flush-then-refresh would; ``rollback``
     records that it was awaited.
+
+    ``active_session`` defaults to ``None`` (the happy path: no existing active
+    session). Pass a fake in_progress row to drive the 409 branch.
     """
 
-    def __init__(self, *, test, skill_rows, commit_error: Exception | None = None):
-        # Result #1 = Test lookup; result #2 = skills join.
-        self._results = [_ScalarResult(test), _RowsResult(skill_rows)]
+    _NO_SUBMISSION_LOOKUP = object()
+
+    def __init__(
+        self,
+        *,
+        test,
+        skill_rows,
+        submission=_NO_SUBMISSION_LOOKUP,
+        active_session=None,
+        commit_error: Exception | None = None,
+    ):
+        self._results = [_ScalarResult(test)]
+        if submission is not self._NO_SUBMISSION_LOOKUP:
+            self._results.append(_ScalarResult(submission))
+        # The route runs the active-session idempotency lookup after the Test
+        # (and optional submission) check and before the skills join.
+        self._results.append(_ScalarResult(active_session))
+        self._results.append(_RowsResult(skill_rows))
         self._commit_error = commit_error
         self.added: list = []
         self.committed = False
@@ -269,9 +312,20 @@ def test_create_session_happy_path(client, fake_session, override_user, monkeypa
     # --- session identity / token contract ---
     assert body["session_id"]  # opaque id present
     assert body["session_id"] != "None"  # refresh populated a real PK
-    # session_token is 64 hex chars (secrets.token_hex(32) -> 256 bits)
-    assert len(body["session_token"]) == 64
-    int(body["session_token"], 16)  # raises if not hex
+    # The client receives the RAW token (64 hex chars from secrets.token_hex(32)).
+    raw_token = body["session_token"]
+    assert len(raw_token) == 64
+    int(raw_token, 16)  # raises if not hex
+
+    # --- token hash-at-rest contract ---
+    # The DB row stores ONLY the SHA-256 hash, never the raw token; the hash is
+    # 64 hex chars and equals sha256(returned raw token). The raw token never
+    # appears on the persisted row.
+    persisted = fake_session.added[0]
+    assert not hasattr(persisted, "session_token")  # raw token is never stored
+    assert len(persisted.session_token_hash) == 64
+    assert persisted.session_token_hash == hash_session_token(raw_token)
+    assert persisted.session_token_hash != raw_token  # hash != raw
 
     # --- server-authoritative state ---
     assert body["test_id"] == 1
@@ -307,6 +361,81 @@ def test_create_session_happy_path(client, fake_session, override_user, monkeypa
     assert fake.calls[0]["url"] == "/v1/api/questions/sample"
     assert fake.calls[0]["params"]["n"] == 2
     assert fake.calls[0]["params"]["skills"] == "python"
+
+
+def test_create_session_with_valid_submission_id_persists_link(
+    client, override_user, monkeypatch
+):
+    session = _FakeSession(
+        test=_FakeTest(id=1, duration=None, number_of_questions=2),
+        submission=_FakeSubmission(id=77, test_id=1, user_id=42),
+        skill_rows=[("python",)],
+    )
+    _override_db(session)
+    _patch_qms(monkeypatch, response=_FakeResponse(200, SAMPLE_QUESTIONS))
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/", json={"test_id": 1, "submission_id": 77}
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 201
+    assert session.added[0].submission_id == 77
+
+
+def test_create_session_invalid_submission_id_404s_before_qms(
+    client, override_user, monkeypatch
+):
+    session = _FakeSession(
+        test=_FakeTest(id=1, duration=None, number_of_questions=2),
+        submission=None,
+        skill_rows=[("python",)],
+    )
+    _override_db(session)
+    fake = _patch_qms(monkeypatch, response=_FakeResponse(200, SAMPLE_QUESTIONS))
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/", json={"test_id": 1, "submission_id": 999}
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Submission not found"
+    assert fake.calls == []
+    assert session.added == []
+
+
+# ---------------------------------------------------------------------------
+# 409 when an active (in_progress, non-expired) session already exists
+# ---------------------------------------------------------------------------
+def test_create_session_active_session_exists_409_before_qms(
+    client, override_user, monkeypatch
+):
+    """Anti-re-sampling guard: a candidate with an in_progress, non-expired
+    session for this (user, test, submission) cannot re-POST to re-roll the
+    sample. The route returns 409 BEFORE any qms call and persists nothing."""
+    session = _FakeSession(
+        test=_FakeTest(id=1, duration=None, number_of_questions=2),
+        skill_rows=[("python",)],
+        active_session=_FakeActiveQuizSession(),
+    )
+    _override_db(session)
+    fake = _patch_qms(monkeypatch, response=_FakeResponse(200, SAMPLE_QUESTIONS))
+
+    try:
+        resp = client.post("/v1/api/test-sessions/", json={"test_id": 1})
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 409
+    assert "active session" in resp.json()["detail"].lower()
+    # the guard short-circuits before sampling and before any persist
+    assert fake.calls == []
+    assert session.added == []
 
 
 # ---------------------------------------------------------------------------

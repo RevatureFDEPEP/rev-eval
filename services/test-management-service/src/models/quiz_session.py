@@ -3,9 +3,11 @@
 
 A quiz session is the server-authoritative record minted when a candidate
 starts a quiz: it pins the exact ordered set of question ids the candidate
-will see, an opaque session token, and a server-computed expiry. The client
-displays a countdown from ``server_now``/``expires_at`` but never decides
-acceptance — every later mutation re-checks the clock against ``expires_at``.
+will see, the SHA-256 hash of an opaque session token, and a server-computed
+expiry. The client displays a countdown from ``server_now``/``expires_at`` but
+never decides acceptance — every later mutation re-checks the clock against
+``expires_at``. The raw token is returned to the client exactly once and never
+stored: only its hash lives here, so a DB dump cannot be replayed.
 """
 
 import uuid
@@ -28,14 +30,17 @@ class QuizSession(Base):
     # it does not authenticate; the session_token authenticates).
     id = Column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex)
 
-    # Opaque bearer token for the session (minted with secrets.token_hex).
-    session_token = Column(String(128), nullable=False)
+    # SHA-256 hex of the opaque bearer token (64 chars). The raw token is
+    # returned to the client once and never persisted; storing only the hash
+    # means a DB dump cannot be replayed. Indexed because session lookup on a
+    # later request hashes the presented token and matches this column.
+    session_token_hash = Column(String(64), nullable=False, index=True)
 
     # The test this session was started from.
     test_id = Column(Integer, ForeignKey("tests.id"), nullable=False, index=True)
 
     # Optional link back to an assigned submission row.
-    submission_id = Column(Integer, nullable=True)
+    submission_id = Column(Integer, ForeignKey("test_submissions.id"), nullable=True)
 
     # The candidate (resolved from the verified gateway identity, never the body).
     user_id = Column(Integer, nullable=False, index=True)
