@@ -64,6 +64,7 @@ jobs:
           - question-management-service
           - test-management-service
           - api-gateway-service
+          - reporting-and-analytics-service
     steps:
       - uses: actions/checkout@v4
         with:
@@ -123,6 +124,7 @@ jobs:
           - question-management-service
           - test-management-service
           - api-gateway-service
+          - reporting-and-analytics-service
     steps:
       - uses: actions/checkout@v4
 
