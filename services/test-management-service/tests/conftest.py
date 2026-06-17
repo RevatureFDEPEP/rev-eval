@@ -17,7 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from src.db.session import Base
 from src.models.category import Category  # noqa: F401
+from src.models.idempotency_key import IdempotencyKey  # noqa: F401
 from src.models.quiz_session import QuizSession  # noqa: F401
+from src.models.session_answer import SessionAnswer  # noqa: F401
 from src.models.skill import Skill  # noqa: F401
 
 # Import all models to register table metadata
