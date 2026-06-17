@@ -8,6 +8,13 @@ from src.schemas.skill_schema import SkillCreate, SkillOut, SkillUpdate
 class SkillService:
 
     @staticmethod
+    async def get_skill_by_id(db: AsyncSession, skill_id: int) -> SkillOut:
+        skill = await SkillRepository.get_by_id(db, skill_id)
+        if not skill:
+            raise ValueError("Skill not found")
+        return SkillOut.from_orm(skill)
+
+    @staticmethod
     async def create_skill(db: AsyncSession, skill_in: SkillCreate) -> SkillOut:
         skill = await SkillRepository.create(db, skill_in)
         return SkillOut.from_orm(skill)

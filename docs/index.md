@@ -31,7 +31,7 @@ tells you every relevant document to read.
 | W2-F4 | CI quality gates (Ruff / ESLint / Trivy / coverage) | 🟡 In Progress | [features/w2-f4-ci-quality-gates.md](features/w2-f4-ci-quality-gates.md) | [feature_specs/w2-f4-ci-quality-gates.md](feature_specs/w2-f4-ci-quality-gates.md) | — |
 | W2-F5 | Direct-to-MinIO diagram uploads (pre-signed URLs) | ❌ Not Started | [features/w2-f5-minio-presigned-uploads.md](features/w2-f5-minio-presigned-uploads.md) | [feature_specs/w2-f5-minio-presigned-uploads.md](feature_specs/w2-f5-minio-presigned-uploads.md) | — |
 | W2-F6 | Structured question authoring interface | 🟡 In Progress | [features/w2-f6-question-authoring-ui.md](features/w2-f6-question-authoring-ui.md) | [feature_specs/w2-f6-question-authoring-ui.md](feature_specs/w2-f6-question-authoring-ui.md) | — |
-| W2-F7 | Alembic migrations & Category domain + reporting service scaffold | ❌ Not Started | [features/w2-f7-alembic-category-domain.md](features/w2-f7-alembic-category-domain.md) | [feature_specs/w2-f7-alembic-category-domain.md](feature_specs/w2-f7-alembic-category-domain.md) | — |
+| W2-F7 | Alembic migrations & Category domain + reporting service scaffold | ✅ Completed | [features/w2-f7-alembic-category-domain.md](features/w2-f7-alembic-category-domain.md) | [feature_specs/w2-f7-alembic-category-domain.md](feature_specs/w2-f7-alembic-category-domain.md) | [plans/w2-f7-alembic-category-domain-plan.md](plans/w2-f7-alembic-category-domain-plan.md) |
 
 ### Week 3 — Days 11–15 (quiz-taking vertical slice)
 

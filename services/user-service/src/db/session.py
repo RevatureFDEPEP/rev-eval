@@ -1,16 +1,7 @@
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import sessionmaker
-from src.config.settings import settings
-from src.db.init_db import Base
+from src.db.init_db import Base, SessionLocal, engine
 
-# Import all models to register them with Base metadata
-
-# Use settings for database URL
-DATABASE_URL = settings.SQLALCHEMY_DATABASE_URL
-
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # ===== Dependency for FastAPI =====
 def get_db():
