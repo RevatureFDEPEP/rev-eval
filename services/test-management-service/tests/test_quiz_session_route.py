@@ -687,11 +687,32 @@ class _AnswerSession:
     changes are observable after the call.
     """
 
-    def __init__(self, *, quiz_session, prior_answer=None, with_idempotency=False):
+    def __init__(
+        self,
+        *,
+        quiz_session,
+        prior_answer=None,
+        with_idempotency=False,
+        commit_error: Exception | None = None,
+        post_commit_results: list | None = None,
+    ):
         self.quiz_session = quiz_session
         self._results = [_AnswerScalarResult(quiz_session)]
         if with_idempotency:
             self._results.append(_AnswerScalarResult(prior_answer))
+        # Extra scripted ``execute`` results consumed AFTER the persist commit
+        # fails — i.e. the ``_existing_answer`` lookups and the ``fresh``
+        # QuizSession re-read on the IntegrityError recovery path. Empty for the
+        # happy/clean-500 paths (those never re-query post-commit).
+        if post_commit_results:
+            self._results.extend(post_commit_results)
+        # ``commit`` raises this the FIRST time it is called, then succeeds on
+        # any later call. The persist commit is the only commit on the
+        # in_progress/unexpired paths these tests drive, so the first commit IS
+        # the persist commit. (The lazy-expire commit is on a path that 409s
+        # before the persist, so it never collides with this injection.)
+        self._commit_error = commit_error
+        self._commit_calls = 0
         self.added: list = []
         self.committed = False
         self.refreshed: list = []
@@ -706,6 +727,9 @@ class _AnswerSession:
         self.added.append(obj)
 
     async def commit(self):
+        self._commit_calls += 1
+        if self._commit_error is not None and self._commit_calls == 1:
+            raise self._commit_error
         self.committed = True
 
     async def refresh(self, obj):
@@ -1121,3 +1145,324 @@ def test_submit_answer_identity_without_id_401(client, monkeypatch):
     assert resp.status_code == 401
     assert "user id" in resp.json()["detail"].lower()
     assert fetch.calls == 0
+
+
+# ===========================================================================
+# Persist-race backstop: IntegrityError / generic SQLAlchemyError on the
+# answer-persist commit (W3-F2 reviewer-flagged gaps)
+# ===========================================================================
+from sqlalchemy.exc import IntegrityError  # noqa: E402
+
+
+def _integrity_error(msg: str = "duplicate key value violates unique constraint"):
+    """A realistic ``IntegrityError`` carrying leaky SQL/value detail in ``orig``.
+
+    The route maps this to either the winner's prior result (200) or a 409 — and
+    must NEVER echo this text. Built with the (statement, params, orig) shape
+    SQLAlchemy raises, so ``str(e)`` is non-empty and leak-prone.
+    """
+    return IntegrityError(
+        "INSERT INTO answers ...",
+        {"idempotency_key": "key-1", "leaky": "secret-value"},
+        Exception(msg),
+    )
+
+
+# ---------------------------------------------------------------------------
+# IntegrityError -> a concurrent writer already wrote the row (the "winner")
+# -> 200 echoing the winner's result, no re-score, no 500.
+# ---------------------------------------------------------------------------
+def test_submit_answer_integrity_error_winner_exists_returns_prior_200(
+    client, override_user, monkeypatch
+):
+    """Double-submit race backstop. Our persist ``commit`` loses to a concurrent
+    writer (unique constraint -> ``IntegrityError``); ``_existing_answer`` then
+    finds the winning row. The route rolls back and returns the WINNER's
+    score/is_correct with a 200 — it does NOT re-score and does NOT 500.
+
+    Drives ``_existing_answer``'s idempotency-key branch (an Idempotency-Key is
+    sent, so the winner is found via the key lookup) plus the ``fresh``
+    QuizSession re-read for the post-recovery cursor/status.
+    """
+    qs = _make_quiz_session(current_index=0, question_ids=("q-alpha", "q-beta"))
+    winner = _make_prior_answer(
+        question_id="q-alpha", score=1.0, is_correct=True, idempotency_key="key-1"
+    )
+    # The fresh re-read returns the session with the winner's already-advanced
+    # cursor/status (a distinct instance from ``qs`` to prove the route reads the
+    # re-fetched row, not the locally-mutated one).
+    fresh = _make_quiz_session(
+        current_index=1, question_ids=("q-alpha", "q-beta"), status="in_progress"
+    )
+    session = _AnswerSession(
+        quiz_session=qs,
+        # The initial idempotency-replay lookup MISSES (prior_answer=None): no
+        # row existed when we checked, so we proceed to score+persist. The
+        # concurrent winner is inserted between our lookup and our commit, which
+        # is exactly what makes the commit hit the unique constraint.
+        with_idempotency=True,
+        prior_answer=None,
+        commit_error=_integrity_error(),
+        # post-commit: (1) _existing_answer key lookup -> winner,
+        #              (2) fresh QuizSession re-read.
+        post_commit_results=[
+            _AnswerScalarResult(winner),
+            _AnswerScalarResult(fresh),
+        ],
+    )
+    _override_answer_db(session)
+    # We DID reach scoring (the persist is downstream of the score call); the
+    # fetch fires exactly once. The point is the WINNER's result is returned, not
+    # this freshly-computed one.
+    fetch = _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[1])
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/sess-1/answer",
+            json={"question_id": "q-alpha", "submitted_answers": [1]},
+            headers={"Idempotency-Key": "key-1"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    # the WINNER's persisted outcome is echoed, NOT a re-score
+    assert body["question_id"] == "q-alpha"
+    assert body["score"] == 1.0
+    assert body["is_correct"] is True
+    # cursor/status come from the fresh re-read of the winning transaction
+    assert body["current_index"] == 1
+    assert body["status"] == "in_progress"
+    # the losing transaction was rolled back; no 500 leaked
+    assert session.rolled_back is True
+    # scoring ran once (it is upstream of persist) but its result was discarded
+    assert fetch.calls == 1
+    # the leaky IntegrityError text never reaches the client
+    assert "secret-value" not in resp.text
+    assert "INSERT" not in resp.text
+
+
+# ---------------------------------------------------------------------------
+# IntegrityError -> no winner row found -> 409 (not 500).
+# ---------------------------------------------------------------------------
+def test_submit_answer_integrity_error_no_winner_returns_409(
+    client, override_user, monkeypatch
+):
+    """Same persist ``IntegrityError`` but ``_existing_answer`` finds NO winning
+    row (key lookup misses, per-question lookup misses). Per the route this is a
+    409 ("Answer already recorded for this question") — never a 500, never an
+    echo of the upstream error.
+
+    With an Idempotency-Key set, ``_existing_answer`` issues TWO lookups (key,
+    then per-question), both returning None.
+    """
+    qs = _make_quiz_session(current_index=0, question_ids=("q-alpha", "q-beta"))
+    session = _AnswerSession(
+        quiz_session=qs,
+        # initial idempotency-replay lookup misses -> proceed to persist.
+        with_idempotency=True,
+        prior_answer=None,
+        commit_error=_integrity_error(),
+        # post-commit: key lookup -> None, then per-question lookup -> None.
+        post_commit_results=[
+            _AnswerScalarResult(None),
+            _AnswerScalarResult(None),
+        ],
+    )
+    _override_answer_db(session)
+    fetch = _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[1])
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/sess-1/answer",
+            json={"question_id": "q-alpha", "submitted_answers": [1]},
+            headers={"Idempotency-Key": "key-1"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 409, resp.text
+    detail = resp.json()["detail"]
+    assert "already recorded" in detail.lower()
+    assert session.rolled_back is True
+    assert fetch.calls == 1
+    # no leak of the IntegrityError detail
+    assert "secret-value" not in resp.text
+    assert "INSERT" not in resp.text
+
+
+# ---------------------------------------------------------------------------
+# Generic SQLAlchemyError on persist (NOT an IntegrityError) -> clean 500,
+# rollback awaited, no internal leak (mirrors create-session clean-500 test).
+# ---------------------------------------------------------------------------
+def test_submit_answer_db_error_is_clean_500(client, override_user, monkeypatch):
+    """A non-integrity ``SQLAlchemyError`` on the persist commit is NOT a race;
+    the route rolls back and returns a generic 500 ("Failed to record answer")
+    without leaking ``str(e)``. No winner lookup is attempted (that branch is
+    IntegrityError-only)."""
+    boom = SQLAlchemyError("UPDATE quiz_sessions ... 'leaky-answer-value'")
+    qs = _make_quiz_session(current_index=0, question_ids=("q-alpha", "q-beta"))
+    session = _AnswerSession(quiz_session=qs, commit_error=boom)
+    _override_answer_db(session)
+    fetch = _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[2])
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/sess-1/answer",
+            json={"question_id": "q-alpha", "submitted_answers": [2]},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 500, resp.text
+    detail = resp.json()["detail"]
+    assert detail == "Failed to record answer"
+    # the raw SQL / leaky value must never reach the client
+    assert "leaky-answer-value" not in detail
+    assert "UPDATE" not in detail
+    # the transaction was rolled back before raising
+    assert session.rolled_back is True
+    # scoring ran (upstream of persist), but the answer was never durably stored
+    assert fetch.calls == 1
+
+
+# ---------------------------------------------------------------------------
+# Lazy-expire with a tz-NAIVE expires_at (the realistic SQLite read shape):
+# an expired session whose stored expires_at has no tzinfo still flips to
+# expired and 409s -> exercises the ``replace(tzinfo=UTC)`` branch (line 434).
+# ---------------------------------------------------------------------------
+def test_submit_answer_naive_expires_at_still_expires_409(
+    client, override_user, monkeypatch
+):
+    """SQLite reads a ``DateTime`` column back as a tz-NAIVE ``datetime``. The
+    route normalizes a naive ``expires_at`` to UTC before comparing it to a
+    tz-aware ``now`` — without that branch the comparison would raise. A naive
+    timestamp in the past must still lazily flip the session to ``expired`` and
+    return 409."""
+    from datetime import UTC, datetime, timedelta as _td
+
+    qs = _make_quiz_session(status="in_progress")
+    # Overwrite with a NAIVE past timestamp (no tzinfo), as SQLite would yield
+    # a DateTime column read-back. Build it tz-aware then drop tzinfo so it is
+    # genuinely naive without using the deprecated utcnow().
+    qs.expires_at = (datetime.now(UTC) - _td(minutes=5)).replace(tzinfo=None)
+    assert qs.expires_at.tzinfo is None  # precondition: genuinely naive
+    session = _AnswerSession(quiz_session=qs)
+    _override_answer_db(session)
+    fetch = _patch_fetch_correct_answers(monkeypatch, qtype="mcq", correct_answers=[2])
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/sess-1/answer",
+            json={"question_id": "q-alpha", "submitted_answers": [2]},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 409, resp.text
+    assert "expired" in resp.json()["detail"].lower()
+    # the naive comparison succeeded and the session flipped + committed
+    assert qs.status == "expired"
+    assert session.committed is True
+    # no scoring / persist happened past the gate
+    assert fetch.calls == 0
+    assert session.added == []
+
+
+# ===========================================================================
+# _fetch_correct_answers error envelope — unit-test the helper DIRECTLY
+# (the answer-key fetch never echoes the upstream body into the raised detail)
+# ===========================================================================
+import asyncio  # noqa: E402
+
+from fastapi import HTTPException  # noqa: E402
+
+
+def _call_fetch(monkeypatch, *, response=None, raises=None):
+    """Patch the qms client and invoke ``_fetch_correct_answers`` directly.
+
+    Mirrors ``_patch_qms`` but for the single-question GET. Returns the helper's
+    return value (the ``(qtype, correct_answers)`` tuple) or raises the route's
+    ``HTTPException``. ``UPSTREAM_LEAK`` is a sentinel embedded in every error
+    body/exception so each test can assert it is never surfaced to the caller.
+    """
+    fake = _FakeQmsClient(response=response, raises=raises)
+    monkeypatch.setattr(http_client, "get_qms_client", lambda: fake)
+    monkeypatch.setattr(_answer_route_mod, "get_qms_client", lambda: fake)
+    return asyncio.run(
+        _answer_route_mod._fetch_correct_answers("q-alpha", "corr-1")
+    )
+
+
+UPSTREAM_LEAK = "UPSTREAM-LEAK-do-not-echo"
+
+
+def test_fetch_correct_answers_happy_path_returns_type_and_key(monkeypatch):
+    """The helper unwraps qms' ``type``/``correct_answers`` from a 200 body."""
+    qtype, key = _call_fetch(
+        monkeypatch,
+        response=_FakeResponse(
+            200, {"type": "mcq", "correct_answers": [2], "question_text": "x"}
+        ),
+    )
+    assert qtype == "mcq"
+    assert key == [2]
+
+
+def test_fetch_correct_answers_404_maps_to_404(monkeypatch):
+    with pytest.raises(HTTPException) as ei:
+        _call_fetch(
+            monkeypatch,
+            response=_FakeResponse(404, {"detail": UPSTREAM_LEAK}),
+        )
+    assert ei.value.status_code == 404
+    assert ei.value.detail == "Question not found"
+    assert UPSTREAM_LEAK not in str(ei.value.detail)
+
+
+def test_fetch_correct_answers_5xx_maps_to_502(monkeypatch):
+    with pytest.raises(HTTPException) as ei:
+        _call_fetch(
+            monkeypatch,
+            response=_FakeResponse(503, {"detail": UPSTREAM_LEAK}),
+        )
+    assert ei.value.status_code == 502
+    assert ei.value.detail == "Question service is unavailable"
+    assert UPSTREAM_LEAK not in str(ei.value.detail)
+
+
+def test_fetch_correct_answers_4xx_maps_to_500_contract(monkeypatch):
+    # a non-404 4xx (e.g. 400/422) is a contract error -> generic 500.
+    with pytest.raises(HTTPException) as ei:
+        _call_fetch(
+            monkeypatch,
+            response=_FakeResponse(422, {"detail": UPSTREAM_LEAK}),
+        )
+    assert ei.value.status_code == 500
+    assert "contract" in str(ei.value.detail).lower()
+    assert UPSTREAM_LEAK not in str(ei.value.detail)
+
+
+def test_fetch_correct_answers_non_json_body_maps_to_500_contract(monkeypatch):
+    # 200 OK but .json() raises -> upstream contract drift -> generic 500.
+    with pytest.raises(HTTPException) as ei:
+        _call_fetch(
+            monkeypatch,
+            response=_FakeResponse(200, ValueError(UPSTREAM_LEAK)),
+        )
+    assert ei.value.status_code == 500
+    assert "contract" in str(ei.value.detail).lower()
+    assert UPSTREAM_LEAK not in str(ei.value.detail)
+
+
+def test_fetch_correct_answers_transport_error_maps_to_502(monkeypatch):
+    # httpx.RequestError (DNS/connect/timeout) -> 502, upstream text not echoed.
+    with pytest.raises(HTTPException) as ei:
+        _call_fetch(
+            monkeypatch,
+            raises=httpx.ConnectError(UPSTREAM_LEAK),
+        )
+    assert ei.value.status_code == 502
+    assert ei.value.detail == "Question service is unavailable"
+    assert UPSTREAM_LEAK not in str(ei.value.detail)
