@@ -1,8 +1,11 @@
+from typing import List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.answer import Answer, GradingStatus
+from src.models.session import Session
+from src.models.test import Test
 
 
 class AnswerRepository:
@@ -44,3 +47,46 @@ class AnswerRepository:
             )
         )
         return result.scalar_one_or_none()
+
+    @staticmethod
+    async def list_pending(
+        db: AsyncSession,
+        *,
+        test_id: Optional[int] = None,
+        page: int = 1,
+        size: int = 20,
+    ) -> Tuple[List[Tuple[Answer, int, int, "datetime", Optional[str]]], int]:
+        """Page through PENDING_REVIEW answers, joined to session + test for
+        the trainer queue. Returns (rows, total) where each row is
+        (Answer, session_user_id, test_id, submitted_at, test_name)."""
+        cols = (
+            Answer,
+            Session.user_id,
+            Session.test_id,
+            Session.submitted_at,
+            Test.name,
+        )
+        base = (
+            select(*cols)
+            .join(Session, Session.session_id == Answer.session_id)
+            .join(Test, Test.id == Session.test_id)
+            .where(Answer.grading_status == GradingStatus.PENDING_REVIEW)
+        )
+        count_q = (
+            select(func.count(Answer.id))
+            .join(Session, Session.session_id == Answer.session_id)
+            .where(Answer.grading_status == GradingStatus.PENDING_REVIEW)
+        )
+        if test_id is not None:
+            base = base.where(Session.test_id == test_id)
+            count_q = count_q.where(Session.test_id == test_id)
+
+        total = int((await db.execute(count_q)).scalar_one())
+        rows = (
+            await db.execute(
+                base.order_by(Answer.created_at.asc())
+                .offset((page - 1) * size)
+                .limit(size)
+            )
+        ).all()
+        return list(rows), total
