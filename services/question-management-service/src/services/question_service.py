@@ -427,12 +427,13 @@ class QuestionService:
         """
         Return n randomly sampled questions using MongoDB $sample aggregation.
         Optionally scoped to questions that include at least one of the given skills.
-        correct_answers are included here; the caller (quiz session route) must strip them.
+        correct_answers excluded at the DB layer so it cannot leak to any caller.
         """
         pipeline: list = []
         if skills:
             pipeline.append({"$match": {"skills": {"$in": skills}}})
         pipeline.append({"$sample": {"size": n}})
+        pipeline.append({"$project": {"correct_answers": 0}})
 
         results = await Question.aggregate(pipeline).to_list()
         for doc in results:

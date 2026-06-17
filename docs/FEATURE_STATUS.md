@@ -12,7 +12,7 @@ This file stays at summary level only.
 > start, advance, or finish a feature, update its detail file (check off steps,
 > add evidence) **and** its status row here, in the same PR as the code change.
 
-**Last assessed:** 2026-06-16 — **Tianya Chen (`tianyac` branch)**
+**Last assessed:** 2026-06-17 — **Tianya Chen (`tianyac` branch)**
 
 Work completed across `tianyac-feat-nginx` (merged), `tianyac-feat-unit-test`
 (PR #45 merged), `tianyac` CI pipeline commits, and `tianyac-feat-session`
@@ -20,7 +20,9 @@ Work completed across `tianyac-feat-nginx` (merged), `tianyac-feat-unit-test`
 `docs/features/` detail files for all 21 features, replacing `docs/plans/`.
 
 **Progress summary:** W3-F1 (quiz session backend) ✅ complete on
-`tianyac-feat-session` (commit `ca6877d`). W2-F1 (nginx TLS + basic routing),
+`tianyac-feat-session` (commit `ca6877d`); security hardened — `correct_answers`
+now excluded by MongoDB `$project` in `QuestionService.sample_questions` so
+`GET /questions/sample` cannot leak the answer key to any caller. W2-F1 (nginx TLS + basic routing),
 W2-F2 (frontend + backend unit tests), W2-F4 (Ruff/ESLint CI gates), W2-F6
 (question authoring schema + tests) partially done (🟡). All other W2,
 remaining W3, and all W4 features not yet started on this branch.
