@@ -1,6 +1,6 @@
 # W5-F1 — Free-text answer scoring & manual grading flow
 
-**Status:** ❌ Not Started
+**Status:** ✅ Completed
 **Spec:** trainer-defined remediation (non-catalog). Origin: deferred from
 [W3-F2](w3-f2-scoring-engine-locking.md). The scoring core punts non-auto-scorable
 question types to "manual review (W4)", but that grading flow was never built.
@@ -24,29 +24,46 @@ answer is **permanently 0.0** — silently wrong, not flagged. Confirmed open at
 program end (`docs/plans/w4-f5-tech-debt-audit-adrs.md:116`). The feature doc that
 deferred it: `docs/features/w3-f2-scoring-engine-locking.md:70`.
 
+> **Status: ✅ Completed** on branch `richardh-feat-W5F1`
+> (plan: [w5-f1 plan](../plans/w5-f1-free-text-manual-grading.md)). Tests:
+> TMS 112 passed / 6 skipped, reporting 46 passed, frontend 156 passed,
+> lint 0 errors + build OK.
+
 ## Steps
 
-- [ ] **1. Persist a "pending manual review" state** instead of a misleading
-      `0.0`/`is_correct=False`. Add an answer-level grading status
-      (e.g. `AUTO` | `PENDING_REVIEW` | `GRADED`) on the answer/score model; a
-      `text` answer lands `PENDING_REVIEW`, excluded from the final score until
-      graded. test-management-service schema is Alembic-owned → new
-      `alembic revision --autogenerate`.
-- [ ] **2. Session finalize semantics** — a session with ungraded `text` answers
-      finalizes to a provisional score and a `needs_grading` flag; auto-only
-      sessions are unaffected (regression-guard the existing scoring path).
-- [ ] **3. Trainer grade endpoint** — `PATCH`/`POST` to set a `text` answer's
-      score (0..1) + optional feedback, TRAINER-gated (reuse W4-F3 `require_trainer`
-      pattern). Recompute the session score on grade. Add `ROUTES` entry only if a
-      new URL pattern is introduced (existing `^/v1/api/...` may already cover it).
-- [ ] **4. Trainer "to grade" queue** — list endpoint of sessions/answers awaiting
-      review (filter by test), so trainers find ungraded work.
-- [ ] **5. Frontend grader surface** — minimal trainer UI to view a pending `text`
-      answer + its question/sample answer and submit a score+feedback. Reuse
-      existing trainer dashboard auth/route conventions.
-- [ ] **6. Tests** — scoring dispatch for `text` → PENDING (unit); finalize with a
-      mix of auto + text answers (integration); grade endpoint RBAC 401/403/200 and
-      score recompute; frontend grader render + submit.
+- [x] **1. Persist a "pending manual review" state** — `GradingStatus`
+      (`AUTO`|`PENDING_REVIEW`|`GRADED`) + grade payload columns on the answer
+      model (`src/models/answer.py:18-46`); a `text` answer lands
+      `PENDING_REVIEW` (`src/services/session_service.py:285-296`), excluded
+      from the on-read score (M4). Alembic `0008`
+      (`alembic/versions/0008_add_answer_grading_status_and_needs_grading.py`).
+- [x] **2. Session finalize semantics** — `Session.needs_grading`
+      (`src/models/session.py:45-51`) set at finalize when any answer is
+      `PENDING_REVIEW` (`session_service.py:300-309`); the attempt's provisional
+      score is the reporting AVG over non-pending answers (M4). Auto-only
+      sessions stay `needs_grading=False` — regression-guarded
+      (`tests/test_answer_endpoint.py::test_auto_only_session_does_not_need_grading`).
+- [x] **3. Trainer grade endpoint** — `POST
+      /v1/api/sessions/{id}/answers/{index}/grade`, TRAINER-gated
+      (`get_current_trainer`), score 0..1 + feedback, recomputes `needs_grading`
+      (`src/v1/routes/session_route.py:66-100`,
+      `src/services/grading_service.py:79-127`). No `ROUTES` change — covered by
+      the existing `^/v1/api/sessions(/.*)?$` pattern. The "session score
+      recompute" is the reporting on-read AVG, so no score column to update.
+- [x] **4. Trainer "to grade" queue** — `GET /v1/api/sessions/grading-queue`
+      (`?test_id` filter, paginated), TRAINER-gated, enriched with question
+      prompt + sample answer (`session_route.py:43-60`,
+      `grading_service.py:38-77`, `AnswerRepository.list_pending`).
+- [x] **5. Frontend grader surface** — `/trainer/grading` page
+      (`frontend/src/app/(dashboard)/trainer/grading/page.tsx`) +
+      `GradeAnswerSheet` (`frontend/src/components/trainer/GradeAnswerSheet.tsx`)
+      + `grading` API module (`frontend/src/lib/api/grading.ts`).
+- [x] **6. Tests** — scoring `text`→PENDING unit (`tests/test_scoring.py`);
+      finalize auto+text (`tests/test_answer_endpoint.py`); grade service
+      recompute/409 (`tests/test_grading_service.py`); grade endpoint RBAC
+      401/403/200 (`tests/test_grade_endpoint.py`); reporting pending-exclusion
+      (`reporting…/tests/test_grading_exclusion.py`); frontend grader render +
+      submit (`…/__tests__/GradeAnswerSheet.test.tsx`).
 
 ## Out of scope
 
@@ -55,7 +72,8 @@ deferred it: `docs/features/w3-f2-scoring-engine-locking.md:70`.
 
 ## Acceptance
 
-- [ ] A `text` answer is recorded `PENDING_REVIEW`, never a silent `0.0`.
-- [ ] A trainer can grade it; the session score recomputes; participant results
-      (W4-F2) reflect the graded score.
-- [ ] Tests above green; `FEATURE_STATUS.md` row flipped to ✅ with evidence.
+- [x] A `text` answer is recorded `PENDING_REVIEW`, never a silent `0.0`.
+- [x] A trainer can grade it; the attempt score recomputes (reporting on-read
+      AVG now includes the graded answer); participant results (W4-F2) reflect
+      the graded score and expose `needs_grading` while provisional.
+- [x] Tests above green; `FEATURE_STATUS.md` row flipped to ✅ with evidence.

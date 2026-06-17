@@ -81,7 +81,7 @@ repayment-backlog entry now maps to a W5 feature (see the coverage map below).
 
 | # | Feature | Origin | Status | Detail | Notes |
 |---|---|---|---|---|---|
-| W5-F1 | Free-text answer scoring & manual grading flow | W3-F2 | ❌ Not Started | [detail](features/w5-f1-free-text-manual-grading.md) | `text` answers fall through `score()` to a hardcoded `0.0` "manual review (W4)" that was never built — `scoring/__init__.py:33-43`. Add a PENDING_REVIEW state + trainer grade endpoint/UI. |
+| W5-F1 | Free-text answer scoring & manual grading flow | W3-F2 | ✅ Completed | [detail](features/w5-f1-free-text-manual-grading.md) | `text` answers now land `PENDING_REVIEW` (not a silent `0.0`); trainer grade endpoint + to-grade queue (`/v1/api/sessions/grading-queue`, `…/answers/{i}/grade`), `/trainer/grading` UI, reporting AVG excludes pending. Alembic `0008`. Branch `richardh-feat-W5F1`. |
 | W5-F2 | Fix `TestRepository.get_by_id` None-row crash | W3-F1 | ❌ Not Started | [detail](features/w5-f2-test-repository-none-crash.md) | `else` branch derefs `None` when the id is missing → AttributeError/500 instead of 404 — `test_repository.py:13-21`. |
 | W5-F3 | Render legacy option-less `true_false` questions | W3-F6 / debt §7 | ❌ Not Started | [detail](features/w5-f3-legacy-true-false-rendering.md) | Pre-W2-F6 docs (no `options`) render "No options available" — `SingleSelectQuestion.tsx:30-31`. Dedicated widget or data normalization. |
 | W5-F4 | Auto-seed the question bank in Docker Compose | W3-F1 | ❌ Not Started | [detail](features/w5-f4-compose-question-bank-seed.md) | Fresh `compose up` leaves the bank empty → `POST /sessions` 422; only the E2E job seeds. Add a guarded idempotent startup seed. |
