@@ -1,4 +1,5 @@
-from typing import List, Optional, Tuple
+from collections import defaultdict
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, case, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,14 @@ from src.schemas.report_schema import AttemptsQueryParams, QueryParams
 _VALID_ATTEMPTS_SORT_COLS = {"completed_at", "percentage_score", "test_id"}
 
 _VALID_SORT_COLS = {"avg_score", "attempt_count", "test_name"}
+
+
+def _median(vals: list) -> Optional[float]:
+    if not vals:
+        return None
+    s = sorted(vals)
+    n = len(s)
+    return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2
 
 
 def _parse_sort(sort_str: str, valid_cols: set, default_col: str) -> Tuple[str, str]:
@@ -68,6 +77,7 @@ class ReportRepository:
             "test_name": test.name,
             "attempt_count": attempt_count,
             "avg_score": avg_score,
+            "median_score": _median(scores),
             "pass_rate": pass_rate,
             "score_distribution": distribution,
         }
@@ -108,6 +118,21 @@ class ReportRepository:
         )
 
         rows = (await self.db.execute(agg_stmt)).fetchall()
+
+        # Fetch per-test scores for Python-computed median (SQLite-safe)
+        scores_by_test: Dict[int, list] = defaultdict(list)
+        if rows:
+            test_ids = [row.test_id for row in rows]
+            scores_stmt = select(
+                QuizSession.test_id, QuizSession.percentage_score
+            ).where(
+                QuizSession.test_id.in_(test_ids),
+                QuizSession.status == "COMPLETED",
+                QuizSession.percentage_score.isnot(None),
+            )
+            for sr in (await self.db.execute(scores_stmt)).fetchall():
+                scores_by_test[sr.test_id].append(sr.percentage_score)
+
         tests = []
         for row in rows:
             attempt_count = row.attempt_count or 0
@@ -119,6 +144,7 @@ class ReportRepository:
                 "test_name": row.test_name,
                 "attempt_count": attempt_count,
                 "avg_score": avg_score,
+                "median_score": _median(scores_by_test.get(row.test_id, [])),
                 "pass_rate": pass_rate,
                 "score_distribution": None,
             })
@@ -288,3 +314,44 @@ class ReportRepository:
             for row in rows
         ]
         return total, attempts
+
+    async def get_test_question_stats(self, test_id: int) -> Optional[List[dict]]:
+        result = await self.db.execute(select(Test).where(Test.id == test_id))
+        if result.scalar_one_or_none() is None:
+            return None
+
+        stmt = select(QuizSession.part_a, QuizSession.part_b).where(
+            QuizSession.test_id == test_id,
+            QuizSession.status == "COMPLETED",
+        )
+        rows = (await self.db.execute(stmt)).fetchall()
+
+        stats: Dict[str, dict] = {}
+        for row in rows:
+            for part in (row.part_a, row.part_b):
+                if not part:
+                    continue
+                for q in part.get("questions") or []:
+                    qid = q.get("question_id")
+                    if not qid:
+                        continue
+                    if qid not in stats:
+                        stats[qid] = {
+                            "question_id": qid,
+                            "question_type": q.get("question_type", "unknown"),
+                            "attempt_count": 0,
+                            "correct_count": 0,
+                        }
+                    stats[qid]["attempt_count"] += 1
+                    if q.get("is_correct"):
+                        stats[qid]["correct_count"] += 1
+
+        result_list = []
+        for s in sorted(stats.values(), key=lambda x: x["question_id"]):
+            ac = s["attempt_count"]
+            cc = s["correct_count"]
+            result_list.append({
+                **s,
+                "correct_rate": round(cc / ac, 4) if ac > 0 else None,
+            })
+        return result_list

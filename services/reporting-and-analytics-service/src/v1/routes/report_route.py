@@ -10,6 +10,7 @@ from src.schemas.report_schema import (
     AttemptsResponse,
     QueryParams,
     RankingsResponse,
+    TestQuestionsResponse,
     TestSummary,
     UserSummaryResponse,
 )
@@ -56,6 +57,22 @@ async def get_aggregate_reports(
         page_size=params.size,
         tests=tests,
     )
+
+
+@router.get(
+    "/tests/{test_id}/questions",
+    response_model=TestQuestionsResponse,
+    summary="Per-question statistics for a test",
+)
+async def get_test_question_stats(
+    test_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: Dict = Depends(_trainer),
+):
+    questions = await ReportService.get_test_question_stats(db, test_id)
+    if questions is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Test {test_id} not found")
+    return TestQuestionsResponse(test_id=test_id, questions=questions)
 
 
 @router.get(

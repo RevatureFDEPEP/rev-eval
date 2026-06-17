@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey
+from sqlalchemy import JSON, Column, Integer, String, Float, DateTime, Boolean, ForeignKey
 from src.db.session import Base
 
 
@@ -37,3 +37,5 @@ class QuizSession(Base):
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=True)
+    part_a = Column(JSON, nullable=True)
+    part_b = Column(JSON, nullable=True)
