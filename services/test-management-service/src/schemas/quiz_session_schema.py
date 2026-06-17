@@ -41,3 +41,33 @@ class SessionRead(BaseModel):
     server_now: datetime
     expires_at: datetime
     first_question: QuizQuestionOut | None
+
+
+# ===== Answer submission (W3-F2) =====
+class AnswerSubmit(BaseModel):
+    """Request body for ``POST /test-sessions/{session_id}/answer``.
+
+    ``submitted_answers`` is whatever the candidate selected (a list of option
+    ids for mcq/multi, or a single-element list for true_false). It is scored
+    server-side against the answer key fetched from question-management-service;
+    the correct answers are NEVER part of this request or its response.
+    """
+
+    question_id: str
+    submitted_answers: list = []
+
+
+class AnswerResult(BaseModel):
+    """Response for a scored answer.
+
+    Carries only the candidate-safe outcome (score + correctness flag) and the
+    server-authoritative session cursor/status. The correct-answer key is never
+    included — only whether the submission was right and how much credit it
+    earned.
+    """
+
+    question_id: str
+    score: float
+    is_correct: bool
+    current_index: int
+    status: str
