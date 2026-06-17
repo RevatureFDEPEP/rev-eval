@@ -17,6 +17,28 @@ services:
       timeout: 5s
       retries: 10
 
+  # Private datastore for reporting-and-analytics-service. Kept separate from
+  # the shared `postgres` so reporting has its own isolated Alembic chain /
+  # alembic_version (ADR 0001) — reporting READS the shared eval_ai_dev for
+  # report data but bookkeeps its own (currently empty) schema here.
+  reporting-postgres:
+    image: postgres:15-alpine
+    container_name: rev-eval-reporting-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${REPORTING_POSTGRES_USER:-root}
+      POSTGRES_PASSWORD: ${REPORTING_POSTGRES_PASSWORD:-root}
+      POSTGRES_DB: ${REPORTING_POSTGRES_DB:-eval_ai_reporting}
+    ports:
+      - "5433:5432"
+    volumes:
+      - reporting_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${REPORTING_POSTGRES_USER:-root} -d ${REPORTING_POSTGRES_DB:-eval_ai_reporting}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   mongo:
     image: mongo:7
     container_name: rev-eval-mongo
@@ -167,6 +189,47 @@ services:
       retries: 10
       start_period: 30s
 
+  reporting-and-analytics-service:
+    build:
+      context: ./services/reporting-and-analytics-service
+      dockerfile: Dockerfile
+    container_name: rev-eval-reporting
+    restart: unless-stopped
+    environment:
+      # Own private datastore (Alembic / alembic_version only).
+      DB_HOST: reporting-postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${REPORTING_POSTGRES_USER:-root}
+      DB_PASSWORD: ${REPORTING_POSTGRES_PASSWORD:-root}
+      DB_NAME: ${REPORTING_POSTGRES_DB:-eval_ai_reporting}
+      # Read-only source of report data: test-management's eval_ai_dev.
+      TMS_DB_HOST: postgres
+      TMS_DB_PORT: 5432
+      TMS_DB_USERNAME: ${POSTGRES_USER:-root}
+      TMS_DB_PASSWORD: ${POSTGRES_PASSWORD:-root}
+      TMS_DB_NAME: ${POSTGRES_DB:-eval_ai_dev}
+      SERVICE_NAME: reporting-and-analytics-service
+      PORT: 8004
+      SERVICE_HOSTNAME: reporting-and-analytics-service
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ALLOW_ORIGINS: http://localhost:3000
+    ports:
+      - "8004:8004"
+    depends_on:
+      reporting-postgres:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      test-management-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   api-gateway:
     build:
       context: ./services/api-gateway-service
@@ -187,6 +250,8 @@ services:
       test-management-service:
         condition: service_healthy
       question-management-service:
+        condition: service_healthy
+      reporting-and-analytics-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -216,5 +281,6 @@ services:
 
 volumes:
   postgres_data:
+  reporting_postgres_data:
   mongo_data:
   minio_data:
