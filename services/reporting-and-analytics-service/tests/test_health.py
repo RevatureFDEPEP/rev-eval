@@ -13,5 +13,7 @@ def test_health_check_returns_ok():
 
 
 def test_health_route_registered():
-    paths = {route.path for route in app.routes}
+    # getattr default: some FastAPI versions wrap included routers in objects
+    # that have no `.path` attribute.
+    paths = {getattr(route, "path", None) for route in app.routes}
     assert "/health" in paths

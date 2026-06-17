@@ -9,6 +9,7 @@ from src.config.settings import settings
 from src.db.session import verify_db_connection
 from src.middleware.correlation import CorrelationIdMiddleware
 from src.utils.logging_config import setup_logging
+from src.v1.routes.reports_route import router as reports_router
 
 load_dotenv()
 setup_logging(settings.SERVICE_NAME, settings.LOG_LEVEL)
@@ -33,7 +34,7 @@ app.add_middleware(CorrelationIdMiddleware)
 
 
 # ---- Routes ----
-# Reporting endpoints land here in W4-F1 (app.include_router(reports_router, ...)).
+app.include_router(reports_router, prefix="/v1/api")
 
 
 # ---- Health Endpoint ----

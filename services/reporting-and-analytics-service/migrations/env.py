@@ -12,7 +12,7 @@ from src.db.session import ASYNC_DATABASE_URL, Base
 #
 # version_table is isolated ("reporting_alembic_version") so this env never
 # touches the "alembic_version" row that test-management-service owns in the
-# same database (see docs/adr/0001-cross-service-data-access.md).
+# same database (see adr/0001-cross-service-data-access.md).
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

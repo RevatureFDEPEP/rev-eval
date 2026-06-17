@@ -1,0 +1,77 @@
+# 0001. Reporting service reads test-management data via shared-DB direct read
+
+- Status: Accepted
+- Date: 2026-06-16
+- Deciders: rev-eval team
+- Context features: W4-F1 (Candidate Results Reporting Endpoints)
+
+## Context
+
+The reporting-and-analytics-service must serve read-heavy candidate results
+(summary envelopes, attempt history, and — in W4-F3 — cross-test aggregates).
+Its source data is the `quiz_sessions` and `session_answers` tables, which are
+written and owned by test-management-service.
+
+Relevant facts about the current topology:
+- There is a single shared PostgreSQL instance (`eval_ai_dev`); user-service and
+  test-management-service already both connect to it.
+- The reports are aggregate-shaped: per-session score is `SUM(points_earned) /
+  SUM(max_points)`, and W4-F3 needs GROUP BY / window-function queries (pass rate,
+  RANK(), percentile_cont) across the full sessions/answers dataset.
+- This is a local-first evaluation platform run via Docker Compose, not a
+  horizontally-scaled production system.
+
+We must decide how the reporting service obtains this data.
+
+## Decision
+
+The reporting service connects to the **same `eval_ai_dev` Postgres database**
+and reads `quiz_sessions` / `session_answers` directly through **read-only ORM
+models**. It owns no copy of this data, defines no mutating operations on these
+tables, and creates no Alembic migration for them (its Alembic environment is
+scaffolded with an isolated `version_table` and is ready for any
+reporting-owned tables added later).
+
+## Consequences
+
+Positive:
+- Aggregate queries (GROUP BY, HAVING, window functions) run natively in SQL in a
+  single round trip — no client-side re-aggregation, no N+1 fan-out.
+- No synchronization machinery, no data duplication, no eventual-consistency window.
+- Lowest implementation and operational cost; fits the single-Compose-stack model.
+
+Negative / accepted trade-offs:
+- Reporting is coupled to test-management's schema: a column rename or table change
+  in test-management can break reporting. Mitigated by (a) read-only models so
+  reporting can never corrupt source data, (b) keeping the mapped surface minimal,
+  and (c) a cross-schema `--integration` test that seeds through test-management's
+  own Alembic-migrated tables and asserts reporting's queries still resolve, so
+  schema drift fails CI rather than production.
+- The two services share a database, weakening the "database-per-service" boundary.
+  Accepted deliberately for a local-first platform; if reporting later needs its own
+  datastore or independent scaling, the migration path is the mirror-table /
+  projection option below (this ADR would then be superseded).
+
+## Alternatives considered
+
+1. **HTTP calls to test-management-service.** Reporting calls new endpoints over
+   httpx. Preserves the service boundary, but aggregate/GROUP BY queries would
+   require either new bespoke aggregate endpoints in test-management or N+1 fan-out
+   from reporting. More code, more latency, and it pushes reporting concerns into
+   test-management. Rejected.
+
+2. **Mirror table + event projection.** Reporting owns its own sessions/answers
+   tables, kept in sync via events or a sync job. Most decoupled and the most
+   scalable, but by far the most code (sync mechanism, migration, consistency and
+   backfill handling) — unjustified for the current scale. Rejected, but retained as
+   the documented evolution path.
+
+## Notes on score semantics (W4-F1)
+
+Derived from `session_answers` because there is no stored per-session score column:
+- An **attempt** is any `quiz_sessions` row for the user.
+- **Per-session score** = `SUM(points_earned) / SUM(max_points)` over that session's
+  answers (a 0..1 fraction); sessions with no answers are counted as attempts but
+  excluded from average/best.
+- **total_time_spent** = sum of `submitted_at − started_at` over sessions that have a
+  `submitted_at`, computed in Python (no portable cross-dialect interval SQL).
