@@ -268,6 +268,25 @@ export interface QuizQuestion {
   // Note: correct_answers are NEVER sent to frontend for security (only during quiz)
 }
 
+export interface QuizSessionRead {
+  session_id: string;
+  session_token: string;
+  test_id: number;
+  user_id: number;
+  status: string;
+  current_index: number;
+  server_now: string;
+  expires_at: string;
+  first_question: QuizQuestion | null;
+  questions: QuizQuestion[];
+}
+
+export interface AuthIdentity {
+  userId: number;
+  email: string;
+  role: string;
+}
+
 export interface GradedQuizQuestion {
   question_id: string;  // MongoDB ObjectId
   question_text: string;  // AI-rephrased question
@@ -291,8 +310,8 @@ export interface QuizAnswer {
 
 export interface TestSessionCreate {
   test_id: number;  // SQL test ID
-  submission_id: number;  // SQL submission ID
-  user_id: number;
+  submission_id?: number | null;  // SQL submission ID
+  user_id?: number;
   total_questions?: number;  // Default: 20
   part_a_config?: {
     easy: number;

@@ -264,4 +264,5 @@ async def create_session(
         server_now=session.server_now,
         expires_at=session.expires_at,
         first_question=questions[0] if questions else None,
+        questions=questions,
     )

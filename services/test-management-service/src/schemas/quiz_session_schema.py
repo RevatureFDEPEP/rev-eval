@@ -12,7 +12,7 @@ candidate over the wire.
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ===== Request =====
@@ -41,3 +41,4 @@ class SessionRead(BaseModel):
     server_now: datetime
     expires_at: datetime
     first_question: QuizQuestionOut | None
+    questions: list[QuizQuestionOut] = Field(default_factory=list)

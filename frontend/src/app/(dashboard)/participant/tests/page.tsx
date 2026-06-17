@@ -160,7 +160,7 @@ export default function ParticipantTestsPage() {
     }
 
     const href = isQuiz
-      ? `/participant/tests/take/mcq/${test.test_id}?submission=${test.submission_id}`
+      ? `/take/${test.test_id}?submission=${test.submission_id}`
       : `/participant/tests/take/interview/${test.test_id}?submission=${test.submission_id}`;
 
     console.log('✅ Generated href:', href, 'for test:', test.test_name, 'test_id:', test.test_id, 'submission_id:', test.submission_id);
@@ -291,7 +291,7 @@ export default function ParticipantTestsPage() {
                       {upcomingTests.map((test) => {
                         const isQuiz = test.test_type === TestType.QUIZ || (test.test_type as string) === 'MCQ';
                         const friendlyType = isQuiz ? 'Quiz' : 'Interview';
-                        const { formatted: dueDate, status: dueStatus } = formatDueDate(test.due_date);
+                        const { formatted: dueDate } = formatDueDate(test.due_date);
                         const href = getActionHref(test, isQuiz);
                         const scoreLabel =
                           test.final_score != null ? `${Math.round(test.final_score)}%` : '—';

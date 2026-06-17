@@ -356,6 +356,10 @@ def test_create_session_happy_path(client, fake_session, override_user, monkeypa
         "difficulty",
         "options",
     }
+    assert [q["question_id"] for q in body["questions"]] == ["q-alpha", "q-beta"]
+    for question in body["questions"]:
+        assert "correct_answers" not in question
+        assert "sample_answer" not in question
 
     # the route called qms /sample with the seeded n + skill filter
     assert fake.calls[0]["url"] == "/v1/api/questions/sample"
