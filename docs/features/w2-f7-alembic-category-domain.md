@@ -23,6 +23,33 @@ domain and introduce Alembic for schema migrations.
 - [ ] **5. Gateway routes** — expose CRUD endpoints at
       `/v1/categories` through the API gateway.
 
+## Reporting Service Scaffold (absorbed from W2-M10)
+
+Stand up `reporting-and-analytics-service` at the same time as this feature —
+it uses the same Alembic pattern and must exist before W4-F1 can add reporting
+tables.
+
+- [ ] **R1. FastAPI scaffold** — `services/reporting-and-analytics-service/main.py`,
+      Pydantic settings, `/health` endpoint, `requirements.txt`.
+- [ ] **R2. Dedicated datastore** — `reporting-postgres` Postgres container with
+      its own named volume in `docker-compose.yml`.
+- [ ] **R3. Compose wiring** — reporting service added to `docker-compose.yml`
+      with health check and `depends_on: reporting-postgres`.
+- [ ] **R4. Alembic init** — `alembic init` in reporting service, `env.py`
+      configured for `reporting-postgres`, baseline migration (empty schema).
+
+## Known Defects (surface during verification)
+
+Fix these as they appear when running the stack against the new schema:
+
+- **skill-500** — a specific skill lookup returns 500; trace and patch the
+  missing null-guard or ORM join.
+- **user-service dual-engine** — user-service initialises two SQLAlchemy
+  engines; remove the duplicate and consolidate to one shared engine.
+- **Pydantic v2 migration** — any services still using v1-style validators
+  (`@validator`, `orm_mode = True`) need updating to v2 (`@field_validator`,
+  `model_config`).
+
 ## Evidence
 
 None on `tianyac` branch. No Alembic env (`alembic.ini` does not exist in

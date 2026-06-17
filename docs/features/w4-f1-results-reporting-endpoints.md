@@ -2,7 +2,7 @@
 
 **Status:** ❌ Not Started
 **Spec:** `days_16_20_features.md` §1 (Day 16)
-**Depends on:** [W2-M10](w2-m10-reporting-service-scaffold.md) + [W2-F7](w2-f7-alembic-category-domain.md) (reporting-and-analytics-service must be scaffolded with a working Alembic env + Postgres before new reporting tables can be migrated), [W3-F2](w3-f2-scoring-engine-locking.md) (sessions/answers tables must hold scored data for the aggregations to read)
+**Depends on:** [W2-F7](w2-f7-alembic-category-domain.md) (reporting-and-analytics-service scaffold + Alembic env must exist before new reporting tables can be migrated — scaffold steps are in the W2-F7 detail file), [W3-F2](w3-f2-scoring-engine-locking.md) (sessions/answers tables must hold scored data for the aggregations to read)
 **Unblocks:** [W4-F2](w4-f2-candidate-results-page.md) (results page fetches `GET /reports/user/{id}`), [W4-F3](w4-f3-rbac-aggregate-queries.md) (require_trainer gate + aggregate endpoints extend this scaffolding), [W4-F5](w4-f5-tech-debt-audit-adrs.md) (cross-service data-access decision is one required ADR)
 **Last updated:** 2026-06-08
 
@@ -35,9 +35,10 @@ history, and per-entity aggregates.
 
 ## Notes
 
-- Hard prerequisite is [W2-M10](w2-m10-reporting-service-scaffold.md) — the
-  service is empty by design today; it must be scaffolded (FastAPI layout,
-  dedicated Postgres, Alembic) before these endpoints exist.
+- Hard prerequisite: `reporting-and-analytics-service` must be scaffolded
+  (FastAPI layout, dedicated `reporting-postgres`, Alembic baseline) before
+  these endpoints exist. Scaffold steps are tracked in
+  [W2-F7](w2-f7-alembic-category-domain.md) under "Reporting Service Scaffold".
 - The shared-DB-vs-HTTP decision drives whether reporting even needs its own
   tables; make it in step 1 before writing queries.
 - **Rolled in from W3-F6:** session finalize never writes `test_submissions`
