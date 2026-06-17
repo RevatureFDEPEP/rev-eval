@@ -35,7 +35,7 @@ class QuizSession(Base):
     test_id = Column(Integer, ForeignKey("tests.id"), nullable=False, index=True)
 
     # Optional link back to an assigned submission row.
-    submission_id = Column(Integer, nullable=True)
+    submission_id = Column(Integer, ForeignKey("test_submissions.id"), nullable=True)
 
     # The candidate (resolved from the verified gateway identity, never the body).
     user_id = Column(Integer, nullable=False, index=True)

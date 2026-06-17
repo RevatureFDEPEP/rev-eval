@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from src.schemas.quiz_session_schema import QuizQuestionOut
 from src.services.quiz_session_helpers import (
     DEFAULT_DURATION_SECONDS,
+    MAX_SAMPLE_QUERY_SIZE,
     build_sample_query,
     compute_expires_at,
     map_sample_to_question,
@@ -36,6 +37,13 @@ def test_query_defaults_n_to_20_when_nonpositive():
 
 def test_query_uses_test_question_count():
     assert build_sample_query(15, None) == {"n": 15}
+
+
+def test_query_caps_n_to_qms_public_maximum():
+    assert build_sample_query(MAX_SAMPLE_QUERY_SIZE + 1, None) == {
+        "n": MAX_SAMPLE_QUERY_SIZE
+    }
+    assert build_sample_query(10_000, None) == {"n": MAX_SAMPLE_QUERY_SIZE}
 
 
 def test_query_joins_skills_csv():

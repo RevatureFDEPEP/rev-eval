@@ -26,6 +26,7 @@ from src.models.quiz_session import QuizSession
 from src.models.skill import Skill
 from src.models.test import Test
 from src.models.test_skill import TestSkill
+from src.models.test_submission import TestSubmission
 from src.schemas.quiz_session_schema import SessionCreate, SessionRead
 from src.services.quiz_session_helpers import (
     build_sample_query,
@@ -73,7 +74,29 @@ async def create_session(
             detail=f"Test {body.test_id} not found",
         )
 
-    # 2) Resolve the test's skills (drives the sampling filter).
+    # 2) If the caller supplies an assignment/submission link, verify it belongs
+    # to this authenticated user and this test before any cross-service call.
+    if body.submission_id is not None:
+        submission = (
+            (
+                await db.execute(
+                    select(TestSubmission).where(
+                        TestSubmission.id == body.submission_id,
+                        TestSubmission.test_id == body.test_id,
+                        TestSubmission.user_id == user_id,
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if submission is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Submission not found",
+            )
+
+    # 3) Resolve the test's skills (drives the sampling filter).
     skill_rows = (
         await db.execute(
             select(Skill.name)
@@ -83,7 +106,7 @@ async def create_session(
     ).all()
     skills = [row[0] for row in skill_rows if row[0]]
 
-    # 3) Sample questions from question-management-service.
+    # 4) Sample questions from question-management-service.
     params = build_sample_query(test.number_of_questions, skills)
     client = get_qms_client()
     try:
@@ -151,7 +174,7 @@ async def create_session(
     questions = [map_sample_to_question(doc) for doc in sampled]
     question_ids = [q.question_id for q in questions]
 
-    # 4) Server-authoritative timing. Timezone-aware UTC (never naive utcnow) so
+    # 5) Server-authoritative timing. Timezone-aware UTC (never naive utcnow) so
     # server_now/expires_at carry an explicit offset and the client's countdown
     # math is unambiguous; the two share one ``server_now`` read so the window is
     # exactly ``duration`` wide.
@@ -159,7 +182,7 @@ async def create_session(
     duration_seconds = resolve_duration_seconds(test.duration)
     expires_at = compute_expires_at(server_now, duration_seconds)
 
-    # 5) Mint opaque token + persist.
+    # 6) Mint opaque token + persist.
     # DEFER (W3-F2): the session_token is stored raw here; it should be hashed at
     # rest (SHA-256) so a DB dump can't be replayed, and returned raw exactly once.
     # DEFER (W3-F2): this service trusts the gateway X-User-* headers and does not

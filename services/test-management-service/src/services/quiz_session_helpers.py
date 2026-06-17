@@ -18,6 +18,8 @@ from src.schemas.quiz_session_schema import QuizQuestionOut
 DEFAULT_DURATION_SECONDS = 3600
 # Token entropy: secrets.token_hex(32) -> 64 hex chars (256 bits).
 SESSION_TOKEN_BYTES = 32
+# Keep in sync with question-management-service's /questions/sample contract.
+MAX_SAMPLE_QUERY_SIZE = 200
 
 
 def build_sample_query(
@@ -26,11 +28,13 @@ def build_sample_query(
     """Build the query params for the qms ``GET /v1/api/questions/sample`` call.
 
     Pure: returns a plain dict so the route's outbound request shape is asserted
-    without httpx. ``n`` falls back to 20 when the test has no question count;
-    ``skills`` is joined into the comma-separated string the qms endpoint parses,
-    and omitted entirely when there are no skills (no empty ``skills=`` param).
+    without httpx. ``n`` falls back to 20 when the test has no question count
+    and is capped at qms's public maximum; ``skills`` is joined into the
+    comma-separated string the qms endpoint parses, and omitted entirely when
+    there are no skills (no empty ``skills=`` param).
     """
     n = number_of_questions if number_of_questions and number_of_questions > 0 else 20
+    n = min(n, MAX_SAMPLE_QUERY_SIZE)
     params: dict[str, str | int] = {"n": n}
     if skills:
         cleaned = [s.strip() for s in skills if s and s.strip()]

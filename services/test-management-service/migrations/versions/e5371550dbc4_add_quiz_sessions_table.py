@@ -36,6 +36,7 @@ def upgrade() -> None:
         sa.Column("status", sa.String(length=32), nullable=False),
         sa.Column("current_index", sa.Integer(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(["submission_id"], ["test_submissions.id"]),
         sa.ForeignKeyConstraint(["test_id"], ["tests.id"]),
         sa.PrimaryKeyConstraint("id"),
     )

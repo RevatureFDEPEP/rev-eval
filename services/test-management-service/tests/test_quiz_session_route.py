@@ -98,6 +98,15 @@ class _FakeTest:
         self.test_skills = list(test_skills)
 
 
+class _FakeSubmission:
+    """Stand-in for a TestSubmission row linked to a candidate/test."""
+
+    def __init__(self, *, id=100, test_id=1, user_id=42):
+        self.id = id
+        self.test_id = test_id
+        self.user_id = user_id
+
+
 class _ScalarResult:
     """What ``db.execute(select(Test)...)`` returns: ``.scalars().first()``."""
 
@@ -125,16 +134,27 @@ class _RowsResult:
 class _FakeSession:
     """Mocked ``AsyncSession``.
 
-    ``execute`` replays a scripted sequence of results (the route issues two
-    queries: the Test lookup, then the skills join). ``add`` records the object;
-    ``commit`` is a no-op (or raises, to drive the rollback path); ``refresh``
-    populates the PK the way a real flush-then-refresh would; ``rollback``
-    records that it was awaited.
+    ``execute`` replays a scripted sequence of results: the Test lookup, an
+    optional submission lookup, then the skills join. ``add`` records the
+    object; ``commit`` is a no-op (or raises, to drive the rollback path);
+    ``refresh`` populates the PK the way a real flush-then-refresh would;
+    ``rollback`` records that it was awaited.
     """
 
-    def __init__(self, *, test, skill_rows, commit_error: Exception | None = None):
-        # Result #1 = Test lookup; result #2 = skills join.
-        self._results = [_ScalarResult(test), _RowsResult(skill_rows)]
+    _NO_SUBMISSION_LOOKUP = object()
+
+    def __init__(
+        self,
+        *,
+        test,
+        skill_rows,
+        submission=_NO_SUBMISSION_LOOKUP,
+        commit_error: Exception | None = None,
+    ):
+        self._results = [_ScalarResult(test)]
+        if submission is not self._NO_SUBMISSION_LOOKUP:
+            self._results.append(_ScalarResult(submission))
+        self._results.append(_RowsResult(skill_rows))
         self._commit_error = commit_error
         self.added: list = []
         self.committed = False
@@ -307,6 +327,52 @@ def test_create_session_happy_path(client, fake_session, override_user, monkeypa
     assert fake.calls[0]["url"] == "/v1/api/questions/sample"
     assert fake.calls[0]["params"]["n"] == 2
     assert fake.calls[0]["params"]["skills"] == "python"
+
+
+def test_create_session_with_valid_submission_id_persists_link(
+    client, override_user, monkeypatch
+):
+    session = _FakeSession(
+        test=_FakeTest(id=1, duration=None, number_of_questions=2),
+        submission=_FakeSubmission(id=77, test_id=1, user_id=42),
+        skill_rows=[("python",)],
+    )
+    _override_db(session)
+    _patch_qms(monkeypatch, response=_FakeResponse(200, SAMPLE_QUESTIONS))
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/", json={"test_id": 1, "submission_id": 77}
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 201
+    assert session.added[0].submission_id == 77
+
+
+def test_create_session_invalid_submission_id_404s_before_qms(
+    client, override_user, monkeypatch
+):
+    session = _FakeSession(
+        test=_FakeTest(id=1, duration=None, number_of_questions=2),
+        submission=None,
+        skill_rows=[("python",)],
+    )
+    _override_db(session)
+    fake = _patch_qms(monkeypatch, response=_FakeResponse(200, SAMPLE_QUESTIONS))
+
+    try:
+        resp = client.post(
+            "/v1/api/test-sessions/", json={"test_id": 1, "submission_id": 999}
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Submission not found"
+    assert fake.calls == []
+    assert session.added == []
 
 
 # ---------------------------------------------------------------------------
