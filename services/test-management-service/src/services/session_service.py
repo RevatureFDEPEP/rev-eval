@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from src import scoring
-from src.models.answer import Answer
+from src.models.answer import Answer, GradingStatus
 from src.models.idempotency_key import IdempotencyKey
 from src.models.session import Session, SessionStatus
 from src.repositories.answer_repository import AnswerRepository
@@ -282,6 +282,11 @@ class SessionService:
             submitted_answers,
         )
 
+        grading_status = (
+            GradingStatus.PENDING_REVIEW
+            if result.requires_review
+            else GradingStatus.AUTO
+        )
         await AnswerRepository.create(
             db,
             Answer(
@@ -291,6 +296,7 @@ class SessionService:
                 submitted_answers=submitted_answers,
                 score=result.score,
                 is_correct=result.is_correct,
+                grading_status=grading_status,
             ),
         )
 
@@ -300,6 +306,12 @@ class SessionService:
         if session.current_index >= len(question_ids):
             session.status = SessionStatus.SUBMITTED
             session.submitted_at = now
+            # Any free-text answer awaiting a trainer grade makes the score
+            # provisional until graded (W5-F1). The just-staged answer is
+            # flushed, so it is counted here.
+            session.needs_grading = (
+                await AnswerRepository.count_pending(db, session_id) > 0
+            )
         else:
             nq = await question_client.get_question(
                 question_ids[session.current_index]

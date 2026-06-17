@@ -2,7 +2,16 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Column, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from src.db.session import Base
 
@@ -41,6 +50,13 @@ class Session(Base):
 
     # Set when status transitions to SUBMITTED (final question answered). W3-F2.
     submitted_at = Column(DateTime, nullable=True)
+
+    # True when the finalized session contains ≥1 PENDING_REVIEW (free-text)
+    # answer awaiting a trainer grade — its score is provisional until graded
+    # (W5-F1). Recomputed when an answer is graded.
+    needs_grading = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
 
     # Ordered list of sampled question ids (Mongo _id strings).
     question_ids = Column(JSON, nullable=False, default=list)

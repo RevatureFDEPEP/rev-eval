@@ -56,7 +56,7 @@ def _question(qid="q0", qtype="mcq", correct=None):
 
 
 def _run(session, submitted, *, idem_existing=None, questions=None, key="key-1",
-         user_id=USER_ID):
+         user_id=USER_ID, pending_count=0):
     """Drive submit_answer with all repos + question_client patched.
 
     ``questions`` maps qid -> question dict for get_question lookups.
@@ -84,9 +84,12 @@ def _run(session, submitted, *, idem_existing=None, questions=None, key="key-1",
          patch(f"{SVC}.IdempotencyRepository.get", new_callable=AsyncMock) as iget, \
          patch(f"{SVC}.IdempotencyRepository.create", side_effect=_capture_idem), \
          patch(f"{SVC}.AnswerRepository.create", side_effect=_capture_answer), \
+         patch(f"{SVC}.AnswerRepository.count_pending", new_callable=AsyncMock) as cpend, \
          patch(f"{SVC}.question_client.get_question", side_effect=_get_question) as gq:
         gfu.return_value = session
         iget.return_value = idem_existing
+        cpend.return_value = pending_count
+        captured["count_pending"] = cpend
         captured["get_question"] = gq
         try:
             out = asyncio.run(
