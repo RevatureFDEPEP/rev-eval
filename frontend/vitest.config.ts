@@ -16,6 +16,10 @@ export default defineConfig({
         'src/lib/schemas/**',
         'src/lib/utils.ts',
         'src/lib/utils/date.ts',
+        // W4-F2 candidate results page
+        'src/components/results/**',
+        'src/lib/results/**',
+        'src/lib/api/reports.ts',
       ],
       thresholds: {
         lines: 70,
@@ -26,6 +30,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // `server-only` is provided by Next at build; stub it so server modules
+      // (e.g. lib/api/server.ts) can be imported in tests.
+      'server-only': path.resolve(__dirname, './src/__tests__/stubs/server-only.ts'),
     },
   },
 })

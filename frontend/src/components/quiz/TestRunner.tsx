@@ -25,6 +25,7 @@
 'use client';
 
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ParticipantQuestion, SessionResponse } from '@/lib/api/types';
@@ -210,11 +211,14 @@ export function TestRunner({ session, initialQuestions }: TestRunnerProps) {
     return (
       <div className="mx-auto w-full max-w-2xl">
         <Card>
-          <CardContent className="space-y-2 p-8 text-center">
+          <CardContent className="space-y-4 p-8 text-center">
             <h2 className="text-xl font-semibold text-slate-900">Quiz submitted</h2>
             <p className="text-sm text-slate-600">
-              Your responses have been recorded. You can close this page.
+              Your responses have been recorded.
             </p>
+            <Button asChild>
+              <Link href={`/results/${session.session_id}`}>View your results</Link>
+            </Button>
           </CardContent>
         </Card>
       </div>

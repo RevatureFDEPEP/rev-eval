@@ -484,6 +484,47 @@ export interface DraftSaveResult {
 /** How a fetch failure should be handled (W3-F4 error classification). */
 export type ExamErrorKind = "transient" | "semantic";
 
+// ===== REPORTING (W4-F1 contract, consumed by W4-F2 results page) =====
+// Mirrors reporting-and-analytics-service/src/schemas/reporting_schema.py.
+
+/** Quiz session lifecycle, as the reporting service reports it. */
+export type ReportSessionStatus = "ACTIVE" | "SUBMITTED" | "EXPIRED";
+
+/** One attempt row from GET /reports/user/{id}/attempts (and the summary's
+ *  most_recent_attempt). `score` is a 0..1 fraction, null when the attempt has
+ *  no scored answers. */
+export interface ReportAttemptItem {
+  session_id: string;
+  test_id: number;
+  test_name?: string | null;
+  status: ReportSessionStatus;
+  score?: number | null;
+  correct_count: number;
+  total_answered: number;
+  started_at?: string | null;
+  submitted_at?: string | null;
+  time_spent_seconds?: number | null;
+}
+
+/** Envelope of GET /reports/user/{id}. Scores cover attempts that have answers;
+ *  `average_score`/`best_score` are null when the candidate has none. */
+export interface UserReportSummary {
+  user_id: number;
+  total_attempts: number;
+  average_score?: number | null;
+  best_score?: number | null;
+  total_time_spent_seconds: number;
+  most_recent_attempt?: ReportAttemptItem | null;
+}
+
+/** Envelope of GET /reports/user/{id}/attempts. */
+export interface PaginatedAttempts {
+  items: ReportAttemptItem[];
+  total: number;
+  page: number;
+  size: number;
+}
+
 // ===== TYPE ALIASES (for backwards compatibility) =====
 
 /** @deprecated Use SubmissionStatus instead */
