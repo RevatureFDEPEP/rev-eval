@@ -1,5 +1,11 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Enum
 from src.db.session import Base
+
+_session_status = Enum(
+    "STARTED", "PART_A_IN_PROGRESS", "PART_A_COMPLETED",
+    "PART_B_IN_PROGRESS", "PART_B_COMPLETED", "COMPLETED", "ABANDONED",
+    name="sessionstatus", create_type=False,
+)
 
 
 class Test(Base):
@@ -32,7 +38,7 @@ class QuizSession(Base):
     test_id = Column(Integer, ForeignKey("tests.id"), nullable=False, index=True)
     submission_id = Column(Integer, nullable=True)
     user_id = Column(Integer, nullable=False, index=True)
-    status = Column(String(50), nullable=False)
+    status = Column(_session_status, nullable=False)
     percentage_score = Column(Float, nullable=True)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
