@@ -9,17 +9,33 @@ from typing import Tuple
 from sqlalchemy import Select, and_, case, distinct, func, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.tms_readonly import SessionStatus, TmsAnswer, TmsSession, TmsTest
+from src.models.tms_readonly import (
+    GradingStatus,
+    SessionStatus,
+    TmsAnswer,
+    TmsSession,
+    TmsTest,
+)
 from src.schemas.report_schema import AggregateQuery, AttemptsQuery
 
 
 def _session_score_subquery():
     """Per-session score: answers carry [0, 1] fractions, one row per question
-    slot, so AVG x100 is the attempt's percentage score."""
+    slot, so AVG x100 is the attempt's percentage score.
+
+    Ungraded free-text answers (``PENDING_REVIEW``, W5-F1) are excluded via a
+    CASE→NULL that AVG skips, so a pending answer doesn't drag the score to 0;
+    the attempt reads provisionally until a trainer grades it (NULL when every
+    answer is still pending). Portable across Postgres + the sqlite test
+    fixture (avoids a FILTER clause)."""
+    scorable = case(
+        (TmsAnswer.grading_status != GradingStatus.PENDING_REVIEW, TmsAnswer.score),
+        else_=None,
+    )
     return (
         select(
             TmsAnswer.session_id.label("session_id"),
-            (func.avg(TmsAnswer.score) * 100).label("score"),
+            (func.avg(scorable) * 100).label("score"),
         )
         .group_by(TmsAnswer.session_id)
         .subquery()
@@ -164,6 +180,7 @@ class ReportRepository:
                 TmsSession.submitted_at,
                 _duration_seconds(db).label("duration_seconds"),
                 score_col,
+                TmsSession.needs_grading,
             )
             .join(TmsTest, TmsTest.id == TmsSession.test_id)
             .outerjoin(score_sq, score_sq.c.session_id == TmsSession.session_id)

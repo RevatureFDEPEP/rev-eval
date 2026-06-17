@@ -68,6 +68,7 @@ class ReportService:
                 submitted_at=row.submitted_at,
                 duration_seconds=_round(row.duration_seconds),
                 score=_round(row.score),
+                needs_grading=bool(row.needs_grading),
             )
             for row in rows
         ]

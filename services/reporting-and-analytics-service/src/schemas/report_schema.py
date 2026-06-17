@@ -45,6 +45,9 @@ class AttemptItem(BaseModel):
     submitted_at: Optional[datetime] = None
     duration_seconds: Optional[float] = None
     score: Optional[float] = None
+    # True when the attempt's score is provisional pending a manual grade of a
+    # free-text answer (W5-F1).
+    needs_grading: bool = False
 
 
 class AttemptsPage(BaseModel):
