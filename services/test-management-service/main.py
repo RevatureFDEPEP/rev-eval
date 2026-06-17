@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import settings
 from src.db.session import init_db
+from src.v1.routes.category_route import router as category_router
 from src.v1.routes.quiz_session_route import router as quiz_session_router
 from src.v1.routes.skill_route import router as skill_router
 from src.v1.routes.test_route import router as test_router
@@ -31,6 +32,7 @@ app.add_middleware(
 )
 
 # ---- Routes ----
+app.include_router(category_router, prefix="/v1/api")
 app.include_router(quiz_session_router, prefix="/v1/api")
 app.include_router(test_router, prefix="/v1/api")
 app.include_router(skill_router, prefix="/v1/api")

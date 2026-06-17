@@ -15,6 +15,7 @@ os.environ.setdefault("SERVICE_NAME", "test-management-service")
 os.environ.setdefault("PORT", "8001")
 os.environ.setdefault("SERVICE_HOSTNAME", "localhost")
 
+import src.models.category  # noqa: F401, E402
 import src.models.quiz_session  # noqa: F401, E402
 import src.models.skill  # noqa: F401, E402
 

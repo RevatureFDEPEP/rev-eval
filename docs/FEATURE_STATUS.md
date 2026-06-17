@@ -15,17 +15,21 @@ This file stays at summary level only.
 **Last assessed:** 2026-06-17 — **Tianya Chen (`tianyac` branch)**
 
 Work completed across `tianyac-feat-nginx` (merged), `tianyac-feat-unit-test`
-(PR #45 merged), `tianyac` CI pipeline commits, and `tianyac-feat-session`
-(W3-F1). Documentation system added on `tianyac-feat-doc`: `docs/FEATURE_STATUS.md` +
-`docs/features/` detail files for all 21 features, replacing `docs/plans/`.
+(PR #45 merged), `tianyac` CI pipeline commits, `tianyac-feat-session`
+(W3-F1), and `tianyac-alembic-migrations` (W2-F7). Documentation system added
+on `tianyac-feat-doc`: `docs/FEATURE_STATUS.md` + `docs/features/` detail files
+for all 21 features, replacing `docs/plans/`.
 
 **Progress summary:** W3-F1 (quiz session backend) ✅ complete on
 `tianyac-feat-session` (commit `ca6877d`); security hardened — `correct_answers`
-now excluded by MongoDB `$project` in `QuestionService.sample_questions` so
-`GET /questions/sample` cannot leak the answer key to any caller. W2-F1 (nginx TLS + basic routing),
-W2-F2 (frontend + backend unit tests), W2-F4 (Ruff/ESLint CI gates), W2-F6
-(question authoring schema + tests) partially done (🟡). All other W2,
-remaining W3, and all W4 features not yet started on this branch.
+excluded by MongoDB `$project`. W2-F7 (Alembic + Category domain + reporting
+scaffold) ✅ complete on `tianyac-alembic-migrations` — migration `0005_add_categories`,
+full Category CRUD stack at `/v1/api/categories`, reporting-and-analytics-service
+scaffold with `reporting-postgres` + Alembic baseline, three defects fixed
+(skill-500, user-service dual-engine, Pydantic v2 audit). W2-F1 (nginx TLS +
+basic routing), W2-F2 (frontend + backend unit tests), W2-F4 (Ruff/ESLint CI
+gates), W2-F6 (question authoring schema + tests) partially done (🟡). All
+other W2, remaining W3, and all W4 features not yet started on this branch.
 
 **W2-F1** — nginx reverse proxy live: :80→:443 redirect, TLS, `/_next/` WebSocket
 routing, `/→frontend`. Remaining: step 4 BFF bearer pattern (direct
@@ -51,8 +55,8 @@ Zod schema (`lib/schemas/question-form.ts`), 135-line schema test suite.
 Remaining: extract `QuestionForm.tsx` shared component, wire gateway submit,
 add file-upload field (blocked on W2-F5), edit page.
 
-All W2-F3 (Loki/Grafana), W2-F5 (MinIO presigned), W2-F7 (Alembic/Category),
-and the full W3 and W4 slices are not yet started on Tianya's branch.
+All W2-F3 (Loki/Grafana) and W2-F5 (MinIO presigned), and the full W3 and W4
+slices are not yet started on Tianya's branch.
 
 ## Status values
 
@@ -74,13 +78,13 @@ Spec: `days_6_10_features.md`.
 | W2-F4 | CI quality gates (Ruff / ESLint / Trivy / coverage) | REQUIRED | 🟡 In Progress | [w2-f4-ci-quality-gates.md](features/w2-f4-ci-quality-gates.md) |
 | W2-F5 | Direct-to-MinIO diagram uploads (pre-signed URLs) | — | ❌ Not Started | [w2-f5-minio-presigned-uploads.md](features/w2-f5-minio-presigned-uploads.md) |
 | W2-F6 | Structured question authoring interface | — | 🟡 In Progress | [w2-f6-question-authoring-ui.md](features/w2-f6-question-authoring-ui.md) |
-| W2-F7 | Alembic migrations & Category domain + reporting service scaffold | — | ❌ Not Started | [w2-f7-alembic-category-domain.md](features/w2-f7-alembic-category-domain.md) |
+| W2-F7 | Alembic migrations & Category domain + reporting service scaffold | — | ✅ Completed | [w2-f7-alembic-category-domain.md](features/w2-f7-alembic-category-domain.md) |
 
 ## Days 11–15 (Week 3 — quiz-taking vertical slice)
 
 Spec: `days_11_15_features.md`. W3-F1 complete (`tianyac-feat-session`, commit
-`ca6877d`). Alembic initialized independently on test-management-service
-(W2-F7 not yet landed). W3-F2 through W3-F7 not yet started.
+`ca6877d`). W2-F7 landed on `tianyac-alembic-migrations` — Alembic at head
+`0005` on test-management-service. W3-F2 through W3-F7 not yet started.
 
 | # | Feature | Day | Status | Detail |
 |---|---|---|---|---|
@@ -118,11 +122,8 @@ Spec: `days_16_20_features.md`. Completes the vertical slice: candidate results
 3. **W2-F4 finish** — add Trivy container scan step to each backend matrix job
    (CRITICAL/HIGH, `exit-code: 1`, `ignore-unfixed: true`); add per-service
    `.coveragerc` with `fail_under` ratchets.
-4. **W2-F7 Alembic + Category + reporting scaffold** — strict prerequisite for
-   all of Week 3; must land as Alembic `0001–0003` on test-management-service
-   before W3-F1 adds `0004`. Also: scaffold `reporting-and-analytics-service`
-   (FastAPI layout, dedicated `reporting-postgres` container, Alembic baseline)
-   and fix surfaces defects: skill-500, user-service dual-engine removal, Pydantic v2 migration.
+4. ~~**W2-F7 Alembic + Category + reporting scaffold**~~ — ✅ done on `tianyac-alembic-migrations`
+   (Alembic head `0005`, Category CRUD, reporting scaffold, three defects fixed).
 5. **W2-F5 pre-signed uploads** — MinIO boto3 pre-signed PUT endpoint + frontend
    file input; unblocks W2-F6 file upload step.
 6. **W2-F6 finish** — extract `QuestionForm` component, wire file upload (W2-F5),
