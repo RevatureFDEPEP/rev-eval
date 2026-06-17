@@ -49,7 +49,7 @@ async def get_aggregate_reports(
     return AggregateReportResponse(
         total_tests=total,
         page=params.page,
-        page_size=params.page_size,
+        page_size=params.size,
         tests=tests,
     )
 
@@ -69,7 +69,7 @@ async def get_test_rankings(
     return RankingsResponse(
         test_id=test_id,
         page=params.page,
-        page_size=params.page_size,
+        page_size=params.size,
         rankings=rankings,
     )
 
@@ -114,6 +114,6 @@ async def get_user_attempts(
         user_id=user_id,
         total=total,
         page=params.page,
-        page_size=params.page_size,
+        page_size=params.size,
         attempts=attempts,
     )

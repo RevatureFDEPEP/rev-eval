@@ -161,7 +161,7 @@ def test_08_aggregate_success():
 
 
 def test_09_aggregate_pagination():
-    r = client.get("/v1/api/reports/aggregate?page=1&page_size=2")
+    r = client.get("/v1/api/reports/aggregate?page=1&size=2")
     assert r.status_code == 200
     data = r.json()
     assert len(data["tests"]) == 2
@@ -170,14 +170,14 @@ def test_09_aggregate_pagination():
 
 
 def test_10_aggregate_page_2():
-    r = client.get("/v1/api/reports/aggregate?page=2&page_size=2")
+    r = client.get("/v1/api/reports/aggregate?page=2&size=2")
     assert r.status_code == 200
     data = r.json()
     assert len(data["tests"]) == 1
 
 
 def test_11_aggregate_sort_by_name_asc():
-    r = client.get("/v1/api/reports/aggregate?sort_by=test_name&order=asc")
+    r = client.get("/v1/api/reports/aggregate?sort=test_name:asc")
     assert r.status_code == 200
     data = r.json()
     names = [t["test_name"] for t in data["tests"]]
@@ -185,7 +185,7 @@ def test_11_aggregate_sort_by_name_asc():
 
 
 def test_12_aggregate_sort_by_attempt_count():
-    r = client.get("/v1/api/reports/aggregate?sort_by=attempt_count&order=desc")
+    r = client.get("/v1/api/reports/aggregate?sort=attempt_count:desc")
     assert r.status_code == 200
     data = r.json()
     counts = [t["attempt_count"] for t in data["tests"]]
@@ -193,7 +193,7 @@ def test_12_aggregate_sort_by_attempt_count():
 
 
 def test_13_aggregate_invalid_sort_falls_back():
-    r = client.get("/v1/api/reports/aggregate?sort_by=invalid_column")
+    r = client.get("/v1/api/reports/aggregate?sort=invalid_column:desc")
     assert r.status_code == 200
 
 
@@ -224,7 +224,7 @@ def test_16_rankings_top_score():
 
 
 def test_17_rankings_pagination():
-    r = client.get("/v1/api/reports/tests/1/rankings?page=1&page_size=2")
+    r = client.get("/v1/api/reports/tests/1/rankings?page=1&size=2")
     assert r.status_code == 200
     data = r.json()
     assert len(data["rankings"]) == 2
@@ -390,7 +390,7 @@ def test_30_user_attempts_filter_by_status_completed():
 
 def test_31_user_attempts_pagination():
     app.dependency_overrides[get_current_user] = override_get_current_user_10
-    r = client.get("/v1/api/reports/user/10/attempts?page=1&page_size=1")
+    r = client.get("/v1/api/reports/user/10/attempts?page=1&size=1")
     assert r.status_code == 200
     data = r.json()
     assert len(data["attempts"]) == 1
@@ -402,7 +402,7 @@ def test_31_user_attempts_pagination():
 
 def test_32_user_attempts_sort_score_asc():
     app.dependency_overrides[get_current_user] = override_get_current_user_10
-    r = client.get("/v1/api/reports/user/10/attempts?sort_by=percentage_score&order=asc")
+    r = client.get("/v1/api/reports/user/10/attempts?sort=percentage_score:asc")
     assert r.status_code == 200
     data = r.json()
     scores = [a["percentage_score"] for a in data["attempts"] if a["percentage_score"] is not None]

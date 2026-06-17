@@ -6,22 +6,27 @@ from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
 
+SessionStatusEnum = Literal[
+    "STARTED", "PART_A_IN_PROGRESS", "PART_A_COMPLETED",
+    "PART_B_IN_PROGRESS", "PART_B_COMPLETED",
+    "COMPLETED", "EXPIRED", "ABANDONED",
+]
+
+
 class QueryParams(BaseModel):
     page: int = Field(1, ge=1)
-    page_size: int = Field(20, ge=1, le=100)
-    sort_by: str = "avg_score"
-    order: Literal["asc", "desc"] = "desc"
+    size: int = Field(20, ge=1, le=100)
+    sort: str = "avg_score:desc"  # format: field:direction
 
 
 class AttemptsQueryParams(BaseModel):
     page: int = Field(1, ge=1)
-    page_size: int = Field(20, ge=1, le=100)
+    size: int = Field(20, ge=1, le=100)
     test_id: Optional[int] = None
     from_date: Optional[datetime] = None
     to_date: Optional[datetime] = None
-    status: Optional[str] = None
-    sort_by: str = "completed_at"
-    order: Literal["asc", "desc"] = "desc"
+    status: Optional[SessionStatusEnum] = None
+    sort: str = "completed_at:desc"  # format: field:direction
 
 
 class TestSummary(BaseModel):

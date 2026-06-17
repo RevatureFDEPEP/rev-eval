@@ -12,6 +12,13 @@ _VALID_ATTEMPTS_SORT_COLS = {"completed_at", "percentage_score", "test_id"}
 _VALID_SORT_COLS = {"avg_score", "attempt_count", "test_name"}
 
 
+def _parse_sort(sort_str: str, valid_cols: set, default_col: str) -> Tuple[str, str]:
+    parts = sort_str.split(":", 1)
+    col = parts[0] if parts[0] in valid_cols else default_col
+    direction = parts[1] if len(parts) > 1 and parts[1] in ("asc", "desc") else "desc"
+    return col, direction
+
+
 class ReportRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -74,8 +81,8 @@ class ReportRepository:
             )
         ).scalar() or 0
 
-        col_name = params.sort_by if params.sort_by in _VALID_SORT_COLS else "avg_score"
-        order_clause = text(f"{col_name} DESC") if params.order == "desc" else text(f"{col_name} ASC")
+        col_name, direction = _parse_sort(params.sort, _VALID_SORT_COLS, "avg_score")
+        order_clause = text(f"{col_name} DESC") if direction == "desc" else text(f"{col_name} ASC")
 
         agg_stmt = (
             select(
@@ -96,8 +103,8 @@ class ReportRepository:
             .where(Test.active.is_(True))
             .group_by(Test.id, Test.name)
             .order_by(order_clause)
-            .offset((params.page - 1) * params.page_size)
-            .limit(params.page_size)
+            .offset((params.page - 1) * params.size)
+            .limit(params.size)
         )
 
         rows = (await self.db.execute(agg_stmt)).fetchall()
@@ -136,8 +143,8 @@ class ReportRepository:
                 QuizSession.percentage_score.isnot(None),
             )
             .order_by(rank_col)
-            .offset((params.page - 1) * params.page_size)
-            .limit(params.page_size)
+            .offset((params.page - 1) * params.size)
+            .limit(params.size)
         )
 
         rows = (await self.db.execute(stmt)).fetchall()
@@ -223,12 +230,12 @@ class ReportRepository:
         }
 
     async def get_user_attempts(self, user_id: int, params: AttemptsQueryParams) -> Tuple[int, List[dict]]:
-        col_name = params.sort_by if params.sort_by in _VALID_ATTEMPTS_SORT_COLS else "completed_at"
-        order_clause = text(f"{col_name} DESC") if params.order == "desc" else text(f"{col_name} ASC")
+        col_name, direction = _parse_sort(params.sort, _VALID_ATTEMPTS_SORT_COLS, "completed_at")
+        order_clause = text(f"{col_name} DESC") if direction == "desc" else text(f"{col_name} ASC")
 
         base_filters = [QuizSession.user_id == user_id]
         if params.status:
-            base_filters.append(QuizSession.status == params.status.upper())
+            base_filters.append(QuizSession.status == params.status)
         if params.test_id is not None:
             base_filters.append(QuizSession.test_id == params.test_id)
         if params.from_date is not None:
@@ -255,8 +262,8 @@ class ReportRepository:
             .join(Test, Test.id == QuizSession.test_id)
             .where(*base_filters)
             .order_by(order_clause)
-            .offset((params.page - 1) * params.page_size)
-            .limit(params.page_size)
+            .offset((params.page - 1) * params.size)
+            .limit(params.size)
         )
         rows = (await self.db.execute(rows_stmt)).fetchall()
         attempts = [
