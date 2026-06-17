@@ -187,3 +187,21 @@ class QuestionRepository:
             List[Question]: List of matching Question documents
         """
         return await Question.find(In(Question.tags, tags)).limit(limit).to_list()
+
+    @staticmethod
+    async def sample(pipeline: list[dict]) -> list[dict]:
+        """
+        Run a MongoDB aggregation pipeline (used for `$sample` random draws).
+
+        The pipeline is built by `sample_service.build_sample_pipeline` so the
+        query shape is unit-tested separately. Returns raw documents (dicts)
+        so the caller maps them through the quiz-safe projection — the answer
+        key never leaves this service.
+
+        Args:
+            pipeline: A MongoDB aggregation pipeline (list of stage dicts).
+
+        Returns:
+            list[dict]: The raw aggregation result documents.
+        """
+        return await Question.aggregate(pipeline).to_list()

@@ -1,6 +1,9 @@
 fastapi
 uvicorn[standard]
 SQLAlchemy
+# Required by SQLAlchemy's async engine (create_async_engine + asyncpg/aiosqlite);
+# the async session layer raises without it. Pinned in as an explicit runtime dep.
+greenlet
 pydantic
 pydantic-settings
 python-dotenv

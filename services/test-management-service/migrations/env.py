@@ -53,6 +53,7 @@ from src.db.session import ASYNC_DATABASE_URL, Base  # noqa: E402
 # (Order does not matter; importing the module is what registers the mappers.)
 from src.models import (  # noqa: E402,F401
     category,
+    quiz_session,
     skill,
     test,
     test_skill,

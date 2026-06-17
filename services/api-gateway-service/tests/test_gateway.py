@@ -21,7 +21,7 @@ def test_list_routes(client):
     data = response.json()
     assert "routes" in data
     assert isinstance(data["routes"], list)
-    assert len(data["routes"]) == 7
+    assert len(data["routes"]) == 8
 
 
 # ===== find_service_for_path =====
@@ -37,6 +37,14 @@ def test_find_service_users():
 
 def test_find_service_tests():
     assert find_service_for_path("/v1/api/tests/") == "test-management-service"
+
+
+def test_find_service_test_sessions():
+    assert find_service_for_path("/v1/api/test-sessions/") == "test-management-service"
+
+
+def test_find_service_test_sessions_bare():
+    assert find_service_for_path("/v1/api/test-sessions") == "test-management-service"
 
 
 def test_find_service_questions():

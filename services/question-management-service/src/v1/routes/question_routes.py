@@ -2,13 +2,20 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import ValidationError
+from src.repositories.question_repository import QuestionRepository
 from src.schemas.question import (
     PresignedUploadResponse,
     QuestionCreate,
     QuestionResponse,
     QuestionUpdate,
 )
+from src.schemas.sample import QuizSampleQuestion
 from src.services.question_service import QuestionService
+from src.services.sample_service import (
+    MAX_SAMPLE_SIZE,
+    build_sample_pipeline,
+    map_question_to_sample,
+)
 from src.services.upload_service import (
     InvalidContentTypeError,
     InvalidFilenameError,
@@ -131,6 +138,52 @@ async def get_all_questions():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while fetching questions: {str(e)}",
+        ) from e
+
+
+# NOTE: static `/sample` MUST be declared before the dynamic `/{id}` route,
+# otherwise FastAPI matches "sample" as an `id` path param and returns 404/500.
+@router.get(
+    "/sample",
+    response_model=list[QuizSampleQuestion],
+    summary="Sample random quiz questions",
+    description="""
+    Return up to `n` random questions, optionally filtered by skill, using a
+    MongoDB `$sample` aggregation. Built for the quiz-session backend
+    (`POST /v1/api/test-sessions/`), which calls this to pick the questions a
+    candidate will see.
+
+    **Query params:**
+    - `n` — number of questions to draw (default 20, range 1-200).
+    - `skills` — optional comma-separated skill filter (e.g. `python,sql`);
+      the random draw is taken from the filtered pool.
+
+    **Answer safety:** the projection deliberately omits `correct_answers` and
+    `sample_answer` — the answer key never leaves this service. Each item is a
+    dict with `_id`, `question_text`, `type`, `difficulty`, `options`.
+    """,
+)
+async def sample_questions(
+    n: int = Query(
+        20,
+        ge=1,
+        le=MAX_SAMPLE_SIZE,
+        description="Number of random questions to draw (1-200)",
+    ),
+    skills: str | None = Query(
+        None, description="Optional comma-separated skill filter (e.g. python,sql)"
+    ),
+):
+    """Return up to `n` random questions (answer key stripped)."""
+    try:
+        pipeline = build_sample_pipeline(n, skills)
+        docs = await QuestionRepository.sample(pipeline)
+        return [map_question_to_sample(doc) for doc in docs]
+    except Exception as e:
+        logger.exception("Failed to sample questions")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to sample questions",
         ) from e
 
 
