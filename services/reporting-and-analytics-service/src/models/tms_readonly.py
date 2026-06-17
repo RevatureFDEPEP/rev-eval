@@ -41,6 +41,18 @@ class SessionStatus(str, enum.Enum):
     EXPIRED = "EXPIRED"
 
 
+class GradingStatus(str, enum.Enum):
+    """Mirror of test-management-service's GradingStatus enum (W5-F1).
+
+    ``PENDING_REVIEW`` answers (ungraded free text) are excluded from the
+    attempt score until a trainer grades them.
+    """
+
+    AUTO = "AUTO"
+    PENDING_REVIEW = "PENDING_REVIEW"
+    GRADED = "GRADED"
+
+
 class TmsTest(TmsBase):
     """tests — only the columns attempt rows are labelled with."""
 
@@ -72,6 +84,10 @@ class TmsSession(TmsBase):
     expires_at = Column(DateTime, nullable=False)
     submitted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=True)
+    # True when the finalized attempt still has ungraded free-text answers
+    # (W5-F1) — its score is provisional until graded. Default is for the
+    # sqlite test fixture only; the live column carries a server default.
+    needs_grading = Column(Boolean, nullable=False, default=False)
 
 
 class TmsAnswer(TmsBase):
@@ -91,3 +107,10 @@ class TmsAnswer(TmsBase):
     question_index = Column(Integer, nullable=False)
     score = Column(Float, nullable=False)
     is_correct = Column(Boolean, nullable=False)
+    # Manual-grading lifecycle (W5-F1); PENDING_REVIEW excluded from the score.
+    # Default is for the sqlite test fixture; the live column has a server default.
+    grading_status = Column(
+        Enum(GradingStatus, name="gradingstatus", create_constraint=False),
+        nullable=False,
+        default=GradingStatus.AUTO,
+    )

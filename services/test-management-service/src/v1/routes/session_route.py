@@ -1,9 +1,14 @@
-from typing import Dict
+from typing import Dict, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.session import get_db
+from src.schemas.grading_schema import (
+    GradedAnswerOut,
+    GradeRequest,
+    GradingQueueOut,
+)
 from src.schemas.session_schema import (
     AnswerResult,
     AnswerSubmit,
@@ -11,6 +16,11 @@ from src.schemas.session_schema import (
     DraftSaveResult,
     SessionCreate,
     SessionOut,
+)
+from src.services.grading_service import (
+    AnswerNotFoundError,
+    AnswerNotPendingError,
+    GradingService,
 )
 from src.services.session_service import (
     EmptyQuestionBankError,
@@ -20,10 +30,64 @@ from src.services.session_service import (
     SessionService,
     SessionTerminalError,
 )
-from src.utils.dependencies import get_current_user_from_headers
+from src.utils.dependencies import (
+    get_current_trainer,
+    get_current_user_from_headers,
+)
 from src.utils.question_client import QuestionServiceError
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
+
+
+# --- Trainer manual-grading (W5-F1) -----------------------------------------
+# Registered before the dynamic /{session_id}/... routes; the static
+# "grading-queue" segment must not be shadowed by a path parameter.
+
+
+@router.get("/grading-queue", response_model=GradingQueueOut)
+async def grading_queue(
+    test_id: Optional[int] = Query(None, description="Filter by test id"),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    current_user: Dict = Depends(get_current_trainer),
+    db: AsyncSession = Depends(get_db),
+):
+    """TRAINER-only: list free-text answers awaiting a manual grade (W5-F1),
+    enriched with each question's prompt + sample answer."""
+    return await GradingService.list_queue(
+        db, test_id=test_id, page=page, size=size
+    )
+
+
+@router.post(
+    "/{session_id}/answers/{question_index}/grade",
+    response_model=GradedAnswerOut,
+)
+async def grade_answer(
+    session_id: UUID,
+    question_index: int,
+    grade_in: GradeRequest,
+    current_user: Dict = Depends(get_current_trainer),
+    db: AsyncSession = Depends(get_db),
+):
+    """TRAINER-only: set a free-text answer's score (0..1) + optional feedback
+    and recompute the session's needs_grading flag (W5-F1). The candidate's
+    attempt score (computed on-read) then includes the graded answer."""
+    try:
+        return await GradingService.grade_answer(
+            db,
+            session_id,
+            question_index,
+            grade_in.score,
+            grade_in.feedback,
+            current_user.get("id"),
+        )
+    except AnswerNotFoundError:
+        raise HTTPException(status_code=404, detail="Answer not found") from None
+    except AnswerNotPendingError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(e)
+        ) from None
 
 
 @router.post("/", response_model=SessionOut, status_code=status.HTTP_201_CREATED)

@@ -44,16 +44,26 @@ def test_dispatch_routes_by_type():
 
 
 def test_text_type_not_auto_scorable():
-    # Free-text isn't auto-scored: recorded as 0.0 awaiting manual review.
+    # Free-text isn't auto-scored: flagged for manual review (W5-F1), score 0.0
+    # until a trainer grades it.
     result = scoring.score("text", None, ["some prose"])
     assert result.score == 0.0
     assert result.is_correct is False
+    assert result.requires_review is True
 
 
 def test_unknown_type_scores_zero():
     result = scoring.score("essay", None, ["x"])
     assert result.score == 0.0
     assert result.is_correct is False
+    assert result.requires_review is True
+
+
+def test_auto_scorable_types_do_not_require_review():
+    # Regression guard: auto types never flag for manual review.
+    assert scoring.score("mcq", [1], [1]).requires_review is False
+    assert scoring.score("true_false", [True], [False]).requires_review is False
+    assert scoring.score("multi", [1, 2], [1]).requires_review is False
 
 
 def test_exact_match_is_order_independent():
