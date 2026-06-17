@@ -252,6 +252,7 @@ services:
       NEXT_PUBLIC_API_GATEWAY_URL: https://localhost
       NEXT_PUBLIC_SITE_URL: http://frontend:3000
       NODE_ENV: development
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
     ports:
       - "3000:3000"
     volumes:

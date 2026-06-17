@@ -29,6 +29,7 @@ import { TestDetailsSheet } from '@/components/trainer/TestDetailsSheet';
 import { SubmissionReviewSheet } from '@/components/trainer/SubmissionReviewSheet';
 import { QuizSubmissionSheet } from '@/components/trainer/QuizSubmissionSheet';
 import { BasicSubmissionSheet } from '@/components/trainer/BasicSubmissionSheet';
+import { AggregateCharts } from '@/components/trainer/AggregateCharts';
 import { getTrainerTests, getCurrentUser, getEvaluatedSubmissionsForTrainer, getAllSubmissionsForTrainer } from '@/lib/api';
 import type { TrainerTestInfo, TestSubmission } from '@/lib/api/types';
 import { Calendar, ClipboardCheck, ClipboardList, Layers, PlusCircle, Star } from 'lucide-react';
@@ -42,8 +43,20 @@ export default function TrainerTestsPage() {
   const pathname = usePathname();
   const tab = searchParams.get('tab') ?? 'management';
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') ?? '');
   const debouncedSearch = useDebounce(searchQuery);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    const current = params.get('q') ?? '';
+    if (current === debouncedSearch) return;
+    if (debouncedSearch) {
+      params.set('q', debouncedSearch);
+    } else {
+      params.delete('q');
+    }
+    router.replace(`${pathname}?${params.toString()}`);
+  }, [debouncedSearch, searchParams, router, pathname]);
 
   const handleTabChange = useCallback(
     (value: string) => {
@@ -289,8 +302,9 @@ export default function TrainerTestsPage() {
       </section>
 
       <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-3">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4">
           <TabsTrigger value="management">Management</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="needs-review">
             Pending Review
             {gradingStats.pendingReviews > 0 && (
@@ -465,6 +479,11 @@ export default function TrainerTestsPage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* Analytics Tab */}
+        <TabsContent value="analytics" className="space-y-6">
+          <AggregateCharts />
         </TabsContent>
 
         {/* Grading Tab */}
