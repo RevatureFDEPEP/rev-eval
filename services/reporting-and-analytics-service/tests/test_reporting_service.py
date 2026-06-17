@@ -8,10 +8,17 @@ from src.services.reporting_service import ReportingService
 class TestUserSummary:
     async def test_aggregates_match_seed(self, session):
         s = await ReportingService.get_user_summary(session, 100)
-        assert s.total_attempts == 4
-        assert s.average_score == 0.4722
+        assert s.total_attempts == 4  # all sessions count as attempts
+        # average/best over SUBMITTED only: s1=2/3, s2=0.75 → mean 0.7083.
+        # s4 (EXPIRED, score 0.0) and s3 (ACTIVE, no answers) are excluded.
+        assert s.average_score == 0.7083
         assert s.best_score == 0.75
-        assert s.total_time_spent_seconds == 900
+        assert s.total_time_spent_seconds == 900  # s1 600 + s2 300
+
+    async def test_expired_and_active_excluded_from_score(self, session):
+        # Regression guard: counting the EXPIRED 0.0 would drop the average to 0.4722.
+        s = await ReportingService.get_user_summary(session, 100)
+        assert s.average_score == 0.7083
 
     async def test_most_recent_is_latest_created(self, session):
         s = await ReportingService.get_user_summary(session, 100)

@@ -69,9 +69,16 @@ Negative / accepted trade-offs:
 ## Notes on score semantics (W4-F1)
 
 Derived from `session_answers` because there is no stored per-session score column:
-- An **attempt** is any `quiz_sessions` row for the user.
+- An **attempt** is any `quiz_sessions` row for the user; `total_attempts` counts all of them.
 - **Per-session score** = `SUM(points_earned) / SUM(max_points)` over that session's
-  answers (a 0..1 fraction); sessions with no answers are counted as attempts but
-  excluded from average/best.
-- **total_time_spent** = sum of `submitted_at − started_at` over sessions that have a
-  `submitted_at`, computed in Python (no portable cross-dialect interval SQL).
+  answers (a 0..1 fraction); `None` when the session has no answers.
+- **average_score / best_score** are over **SUBMITTED** sessions only. ACTIVE
+  (in-progress) and EXPIRED (timed-out) sessions are attempts but are excluded from
+  score stats so an abandoned attempt cannot drag a candidate's average down.
+- **total_time_spent** = sum of `submitted_at − started_at` over SUBMITTED sessions,
+  computed in Python (no portable cross-dialect interval SQL).
+- **most_recent_attempt** = the attempt with the latest `created_at` (any status).
+- The score formula lives in one place (`_raw_score`); the summary averages the raw
+  fractions and rounds once, so it stays consistent with the per-attempt scores.
+- Attempt-history **date filters apply to `created_at`** (always present) and are
+  interpreted in **UTC**, matching test-management's tz-naive UTC timestamps.

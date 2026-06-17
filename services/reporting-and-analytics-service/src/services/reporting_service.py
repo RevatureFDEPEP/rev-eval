@@ -2,6 +2,7 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.models.tms_readonly import QuizSessionStatus
 from src.repositories.reporting_repository import ReportingRepository
 from src.schemas.reporting_schema import (
     AttemptItem,
@@ -11,10 +12,18 @@ from src.schemas.reporting_schema import (
 )
 
 
-def _score_fraction(points_sum, max_sum) -> float | None:
+def _raw_score(points_sum, max_sum) -> float | None:
+    """The one score definition: points_earned / max_points over a session's
+    answers. None when there are no answers (max_sum is None) or max is 0."""
     if max_sum is None or max_sum == 0:
         return None
-    return round(points_sum / max_sum, 4)
+    return points_sum / max_sum
+
+
+def _score_fraction(points_sum, max_sum) -> float | None:
+    """Display score: the raw fraction rounded to 4dp."""
+    raw = _raw_score(points_sum, max_sum)
+    return round(raw, 4) if raw is not None else None
 
 
 def _duration_seconds(started_at, submitted_at) -> int | None:
@@ -41,23 +50,33 @@ def _row_to_attempt(row) -> AttemptItem:
 class ReportingService:
     @staticmethod
     async def get_user_summary(db: AsyncSession, user_id: int) -> UserSummaryResponse:
-        agg = await ReportingRepository.fetch_score_aggregates(db, user_id)
-        durations = await ReportingRepository.fetch_session_durations(db, user_id)
-        recent_row = await ReportingRepository.fetch_most_recent_attempt(db, user_id)
+        rows = await ReportingRepository.fetch_user_session_rollup(db, user_id)
 
-        total_time = sum(_duration_seconds(s, sub) or 0 for s, sub in durations)
+        # Score and time count only SUBMITTED (completed) attempts. ACTIVE
+        # (in-progress) and EXPIRED (timed-out) sessions are still attempts but
+        # would skew a candidate's average, so they're excluded from score stats.
+        submitted = [r for r in rows if r.status == QuizSessionStatus.SUBMITTED]
+        raw_scores = [
+            s
+            for s in (_raw_score(r.points_sum, r.max_sum) for r in submitted)
+            if s is not None
+        ]
+        total_time = sum(
+            _duration_seconds(r.started_at, r.submitted_at) or 0 for r in submitted
+        )
+        dated = [r for r in rows if r.created_at is not None]
+        most_recent = max(dated, key=lambda r: r.created_at) if dated else None
+
         return UserSummaryResponse(
             user_id=user_id,
-            total_attempts=int(agg.total_attempts or 0),
+            total_attempts=len(rows),
             average_score=(
-                round(agg.average_score, 4) if agg.average_score is not None else None
+                round(sum(raw_scores) / len(raw_scores), 4) if raw_scores else None
             ),
-            best_score=(
-                round(agg.best_score, 4) if agg.best_score is not None else None
-            ),
+            best_score=round(max(raw_scores), 4) if raw_scores else None,
             total_time_spent_seconds=total_time,
             most_recent_attempt=(
-                _row_to_attempt(recent_row) if recent_row is not None else None
+                _row_to_attempt(most_recent) if most_recent is not None else None
             ),
         )
 

@@ -38,11 +38,11 @@ def _seed_objects():
     """Deterministic dataset. User 100 has 4 attempts; user 200 isolates leakage.
 
     Hand-computed expectations (user 100):
-      total_attempts = 4
-      per-session scores: s1=2/3, s2=0.75, s4=0.0, s3=None (no answers)
-      average_score = (0.666667 + 0.75 + 0.0) / 3 = 0.4722
-      best_score = 0.75
-      total_time_spent = 600 (s1) + 300 (s2) = 900   (s3/s4 have no submitted_at)
+      total_attempts = 4   (all sessions count as attempts)
+      per-session scores: s1=2/3, s2=0.75, s4=0.0 (EXPIRED), s3=None (no answers)
+      average_score/best_score over SUBMITTED only (s1, s2): mean(2/3, 0.75) = 0.7083,
+        best = 0.75. s4 (EXPIRED) and s3 (ACTIVE) are excluded from score stats.
+      total_time_spent = 600 (s1) + 300 (s2) = 900   (only SUBMITTED sessions)
       most_recent_attempt = s2 (created 12:00)
     """
     tests = [Test(id=1, name="Python"), Test(id=2, name="SQL")]

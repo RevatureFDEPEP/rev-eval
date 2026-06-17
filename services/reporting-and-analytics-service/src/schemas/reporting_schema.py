@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from typing import Annotated
 
-from fastapi import Query
+from fastapi import HTTPException, Query
 from pydantic import BaseModel
 
 from src.models.tms_readonly import QuizSessionStatus
@@ -83,3 +83,15 @@ class AttemptsQuery:
         self.date_to = date_to
         self.status = status
         self.sort = sort
+
+        # The regex guarantees "<field>:asc|desc"; the field must also be one we
+        # can actually sort by. Reject unknown fields with 422 rather than
+        # silently falling back to the default (a wrong-order 200 with no signal).
+        field, _, direction = sort.partition(":")
+        if field not in SORTABLE_FIELDS:
+            raise HTTPException(
+                status_code=422,
+                detail=f"sort field must be one of {sorted(SORTABLE_FIELDS)}",
+            )
+        self.sort_field = field
+        self.sort_descending = direction == "desc"
