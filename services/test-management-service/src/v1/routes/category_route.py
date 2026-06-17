@@ -41,3 +41,19 @@ async def delete_category(category_id: int, db: AsyncSession = Depends(get_db)):
         await CategoryService.delete_category(db, category_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Category not found") from None
+
+
+@router.post("/{category_id}/skills/{skill_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def link_skill(category_id: int, skill_id: int, db: AsyncSession = Depends(get_db)):
+    try:
+        await CategoryService.link_skill(db, category_id, skill_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
+
+
+@router.delete("/{category_id}/skills/{skill_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def unlink_skill(category_id: int, skill_id: int, db: AsyncSession = Depends(get_db)):
+    try:
+        await CategoryService.unlink_skill(db, category_id, skill_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
