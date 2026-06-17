@@ -95,3 +95,42 @@ def test_missing_answer_404():
         gbs.return_value = None
         with pytest.raises(AnswerNotFoundError):
             asyncio.run(GradingService.grade_answer(db, SID, 2, 0.5, None, 9))
+
+
+def _pending_row():
+    answer = SimpleNamespace(
+        id=7, session_id=SID, question_index=1, question_id="q-mongo",
+        submitted_answers=["prose"], grading_status=GradingStatus.PENDING_REVIEW,
+    )
+    return (answer, 42, 1, None, "Java Quiz")
+
+
+def _list_queue(question=None, raise_fetch=False):
+    db = AsyncMock()
+
+    async def _get_question(_qid):
+        if raise_fetch:
+            raise RuntimeError("question-service down")
+        return question or {"question_text": "Explain X", "sample_answer": "Y"}
+
+    with patch(f"{SVC}.AnswerRepository.list_pending", new_callable=AsyncMock) as lp, \
+         patch(f"{SVC}.question_client.get_question", side_effect=_get_question):
+        lp.return_value = ([_pending_row()], 1)
+        return asyncio.run(GradingService.list_queue(db, test_id=1, page=1, size=20))
+
+
+def test_list_queue_enriches_with_question_metadata():
+    out = _list_queue()
+    assert out.total == 1 and out.page == 1 and out.size == 20
+    item = out.items[0]
+    assert item.answer_id == 7
+    assert item.test_name == "Java Quiz"
+    assert item.question_text == "Explain X"
+    assert item.sample_answer == "Y"
+
+
+def test_list_queue_tolerates_question_fetch_failure():
+    out = _list_queue(raise_fetch=True)
+    item = out.items[0]
+    assert item.question_text is None  # enrichment is best-effort
+    assert item.submitted_answers == ["prose"]
