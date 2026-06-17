@@ -1,6 +1,6 @@
 # W5-F2 — Fix `TestRepository.get_by_id` None-row crash
 
-**Status:** ❌ Not Started
+**Status:** ✅ Completed
 **Spec:** trainer-defined remediation (non-catalog). Origin: deferred from
 [W3-F1](w3-f1-quiz-session-backend.md) Remaining; out-of-scope-noted in
 [W3-F7](w3-f7-review-remediation.md) (line 177).
@@ -29,14 +29,21 @@ raises `AttributeError` → unhandled 500 instead of a clean 404. `list_all`
 
 ## Steps
 
-- [ ] **1. Guard the None case** — return `None` early when no row is found, and
+- [x] **1. Guard the None case** — return `None` early when no row is found, and
       only set `duration_seconds` on a real `Test`. Keep the `duration`/no-`duration`
       handling for found rows. Mirror the safe `list_all` pattern.
-- [ ] **2. Caller check** — confirm the service/route layer maps a `None` return
+      Evidence: `src/repositories/test_repository.py:16-20` (commit `71c9822`).
+- [x] **2. Caller check** — confirm the service/route layer maps a `None` return
       to a 404 (add the mapping if it currently assumes a non-None test).
-- [ ] **3. Tests** — unit: `get_by_id` with a missing id returns `None` (no raise);
+      Already satisfied — no change needed: `test_service.py` callers
+      (`get_test_by_id:90`, `update_test:43`, `delete_test:83`) raise
+      `ValueError("Test not found")` on a falsy test, and `test_route.py:44-45,
+      71-72, 97-98` map that to a 404. They simply never ran before because the
+      repo raised first.
+- [x] **3. Tests** — unit: `get_by_id` with a missing id returns `None` (no raise);
       with a row that has/lacks `duration` sets `duration_seconds` correctly. If a
       route exercises it, an integration check that an unknown test id → 404.
+      Evidence: `tests/test_test_repository.py` (3 tests, commit `881e7fe`).
 
 ## Out of scope
 
@@ -44,6 +51,6 @@ raises `AttributeError` → unhandled 500 instead of a clean 404. `list_all`
 
 ## Acceptance
 
-- [ ] Fetching an unknown test id returns `None`/404, never raises.
-- [ ] Existing `get_by_id` callers unchanged in behavior for valid ids.
-- [ ] Tests green; `FEATURE_STATUS.md` row flipped to ✅ with evidence.
+- [x] Fetching an unknown test id returns `None`/404, never raises.
+- [x] Existing `get_by_id` callers unchanged in behavior for valid ids.
+- [x] Tests green; `FEATURE_STATUS.md` row flipped to ✅ with evidence.
