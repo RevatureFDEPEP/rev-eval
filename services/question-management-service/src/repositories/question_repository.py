@@ -169,6 +169,16 @@ class QuestionRepository:
         return await Question.find(Question.difficulty == difficulty).limit(limit).to_list()
 
     @staticmethod
+    async def sample_ids_by_skills(skills: list[str], count: int) -> list[str]:
+        pipeline = [
+            {"$match": {"skills": {"$in": skills}}},
+            {"$sample": {"size": count}},
+            {"$project": {"_id": 1}},
+        ]
+        docs = await Question.aggregate(pipeline).to_list()
+        return [str(doc["_id"]) for doc in docs]
+
+    @staticmethod
     async def find_by_tags(tags: list[str], limit: int = 100) -> list[Question]:
         """
         Find questions that have any of the specified tags.

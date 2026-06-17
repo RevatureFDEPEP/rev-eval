@@ -15,6 +15,7 @@ from src.models.skill import Skill  # noqa: E402, F401
 from src.models.test import Test  # noqa: E402, F401
 from src.models.test_skill import TestSkill  # noqa: E402, F401
 from src.models.test_submission import TestSubmission  # noqa: E402, F401
+from src.models.session import Session  # noqa: E402, F401
 
 config = context.config
 

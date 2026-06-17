@@ -241,6 +241,10 @@ class QuestionService:
                         raise ValueError("TEXT sample_answer must be at least 10 characters long")
 
     @staticmethod
+    async def sample_question_ids(skills: list[str], count: int) -> list[str]:
+        return await QuestionRepository.sample_ids_by_skills(skills, count)
+
+    @staticmethod
     async def delete_question(qid: str) -> bool:
         """
         Delete a question by its ID.
