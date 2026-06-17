@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth/useAuth';
+import { useDebounce } from '@/lib/hooks/useDebounce';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TestDetailsSheet } from '@/components/trainer/TestDetailsSheet';
 import { SubmissionReviewSheet } from '@/components/trainer/SubmissionReviewSheet';
@@ -33,6 +36,23 @@ import { formatTableDate } from '@/lib/utils/date';
 
 export default function TrainerTestsPage() {
   const { user, loading: authLoading } = useAuth({ ensureSignedIn: true });
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const tab = searchParams.get('tab') ?? 'management';
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery);
+
+  const handleTabChange = useCallback(
+    (value: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('tab', value);
+      router.push(`${pathname}?${params.toString()}`);
+    },
+    [searchParams, router, pathname],
+  );
 
   // Test Management state
   const [tests, setTests] = useState<TrainerTestInfo[]>([]);
@@ -157,6 +177,12 @@ export default function TrainerTestsPage() {
     return { pendingReviews, avgAIScore };
   }, [submissions]);
 
+  const filteredTests = useMemo(() => {
+    if (!debouncedSearch.trim()) return tests;
+    const q = debouncedSearch.toLowerCase();
+    return tests.filter((t) => t.name.toLowerCase().includes(q));
+  }, [tests, debouncedSearch]);
+
   const handleTestClick = (test: TrainerTestInfo) => {
     setSelectedTest(test);
     setTestSheetOpen(true);
@@ -262,7 +288,7 @@ export default function TrainerTestsPage() {
         </Badge>
       </section>
 
-      <Tabs defaultValue="management" className="w-full">
+      <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full max-w-2xl grid-cols-3">
           <TabsTrigger value="management">Management</TabsTrigger>
           <TabsTrigger value="needs-review">
@@ -346,6 +372,15 @@ export default function TrainerTestsPage() {
                 </Button>
               </CardContent>
             </Card>
+          ) : filteredTests.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center gap-4 py-12 text-center">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">No tests match &ldquo;{debouncedSearch}&rdquo;</h3>
+                  <p className="text-sm text-slate-500">Try a different search term.</p>
+                </div>
+              </CardContent>
+            </Card>
           ) : (
             <Card className="border border-slate-200/70 bg-white/95 shadow-sm">
               <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -353,7 +388,14 @@ export default function TrainerTestsPage() {
                   <CardTitle>All Tests</CardTitle>
                   <CardDescription>Overview of every assessment you&apos;ve created</CardDescription>
                 </div>
-                <DropdownMenu>
+                <div className="flex items-center gap-3">
+                  <Input
+                    placeholder="Search tests…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-48 lg:w-64"
+                  />
+                  <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button className="transition-transform hover:-translate-y-0.5">
                       <PlusCircle className="mr-2 size-4" />
@@ -369,6 +411,7 @@ export default function TrainerTestsPage() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -385,7 +428,7 @@ export default function TrainerTestsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {tests.map((test) => {
+                    {filteredTests.map((test) => {
                       const isQuiz = (test.test_type as string) === 'QUIZ' || (test.test_type as string) === 'MCQ';
                       const friendlyType = isQuiz ? 'Quiz' : 'Interview';
                       const created = formatTableDate(test.created_at);

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { decodeJwt } from 'jose';
+import { jwtVerify } from 'jose';
 
 const AUTH_COOKIE = 'auth_token';
 
@@ -25,23 +25,23 @@ function isPublic(pathname: string): boolean {
 interface DecodedSession {
   userId: string;
   role: string;
-  expired: boolean;
 }
 
-function decodeSession(token: string | undefined): DecodedSession | null {
+async function verifySession(token: string | undefined): Promise<DecodedSession | null> {
   if (!token) return null;
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return null;
   try {
-    const claims = decodeJwt(token);
-    if (!claims.sub) return null;
-    const role = typeof claims.role === 'string' ? claims.role.toUpperCase() : '';
-    const expired = typeof claims.exp === 'number' ? claims.exp * 1000 < Date.now() : false;
-    return { userId: String(claims.sub), role, expired };
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
+    if (!payload.sub) return null;
+    const role = typeof payload.role === 'string' ? payload.role.toUpperCase() : '';
+    return { userId: String(payload.sub), role };
   } catch {
     return null;
   }
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isPublic(pathname)) {
@@ -49,9 +49,9 @@ export function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get(AUTH_COOKIE)?.value;
-  const session = decodeSession(token);
+  const session = await verifySession(token);
 
-  if (!session || session.expired) {
+  if (!session) {
     const loginUrl = new URL('/', request.url);
     return NextResponse.redirect(loginUrl);
   }
