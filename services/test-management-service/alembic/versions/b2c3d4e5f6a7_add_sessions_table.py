@@ -21,7 +21,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Create enum type only if it doesn't already exist (init_db may have created it via create_all)
-    op.execute("CREATE TYPE IF NOT EXISTS sessionstatus AS ENUM ('ACTIVE', 'COMPLETED', 'EXPIRED')")
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE sessionstatus AS ENUM ('ACTIVE', 'COMPLETED', 'EXPIRED');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
     op.create_table(
         "sessions",
         sa.Column("session_id", postgresql.UUID(as_uuid=True), nullable=False),
@@ -34,7 +40,7 @@ def upgrade() -> None:
             "status",
             sa.Enum("ACTIVE", "COMPLETED", "EXPIRED", name="sessionstatus", create_type=False),
             nullable=False,
-            server_default="ACTIVE",
+            server_default="'ACTIVE'",
         ),
         sa.Column("current_index", sa.Integer(), nullable=False, server_default="0"),
         sa.ForeignKeyConstraint(["test_id"], ["tests.id"], ondelete="CASCADE"),
