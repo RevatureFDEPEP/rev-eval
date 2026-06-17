@@ -30,14 +30,15 @@ def score(
     """Dispatch to the scorer for ``question_type``.
 
     ``mcq``/``true_false`` → exact match; ``multi`` → partial credit. Any other
-    type (e.g. free-text ``text``) is not auto-scorable: it is recorded with a
-    ``0.0`` score awaiting manual review (W4), and never blocks the candidate
-    from advancing.
+    type (e.g. free-text ``text``) is not auto-scorable: it is flagged
+    ``requires_review`` so the answer endpoint records it ``PENDING_REVIEW`` for
+    manual trainer grading (W5-F1) — excluded from the score until graded, and
+    never blocks the candidate from advancing.
     """
     qtype = (question_type or "").lower()
     if qtype in _EXACT_TYPES:
         return exact_match.score_question(qtype, correct_answers, submitted_answers)
     if qtype in _PARTIAL_TYPES:
         return partial_credit.score_question(qtype, correct_answers, submitted_answers)
-    # Not auto-scorable (e.g. text) — recorded, manual review deferred to W4.
-    return ScoreResult(score=0.0, is_correct=False)
+    # Not auto-scorable (e.g. text) — flag for manual review (W5-F1).
+    return ScoreResult(score=0.0, is_correct=False, requires_review=True)
