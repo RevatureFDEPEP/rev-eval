@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
+from src.models.answer import GradingStatus
 from src.models.session import SessionStatus
 from src.services.session_service import (
     SessionExpiredError,
@@ -135,6 +136,27 @@ def test_final_question_finalizes_session():
     assert out.submitted_at is not None
     assert out.next_question is None              # no next question
     assert session.status == SessionStatus.SUBMITTED
+
+
+def test_text_answer_recorded_pending_review():
+    # A free-text answer is staged PENDING_REVIEW, not a silent 0.0 (W5-F1).
+    session = _session(current_index=0, question_ids=["q0"])
+    questions = {"q0": _question("q0", qtype="text", correct=[])}
+    out, cap = _run(session, ["my prose answer"], questions=questions, pending_count=1)
+    assert out.status == "SUBMITTED"
+    assert cap["answer"].grading_status == GradingStatus.PENDING_REVIEW
+    assert cap["answer"].score == 0.0
+    # The finalized session is flagged as needing a manual grade.
+    assert session.needs_grading is True
+
+
+def test_auto_only_session_does_not_need_grading():
+    # Regression: an all-auto session finalizes without needs_grading (W5-F1).
+    session = _session(current_index=2, question_ids=["q0", "q1", "q2"])
+    out, cap = _run(session, [2], pending_count=0)
+    assert out.status == "SUBMITTED"
+    assert cap["answer"].grading_status == GradingStatus.AUTO
+    assert session.needs_grading is False
 
 
 def test_idempotency_replays_without_rescoring():
