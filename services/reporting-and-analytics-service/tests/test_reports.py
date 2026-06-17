@@ -16,6 +16,7 @@ import time as _time
 from datetime import datetime
 
 import jwt as _jwt
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -88,6 +89,19 @@ app.dependency_overrides[get_db] = override_get_db
 app.dependency_overrides[verify_jwt] = override_verify_jwt_trainer
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _restore_trainer_override():
+    """Re-set verify_jwt override before every test.
+
+    test_auth_jwt.py's TestEndpointAuth removes it during teardown.
+    Running that file first (alphabetically) leaves this file without
+    an override unless we restore it here.
+    """
+    app.dependency_overrides[verify_jwt] = override_verify_jwt_trainer
+    yield
+    app.dependency_overrides[verify_jwt] = override_verify_jwt_trainer
 
 
 # ---------------------------------------------------------------------------
@@ -248,22 +262,17 @@ def test_18_rankings_empty_test():
 # RBAC — now tests the JWT layer (require_role / verify_jwt)
 # ---------------------------------------------------------------------------
 
-_SECRET = os.environ.get("JWT_SECRET", "change-me-in-production")
-
-
 def _token(role: str) -> str:
+    from src.config.settings import settings as _s
     return _jwt.encode(
         {"sub": "1", "role": role, "exp": int(_time.time()) + 3600},
-        _SECRET,
+        _s.JWT_SECRET,
         algorithm="HS256",
     )
 
 
 def test_19_rbac_participant_jwt_returns_403():
-    # Remove override so the real JWT dep runs
-    del app.dependency_overrides[verify_jwt]
-    from src.config import settings as cfg
-    cfg.settings.JWT_SECRET = _SECRET
+    app.dependency_overrides.pop(verify_jwt, None)
     r = client.get(
         "/v1/api/reports/tests/1",
         headers={"Authorization": f"Bearer {_token('PARTICIPANT')}"},
@@ -273,18 +282,14 @@ def test_19_rbac_participant_jwt_returns_403():
 
 
 def test_20_rbac_no_token_returns_401():
-    del app.dependency_overrides[verify_jwt]
-    from src.config import settings as cfg
-    cfg.settings.JWT_SECRET = _SECRET
+    app.dependency_overrides.pop(verify_jwt, None)
     r = client.get("/v1/api/reports/tests/1")
     assert r.status_code == 401
     app.dependency_overrides[verify_jwt] = override_verify_jwt_trainer
 
 
 def test_21_rbac_trainer_jwt_accepted():
-    del app.dependency_overrides[verify_jwt]
-    from src.config import settings as cfg
-    cfg.settings.JWT_SECRET = _SECRET
+    app.dependency_overrides.pop(verify_jwt, None)
     r = client.get(
         "/v1/api/reports/tests/1",
         headers={"Authorization": f"Bearer {_token('TRAINER')}"},
@@ -294,9 +299,7 @@ def test_21_rbac_trainer_jwt_accepted():
 
 
 def test_22_rbac_invalid_token_returns_401():
-    del app.dependency_overrides[verify_jwt]
-    from src.config import settings as cfg
-    cfg.settings.JWT_SECRET = _SECRET
+    app.dependency_overrides.pop(verify_jwt, None)
     r = client.get(
         "/v1/api/reports/tests/1",
         headers={"Authorization": "Bearer notavalidtoken"},

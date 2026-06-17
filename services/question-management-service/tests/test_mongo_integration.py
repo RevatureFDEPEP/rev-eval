@@ -32,6 +32,14 @@ pytestmark = pytest.mark.skipif(
 
 from fastapi.testclient import TestClient  # noqa: E402
 from main import app  # noqa: E402
+from src.utils.dependencies import verify_jwt  # noqa: E402
+
+
+def _fake_trainer():
+    return {"sub": "1", "role": "TRAINER", "email": "trainer@ci.test"}
+
+
+app.dependency_overrides[verify_jwt] = _fake_trainer
 
 _MONGO_URL = "mongodb://localhost:27017"
 _TEST_DB = "test_questions"

@@ -109,7 +109,12 @@ class TestWriteEndpointsRequireAuth:
         assert resp.status_code == 401
 
     def test_create_question_participant_role_returns_403(self):
-        token = _make_token(role="PARTICIPANT")
+        from src.config.settings import settings as s
+        token = jwt.encode(
+            {"sub": "1", "role": "PARTICIPANT", "exp": int(time.time()) + 3600},
+            s.JWT_SECRET,
+            algorithm="HS256",
+        )
         with self._make_client():
             with TestClient(app) as client:
                 resp = client.post(
