@@ -36,7 +36,7 @@ export function ScorePerAttemptChart({
   return (
     <ChartWrapper
       ariaLabel="Bar chart of score percentage per quiz attempt, oldest to newest"
-      data={data as unknown as Array<Record<string, unknown>>}
+      data={data}
       xKey="label"
       yDomain={[0, 100]}
       yTickFormatter={(v) => `${v}%`}

@@ -26,7 +26,7 @@ export interface ChartWrapperProps {
   /** Screen-reader description of the chart (required — the SVG is opaque). */
   ariaLabel: string;
   /** Row objects; each key is addressable by `xKey` / the series `dataKey`. */
-  data: Array<Record<string, unknown>>;
+  data: object[];
   /** Row key used for the category (X) axis. */
   xKey: string;
   /** The `<Bar>` series (one or more). */

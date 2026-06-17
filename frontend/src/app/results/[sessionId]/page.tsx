@@ -11,9 +11,10 @@
  * renders on first byte while the reporting data loads.
  */
 import { Suspense } from 'react';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
-import { getCurrentUserServer } from '@/lib/api/server';
+import { ServerApiError, getCurrentUserServer } from '@/lib/api/server';
+import { loadUserAttempts } from '@/lib/api/reports';
 import { AuthProvider } from '@/lib/auth/AuthContext';
 import { RegionErrorBoundary } from '@/components/results/RegionErrorBoundary';
 import { AttemptsRegion, ChartRegion, SummaryRegion } from './regions';
@@ -33,8 +34,28 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
   }
   const userId = session.userId;
 
+  // Identity seeding and the ownership fetch are independent — run concurrently.
+  const userPromise = getCurrentUserServer();
+
+  // Ownership check at the page level (a server component, with no client error
+  // boundary above it) so notFound() reaches not-found.tsx the standard way.
+  // Only 404 when we positively know the attempt is not the caller's: a fetch
+  // failure leaves `attempts` null so the regions surface their own error panel
+  // (the cache()-shared rejection re-throws inside each region) instead of a
+  // misleading "not found".
+  let attempts = null;
+  try {
+    attempts = await loadUserAttempts(userId);
+  } catch (e) {
+    if (e instanceof ServerApiError && e.status === 401) redirect('/');
+    // other failures: fall through; regions render their own error state
+  }
+  if (attempts && !attempts.items.some((a) => a.session_id === sessionId)) {
+    notFound();
+  }
+
   // Seed AuthContext for client children (W3-F3 pattern); never throws.
-  const user = await getCurrentUserServer();
+  const user = await userPromise;
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
