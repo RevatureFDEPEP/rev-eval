@@ -55,7 +55,7 @@ class AnswerRepository:
         test_id: Optional[int] = None,
         page: int = 1,
         size: int = 20,
-    ) -> Tuple[List[Tuple[Answer, int, int, "datetime", Optional[str]]], int]:
+    ) -> Tuple[List[tuple], int]:
         """Page through PENDING_REVIEW answers, joined to session + test for
         the trainer queue. Returns (rows, total) where each row is
         (Answer, session_user_id, test_id, submitted_at, test_name)."""
