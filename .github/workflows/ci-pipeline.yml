@@ -97,6 +97,36 @@ jobs:
         if: always() && matrix.service == 'test-management-service'
         run: docker compose down -v --remove-orphans
 
+      # W4-F1: reporting reads test-management's tables from the shared DB, so
+      # its cross-schema suite needs the REAL schema. Bring up test-management
+      # (it migrates eval_ai_dev on startup) and run reporting's --integration
+      # tests against it; this catches mirror/schema drift the hermetic suite
+      # (which builds its schema from reporting's own models) cannot.
+      - name: Start integration containers (Postgres, test-management)
+        if: matrix.service == 'reporting-and-analytics-service'
+        run: |
+          cp .env.example .env
+          docker compose up -d --wait postgres test-management-service
+
+      - name: Run integration tests
+        if: matrix.service == 'reporting-and-analytics-service'
+        working-directory: services/reporting-and-analytics-service
+        # IT_REQUIRE_SCHEMA makes a missing quiz_sessions table a hard failure
+        # (not a skip), so a table-level mirror/schema divergence fails CI here
+        # instead of silently opting out — the suite has just brought up
+        # test-management, so the tables MUST exist unless the contract drifted.
+        env:
+          IT_REQUIRE_SCHEMA: "1"
+        run: pytest --integration -m integration -v
+
+      - name: Dump integration container logs
+        if: failure() && matrix.service == 'reporting-and-analytics-service'
+        run: docker compose logs --no-color
+
+      - name: Stop integration containers
+        if: always() && matrix.service == 'reporting-and-analytics-service'
+        run: docker compose down -v --remove-orphans
+
       - name: Build production image
         working-directory: services/${{ matrix.service }}
         run: docker build --target production -t ${{ matrix.service }}:ci .

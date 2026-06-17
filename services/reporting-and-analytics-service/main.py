@@ -9,6 +9,7 @@ from src.config.settings import settings
 from src.db.session import verify_db_connection
 from src.middleware.correlation import CorrelationIdMiddleware
 from src.utils.logging_config import setup_logging
+from src.v1.routes.reports_route import router as reports_router
 
 load_dotenv()
 setup_logging(settings.SERVICE_NAME, settings.LOG_LEVEL)
@@ -33,10 +34,15 @@ app.add_middleware(CorrelationIdMiddleware)
 
 
 # ---- Routes ----
-# Reporting endpoints land here in W4-F1 (app.include_router(reports_router, ...)).
+app.include_router(reports_router, prefix="/v1/api")
 
 
 # ---- Health Endpoint ----
+# Liveness only: reports that the process is up, NOT that the shared DB is
+# reachable. This is deliberate — restarting reporting cannot fix a DB outage,
+# and the gateway does not gate startup on this service. DB unreachability
+# surfaces per-request (a 5xx from the reporting query), not as an unhealthy
+# container. verify_db_connection() on startup logs connectivity for diagnostics.
 @app.get("/health", tags=["health"])
 def health_check():
     return {"status": "ok"}

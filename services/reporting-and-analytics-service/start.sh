@@ -4,7 +4,7 @@
 #
 # This service is a READ-ONLY consumer of test-management-service's data: it
 # reads quiz_sessions / session_answers from the shared eval_ai_dev Postgres
-# (see docs/adr/0001-cross-service-data-access.md). It owns NO tables, so it
+# (see adr/0001-cross-service-data-access.md). It owns NO tables, so it
 # runs NO Alembic migrations here — doing so would touch the `alembic_version`
 # row that test-management-service owns in the same database. Its Alembic
 # environment is scaffolded (with an isolated version_table) for the day this

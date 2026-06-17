@@ -229,8 +229,6 @@ services:
         condition: service_healthy
       question-management-service:
         condition: service_healthy
-      reporting-and-analytics-service:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s

@@ -13,7 +13,7 @@ Read-heavy service that serves candidate results and trainer dashboards
 The service reads test-management's data **directly from the shared database**
 (shared-DB read-only), rather than over HTTP or via a mirror table. The decision,
 trade-offs, and alternatives are recorded in
-`docs/adr/0001-cross-service-data-access.md` (added in W4-F1).
+`adr/0001-cross-service-data-access.md` (added in W4-F1).
 
 ## Authorization
 
