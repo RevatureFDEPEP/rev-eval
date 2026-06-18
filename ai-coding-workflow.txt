@@ -1,0 +1,36 @@
+
+In this project, create a custom workflow skill that will do the following:
+1. start with `/plan` mode, and plan a specific $feature-id by reading the ./docs/index.md and all the relevant files in ./docs, write the plan to ./docs/plans, showing any major decisions for human to approve
+2. write an ADR for the specific $feature-id in ./docs/adr, the naming convention should follow what is in features and feature_specs
+3. make sure to activate the project python venv in ./venv when using python and its tools
+4. when using pnpm, it should be via corepack enable
+5. execute the plan made in step 1 with manual approval
+6. if the plan doesn't already include tests, add all relevant tests the $feature-id like unit test and integration test
+7. run tests on $feature-id and resolve all issues
+8. run linting on $feature-id, python uses ruff and next.js uses eslint, resolve all issues
+9. if any files changes either after step 7 or step 8, re-run the other step until all issues are resolved (no file change)
+10. commit the work and push it to remote git repo
+11. update all the corresponding documents in ./docs/features, ./docs/FEATURE_STATUS.md, and ./docs/index.md
+12. commit the docment changes in step 11 and push it to remote git repo
+
+
+
+Done. Command at .claude/commands/feature.md → invoke as:
+
+/feature w3-f3
+
+Two notes:
+- Venv is .venv (not ./venv as stated) — confirmed from pyvenv.cfg. Command uses .venv.
+- ADR dir docs/adr/ created (was missing).
+
+Workflow summary:
+1. /plan mode → reads all relevant docs + code → writes plan to docs/plans/ → waits for approval
+2. Writes ADR to docs/adr/ with w#-f#-topic.md / # ADR W#-F# — Topic format
+3. Executes plan with per-section confirmation checkpoints
+4. Adds missing tests if plan omitted them
+5. Runs tests (pytest / jest), fixes all failures
+6. Runs lint (ruff + eslint), fixes all issues
+7. Convergence loop — re-runs whichever step changed files until both pass clean
+8. Commits + pushes code
+9. Updates docs/features/, FEATURE_STATUS.md, docs/index.md
+10. Commits + pushes docs
