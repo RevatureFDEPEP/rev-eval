@@ -308,18 +308,6 @@ export interface QuizAnswer {
   time_spent_seconds?: number;
 }
 
-export interface TestSessionCreate {
-  test_id: number;  // SQL test ID
-  submission_id?: number | null;  // SQL submission ID
-  user_id?: number;
-  total_questions?: number;  // Default: 20
-  part_a_config?: {
-    easy: number;
-    medium: number;
-    hard: number;
-  };
-}
-
 export interface TestSessionPart {
   questions: GradedQuizQuestion[];
   started_at?: string;

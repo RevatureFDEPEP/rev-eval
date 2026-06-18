@@ -7,42 +7,13 @@
 
 import { api } from './client';
 import {
-  TestSessionCreate,
   TestSession,
-  QuizSessionRead,
   PartAQuestionsResponse,
   PartBQuestionsResponse,
   PartAAnswersSubmit,
   PartBAnswersSubmit,
   QuizSubmitResponse,
 } from './types';
-
-/**
- * Create a new test session when user starts a quiz
- *
- * @param data - Session creation data (test_id, submission_id, user_id, etc.)
- * @returns Created test session with session_id
- */
-export async function createTestSession(data: TestSessionCreate): Promise<TestSession> {
-  const response = await api.post<QuizSessionRead>('/v1/api/test-sessions/', {
-    test_id: data.test_id,
-    ...(data.submission_id != null ? { submission_id: data.submission_id } : {}),
-  });
-
-  return {
-    id: response.session_id,
-    session_id: response.session_id,
-    test_id: response.test_id,
-    submission_id: data.submission_id ?? 0,
-    user_id: response.user_id,
-    status: response.status as TestSession['status'],
-    started_at: response.server_now,
-    total_questions: response.questions.length,
-    created_at: response.server_now,
-    updated_at: response.server_now,
-    current_part: null,
-  };
-}
 
 /**
  * Get Part A questions (11 questions: 3 easy, 4 medium, 4 hard)
