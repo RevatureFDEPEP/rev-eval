@@ -480,6 +480,10 @@ async def submit_answer(
     session.current_index = (session.current_index or 0) + 1
     if question_ids and session.current_index >= len(question_ids):
         session.status = "submitted"
+        # Stamp the submission time from the same server-authoritative clock the
+        # expiry gate used above (never a client value). W4-F1 reporting sorts on
+        # this; it is set exactly once, only on this submit transition.
+        session.submitted_at = now
 
     try:
         db.add(answer)

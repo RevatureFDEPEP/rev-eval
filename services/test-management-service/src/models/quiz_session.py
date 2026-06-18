@@ -57,4 +57,10 @@ class QuizSession(Base):
     status = Column(String(32), nullable=False, default="in_progress")
     current_index = Column(Integer, nullable=False, default=0)
 
+    # Server-stamped once, on the transition to "submitted" (the candidate
+    # answered the final question). Stays NULL while in_progress and on the
+    # "expired" transition (an expiry is not a submission). W4-F1 reporting reads
+    # it for "most recent attempt" and sort-by-submitted_at.
+    submitted_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)

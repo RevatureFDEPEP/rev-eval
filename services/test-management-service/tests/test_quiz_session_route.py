@@ -843,6 +843,8 @@ def test_submit_answer_happy_path_correct(client, override_user, monkeypatch):
     # the answer row was persisted with the server-computed score
     assert session.added and session.added[0].score == 1.0
     assert session.added[0].is_correct is True
+    # not the last question -> still open -> submitted_at must stay unset
+    assert qs.submitted_at is None
 
 
 # ---------------------------------------------------------------------------
@@ -923,6 +925,10 @@ def test_submit_answer_last_question_flips_to_submitted(
     body = resp.json()
     assert body["current_index"] == 2
     assert body["status"] == "submitted"
+    # the submit transition stamps submitted_at from the server clock (W4-F1
+    # reporting sorts on it); it is set exactly here, not before.
+    assert qs.submitted_at is not None
+    assert qs.submitted_at.tzinfo is not None
 
 
 # ---------------------------------------------------------------------------
@@ -1101,6 +1107,8 @@ def test_submit_answer_409_when_session_expired(client, override_user, monkeypat
     # the session was flipped to expired and that flip was committed
     assert qs.status == "expired"
     assert session.committed is True
+    # an expiry is NOT a submission -> submitted_at stays unset
+    assert qs.submitted_at is None
     # no scoring / answer persist happened
     assert fetch.calls == 0
     assert session.added == []
