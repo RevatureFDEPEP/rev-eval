@@ -20,23 +20,27 @@ but `docker compose up` does not run it — only the E2E CI job does.
 - [x] **1. Decide the seed trigger** — chose the preferred option: a guarded,
       idempotent startup seed in question-management-service, gated by
       `SEED_QUESTION_BANK` (not a one-shot compose service).
-      Evidence: `src/db/seed.py:seed_question_bank`, plan
-      `docs/plans/w5-f4-compose-question-bank-seed.md`.
+      Evidence: `services/question-management-service/src/db/seed.py:seed_question_bank`,
+      plan `docs/plans/w5-f4-compose-question-bank-seed.md`.
 - [x] **2. Implement** — `seed_question_bank()` reuses the existing fixtures via
-      the new pure-data module `src/db/seed_data.py` (the 31-question list moved
-      verbatim out of `seed_rag_context_questions.py`, which now imports it — no
+      the new pure-data module
+      `services/question-management-service/src/db/seed_data.py` (the 31-question
+      list moved verbatim out of `seed_rag_context_questions.py`, which now
+      imports it — no
       duplication). Validates each fixture via `QuestionCreate` and inserts
       through `QuestionRepository.create` (option_id generation mirrored in
       `_to_question`, keeping the seeder's imports minimal so it doesn't pull
       the service layer into the coverage gate); idempotent: only runs when
       `Question.find_all().count() == 0`, so re-runs insert nothing.
-      Evidence: `src/db/seed.py`, `src/db/seed_data.py`,
-      `seed_rag_context_questions.py:24`.
+      Evidence: `services/question-management-service/src/db/seed.py`,
+      `services/question-management-service/src/db/seed_data.py`,
+      `services/question-management-service/seed_rag_context_questions.py:24`.
 - [x] **3. Default-on for local dev, opt-out for non-local** — `SEED_QUESTION_BANK`
-      defaults `True` (`src/config/settings.py`), set on the compose QMS service
-      as `${SEED_QUESTION_BANK:-true}` (`docker-compose.yml`); set `false` to opt
-      out. Evidence: `src/config/settings.py` (SEED_QUESTION_BANK),
-      `docker-compose.yml` (QMS `environment`).
+      defaults `True` (`services/question-management-service/src/config/settings.py`),
+      set on the compose QMS service as `${SEED_QUESTION_BANK:-true}`
+      (`docker-compose.yml`); set `false` to opt out.
+      Evidence: `services/question-management-service/src/config/settings.py`
+      (SEED_QUESTION_BANK), `docker-compose.yml` (QMS `environment`).
 - [x] **4. Verify** — clean-DB smoke: ran the built QMS image against a fresh
       Mongo → startup log `Question bank empty; seeding 31 demo question(s)` →
       `seed complete: inserted=28 skipped=3` → `GET /v1/api/questions/` returned
@@ -62,5 +66,6 @@ but `docker compose up` does not run it — only the E2E CI job does.
       `POST /sessions` that no longer hits the empty-bank failure — no manual
       seed step. Verified via the built QMS image on a fresh Mongo volume.
 - [x] Seeding is idempotent (re-run inserts 0) and opt-out-able via
-      `SEED_QUESTION_BANK=false`. Covered by `tests/test_seed.py` (3 tests).
+      `SEED_QUESTION_BANK=false`. Covered by
+      `services/question-management-service/tests/test_seed.py` (3 tests).
 - [x] `FEATURE_STATUS.md` row flipped to ✅ with evidence.
