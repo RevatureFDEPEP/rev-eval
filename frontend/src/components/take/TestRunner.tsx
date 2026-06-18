@@ -38,6 +38,7 @@ import { useServerTimer } from '@/lib/exam/useServerTimer';
 import type { AnswerResult, SanitizedQuestion, SessionOut } from '@/lib/api/types';
 import { MultiSelectQuestion } from './MultiSelectQuestion';
 import { SingleSelectQuestion } from './SingleSelectQuestion';
+import { TrueFalseQuestion } from './TrueFalseQuestion';
 
 interface TestRunnerProps {
   session: SessionOut;
@@ -73,8 +74,33 @@ function renderQuestion(
           labelledBy={labelledBy}
         />
       );
+    case 'true_false':
+      // true_false is canonically option-less (W2-F6 stores correct_answers:
+      // [bool], no options) → synthesize the True/False control (W5-F3). A
+      // legacy true_false that *does* carry options falls through to the
+      // options-based single-select below.
+      if (!question.options || question.options.length === 0) {
+        return (
+          <TrueFalseQuestion
+            question={question}
+            selected={selected}
+            onChange={onChange}
+            disabled={disabled}
+            labelledBy={labelledBy}
+          />
+        );
+      }
+      return (
+        <SingleSelectQuestion
+          question={question}
+          selected={selected}
+          onChange={onChange}
+          disabled={disabled}
+          labelledBy={labelledBy}
+        />
+      );
     default:
-      // mcq, true_false → single-select radio group.
+      // mcq → single-select radio group.
       return (
         <SingleSelectQuestion
           question={question}
