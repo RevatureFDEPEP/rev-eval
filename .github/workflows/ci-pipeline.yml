@@ -18,6 +18,7 @@ jobs:
           - user-service
           - question-management-service
           - test-management-service
+          - reporting-and-analytics-service
           - api-gateway-service
     steps:
       - uses: actions/checkout@v3
