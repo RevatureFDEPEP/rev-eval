@@ -407,6 +407,48 @@ export interface TmsSessionStartResponse {
   questions: TmsQuestion[];
 }
 
+// ===== REPORTING & ANALYTICS =====
+
+/** Mirrors AttemptStatus from the reporting service (session_mirror model). */
+export enum AttemptStatus {
+  ACTIVE = "ACTIVE",
+  EXPIRED = "EXPIRED",
+  COMPLETED = "COMPLETED",
+  ABANDONED = "ABANDONED",
+  SUBMITTED = "SUBMITTED",
+}
+
+/** A single quiz attempt as returned by the reporting endpoints (AttemptOut). */
+export interface Attempt {
+  session_id: string;
+  user_id: number;
+  test_id?: string | null;
+  status: AttemptStatus;
+  score: number;
+  time_spent_seconds: number;
+  started_at?: string | null;
+  submitted_at?: string | null;
+  created_at: string;
+}
+
+/** Summary envelope for GET /reports/user/{user_id}. */
+export interface UserReportSummary {
+  user_id: number;
+  total_attempts: number;
+  average_score: number;
+  best_score: number;
+  total_time_spent: number;
+  most_recent_attempt?: Attempt | null;
+}
+
+/** Paginated envelope for GET /reports/user/{user_id}/attempts. */
+export interface PaginatedAttempts {
+  items: Attempt[];
+  total: number;
+  page: number;
+  size: number;
+  pages: number;
+}
 // ===== TYPE ALIASES (for backwards compatibility) =====
 
 /** @deprecated Use SubmissionStatus instead */
