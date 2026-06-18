@@ -145,12 +145,13 @@ export function GradedSubmissionSheet({
     return audioEntry?.audio_url;
   };
 
+  const stopAudio = audioPlayer.stop;
   useEffect(() => {
     return () => {
-      audioPlayer.stop();
+      stopAudio();
       setPlayingAudioIndex(null);
     };
-  }, [open, audioPlayer]);
+  }, [open, stopAudio]);
 
   if (!submission) return null;
 

@@ -66,8 +66,10 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t rev-eval/${{ matrix.service }}:ci \
-            services/${{ matrix.service }}
+          docker build \
+            -f services/${{ matrix.service }}/Dockerfile \
+            -t rev-eval/${{ matrix.service }}:ci \
+            services/
 
       - name: Trivy scan
         uses: aquasecurity/trivy-action@v0.36.0

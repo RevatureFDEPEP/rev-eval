@@ -13,7 +13,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY user-service/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel "jaraco.context>=6.1.0" && \
     pip install --no-cache-dir -r requirements.txt
 
@@ -30,7 +30,7 @@ RUN pytest tests/ --tb=short -q
 
 FROM base AS production
 
-COPY . .
+COPY user-service/ .
 
 EXPOSE 8002
 

@@ -217,12 +217,13 @@ export function SubmissionReviewSheet({
     return audioEntry?.audio_url;
   };
 
+  const stopAudio = audioPlayer.stop;
   useEffect(() => {
     return () => {
-      audioPlayer.stop();
+      stopAudio();
       setPlayingAudioIndex(null);
     };
-  }, [open, audioPlayer]);
+  }, [open, stopAudio]);
 
   const handleUseAIValue = (setter: (value: string) => void, value: string | string[] | undefined) => {
     if (Array.isArray(value)) {

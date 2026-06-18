@@ -13,7 +13,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY test-management-service/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel "jaraco.context>=6.1.0" && \
     pip install --no-cache-dir -r requirements.txt
 
@@ -23,14 +23,14 @@ FROM base AS test
 COPY requirements-dev.txt ./requirements-dev.txt
 RUN pip install --no-cache-dir -r requirements-dev.txt
 
-COPY . .
+COPY test-management-service/ .
 
 RUN pytest tests/ --tb=short -q
 
 
 FROM base AS production
 
-COPY . .
+COPY test-management-service/ .
 
 RUN sed -i 's/\r$//' start.sh && chmod +x start.sh
 
