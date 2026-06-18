@@ -1,10 +1,17 @@
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import exc as sa_exc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from src.models.session import Session, SessionStatus
+
+
+def _is_sqlite(db: AsyncSession) -> bool:
+    """Return True when the underlying engine is SQLite (test environment)."""
+    try:
+        return db.sync_session.bind.dialect.name == "sqlite"
+    except Exception:
+        return False
 
 
 class SessionRepository:
@@ -46,24 +53,15 @@ class SessionRepository:
     async def get_locked(db: AsyncSession, session_id: str) -> Optional[Session]:
         """Fetch session with SELECT FOR UPDATE to serialise concurrent answer submissions.
 
-        Falls back to a plain SELECT on databases that do not support FOR UPDATE
-        (e.g. SQLite used in tests).
+        Skips FOR UPDATE on SQLite (used in tests) which does not support it.
+        On Postgres, any unexpected error propagates rather than silently
+        falling back to a non-locking SELECT.
         """
-        try:
-            result = await db.execute(
-                select(Session)
-                .where(Session.session_id == session_id)
-                .with_for_update()
-            )
-            return result.scalars().first()
-        except (sa_exc.CompileError, Exception) as exc:
-            # SQLite raises OperationalError / CompileError for FOR UPDATE
-            if "for update" in str(exc).lower() or "not supported" in str(exc).lower():
-                result = await db.execute(
-                    select(Session).where(Session.session_id == session_id)
-                )
-                return result.scalars().first()
-            raise
+        stmt = select(Session).where(Session.session_id == session_id)
+        if not _is_sqlite(db):
+            stmt = stmt.with_for_update()
+        result = await db.execute(stmt)
+        return result.scalars().first()
 
     @staticmethod
     async def advance_index(
@@ -72,15 +70,17 @@ class SessionRepository:
         new_index: int,
         submitted: bool = False,
     ) -> Session:
-        """Advance current_index; optionally mark as SUBMITTED."""
+        """Advance current_index; optionally mark as SUBMITTED.
+
+        Uses flush() so the caller can commit the enclosing transaction
+        atomically (answer + index advance + idempotency key in one commit).
+        """
         session.current_index = new_index
         if submitted:
             session.status = SessionStatus.SUBMITTED
             session.submitted_at = datetime.utcnow()
         session.updated_at = datetime.utcnow()
-        await db.commit()
-        await db.refresh(session)
-        return session
+        await db.flush()
 
     @staticmethod
     async def list_by_user(db: AsyncSession, user_id: int) -> List[Session]:

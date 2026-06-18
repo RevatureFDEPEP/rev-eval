@@ -31,7 +31,10 @@ _QUESTION_SERVICE_URL = os.getenv("QUESTION_SERVICE_URL", "http://question-manag
 _DEFAULT_DURATION_SECONDS = 7200  # 2-hour fallback when test.duration is not set
 
 # Question types that receive Jaccard partial-credit scoring
-_PARTIAL_CREDIT_TYPES = {"text", "short_answer", "essay", "fill_in_the_blank"}
+_PARTIAL_CREDIT_TYPES = {
+    "multiple_select", "multi_select", "checkbox", "multi_answer",
+    "text", "short_answer", "essay", "fill_in_the_blank",
+}
 
 
 class SessionService:
@@ -256,25 +259,11 @@ class SessionService:
         # ── 7. Advance index and check completion ────────────────────────────
         new_index = current_idx + 1
         is_last = new_index >= len(question_ids)
-        session = await SessionRepository.advance_index(
+        await SessionRepository.advance_index(
             db, session, new_index=new_index, submitted=is_last
         )
 
-        # ── 8. Fetch next question (non-fatal) ───────────────────────────────
-        next_question: Optional[Dict[str, Any]] = None
-        if not is_last:
-            next_id = question_ids[new_index]
-            try:
-                nq_resp = await client.get(
-                    f"{_QUESTION_SERVICE_URL}/v1/api/questions/{next_id}",
-                    headers=outbound_headers,
-                )
-                if nq_resp.status_code == 200:
-                    next_question = nq_resp.json()
-            except httpx.RequestError:
-                pass
-
-        # ── 9. Build response ─────────────────────────────────────────────────
+        # ── 8. Build response (before commit so we read dirty state) ─────────
         response = AnswerResponse(
             session_id=session_id,
             question_id=current_question_id,
@@ -285,20 +274,35 @@ class SessionService:
             details=result.details,
             current_index=session.current_index,
             session_status=session.status,
-            next_question=next_question,
+            next_question=None,
             submitted_at=session.submitted_at,
         )
 
-        # Store for idempotency (exclude next_question to keep it compact)
+        # ── 9. Store idempotency key (still inside the same transaction) ─────
         if idempotency_key:
             cache_payload = response.model_dump(mode="json")
-            cache_payload["next_question"] = None  # don't cache the volatile field
             await IdempotencyRepository.create(
                 db,
                 idempotency_key=idempotency_key,
                 session_id=session_id,
                 response_body=json.dumps(cache_payload),
             )
-            await db.commit()
+
+        # ── 10. Single atomic commit: answer + index + idempotency key ───────
+        await db.commit()
+        await db.refresh(session)
+
+        # ── 11. Fetch next question (non-fatal, after commit) ────────────────
+        if not is_last:
+            next_id = question_ids[new_index]
+            try:
+                nq_resp = await client.get(
+                    f"{_QUESTION_SERVICE_URL}/v1/api/questions/{next_id}",
+                    headers=outbound_headers,
+                )
+                if nq_resp.status_code == 200:
+                    response.next_question = nq_resp.json()
+            except httpx.RequestError:
+                pass
 
         return response
