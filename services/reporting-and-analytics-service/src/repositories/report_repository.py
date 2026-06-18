@@ -26,6 +26,14 @@ class ReportRepository:
         Returns (total_attempts, average_score, best_score, total_time_spent,
         most_recent_attempt). Uses func.count/avg/sum/max plus a scalar
         subquery selecting the most recent attempt's id (see ADR 0001).
+
+        AI-assisted (Claude Code): the single-query aggregate (count/avg/sum/max
+        + most-recent scalar subquery) was drafted with AI. Human review chose
+        to fetch the most-recent row by id subquery rather than a second full
+        query, kept the deterministic (created_at desc, session_id desc)
+        ordering as a stable tiebreak, and coerced the possibly-NULL aggregates
+        to safe defaults (0 / 0.0) so a brand-new user returns zeros, not nulls.
+        This local-SQL approach is the whole point of ADR 0001's mirror table.
         """
         most_recent_id_subq = (
             select(SessionMirror.session_id)

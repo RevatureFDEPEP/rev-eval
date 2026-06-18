@@ -26,7 +26,15 @@ def score_question(
     correct_answers: List[Any],
     submitted_answers: List[Any],
 ) -> ScoreResult:
-    """Return a ScoreResult using Jaccard-similarity partial-credit logic."""
+    """Return a ScoreResult using Jaccard-similarity partial-credit logic.
+
+    AI-assisted (Claude Code): the Jaccard formula and the empty-set edge case
+    were drafted with AI. Human review confirmed the intersection/union math,
+    added the both-empty → full-credit branch deliberately (a question with no
+    correct answers and no submission is treated as satisfied), and confirmed
+    via ADR 0002 that this scorer is wired to free-text types only, not
+    multi-select. See docs/adr/0002-multi-select-scoring-algorithm.md.
+    """
     correct = _normalise(correct_answers)
     submitted = _normalise(submitted_answers)
 

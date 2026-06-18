@@ -232,6 +232,11 @@ class SessionService:
         correct_answers: List[Any] = question_data.get("correct_answers") or question_data.get("answers") or []
 
         # ── 5. Score ─────────────────────────────────────────────────────────
+        # AI-assisted (Claude Code): the scorer-selection rule was drafted with
+        # AI. Human review chose to key the decision off a single
+        # `_PARTIAL_CREDIT_TYPES` set so the policy lives in one place, and
+        # confirmed multi-select falls through to `exact_match` (full-match) per
+        # ADR 0002 rather than receiving Jaccard partial credit.
         scorer = (
             partial_credit
             if question_type.lower() in _PARTIAL_CREDIT_TYPES

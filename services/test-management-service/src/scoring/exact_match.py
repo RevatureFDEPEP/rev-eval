@@ -32,6 +32,11 @@ def score_question(
     correct = _normalise(correct_answers)
     submitted = _normalise(submitted_answers)
 
+    # AI-assisted (Claude Code): the type-routing and full-match branches were
+    # drafted with AI. Human review made the "unrecognised type → single-answer
+    # exact match" fallback explicit (defensive default so a bad `type` field
+    # can never crash scoring) and confirmed multi-select uses set equality
+    # (all-or-nothing) per the decision in ADR 0002.
     if qtype in _SINGLE_ANSWER_TYPES or qtype not in _MULTI_ANSWER_TYPES:
         # For any unrecognised type default to single-answer exact match
         correct_val = next(iter(correct), "")
