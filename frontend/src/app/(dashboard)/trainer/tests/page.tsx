@@ -30,7 +30,7 @@ import { SubmissionReviewSheet } from '@/components/trainer/SubmissionReviewShee
 import { QuizSubmissionSheet } from '@/components/trainer/QuizSubmissionSheet';
 import { BasicSubmissionSheet } from '@/components/trainer/BasicSubmissionSheet';
 import { AggregateCharts } from '@/components/trainer/AggregateCharts';
-import { getTrainerTests, getCurrentUser, getEvaluatedSubmissionsForTrainer, getAllSubmissionsForTrainer } from '@/lib/api';
+import { getTrainerTests, getEvaluatedSubmissionsForTrainer, getAllSubmissionsForTrainer } from '@/lib/api';
 import type { TrainerTestInfo, TestSubmission } from '@/lib/api/types';
 import { Calendar, ClipboardCheck, ClipboardList, Layers, PlusCircle, Star } from 'lucide-react';
 import { formatTableDate } from '@/lib/utils/date';
@@ -73,8 +73,7 @@ export default function TrainerTestsPage() {
   const [testsError, setTestsError] = useState<string | null>(null);
   const [selectedTest, setSelectedTest] = useState<TrainerTestInfo | null>(null);
   const [testSheetOpen, setTestSheetOpen] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
-  const [loadingUser, setLoadingUser] = useState(true);
+  const currentUserId = user?.id ?? null;
 
   // Needs Review state (evaluated submissions)
   const [submissions, setSubmissions] = useState<TestSubmission[]>([]);
@@ -141,26 +140,6 @@ export default function TrainerTestsPage() {
     if (authLoading || !userId) return;
     let cancelled = false;
 
-    const loadUser = async () => {
-      try {
-        setLoadingUser(true);
-        const profile = await getCurrentUser();
-        if (!cancelled) {
-          setCurrentUserId(profile.id);
-        }
-      } catch (err) {
-        console.error('Failed to load current user profile:', err);
-        if (!cancelled) {
-          setCurrentUserId(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingUser(false);
-        }
-      }
-    };
-
-    loadUser();
     loadTests();
     loadEvaluatedSubmissions();
     loadGradedSubmissions();
@@ -273,16 +252,7 @@ export default function TrainerTestsPage() {
     handleReviewSheetClose();
   };
 
-  if (authLoading || loadingUser || !user) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <div className="text-center">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-slate-900" />
-          <p className="mt-4 text-sm text-slate-600">Loading trainer tools…</p>
-        </div>
-      </div>
-    );
-  }
+  if (!user) return null;
 
   return (
     <div className="space-y-6">

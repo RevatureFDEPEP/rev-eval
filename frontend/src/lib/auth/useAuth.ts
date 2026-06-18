@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuthContext } from './AuthContext';
 
 export interface AuthUser {
   id: number;
@@ -23,15 +24,29 @@ interface UseAuthResult {
 }
 
 export function useAuth(options: UseAuthOptions = {}): UseAuthResult {
+  const ctx = useAuthContext();
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
 
   const ensureSignedIn = options.ensureSignedIn;
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
 
+  // Fallback state used only when no AuthProvider is present
+  const [localUser, setLocalUser] = useState<AuthUser | null>(null);
+  const [localLoading, setLocalLoading] = useState(true);
+
+  // Redirect when context resolves to unauthenticated
   useEffect(() => {
+    if (ctx === null) return;
+    if (!ctx.loading && !ctx.user && ensureSignedIn) {
+      routerRef.current.replace('/');
+    }
+  }, [ctx, ensureSignedIn]);
+
+  // Standalone fetch — only runs when there is no AuthProvider
+  useEffect(() => {
+    if (ctx !== null) return;
+
     let cancelled = false;
 
     async function load() {
@@ -39,19 +54,19 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthResult {
         const res = await fetch('/api/auth/me', { cache: 'no-store' });
         if (cancelled) return;
         if (!res.ok) {
-          setUser(null);
+          setLocalUser(null);
           if (ensureSignedIn) routerRef.current.replace('/');
           return;
         }
         const data: AuthUser = await res.json();
-        setUser((prev) => (prev?.id === data.id && prev?.role === data.role ? prev : data));
+        setLocalUser((prev) => (prev?.id === data.id && prev?.role === data.role ? prev : data));
       } catch {
         if (!cancelled) {
-          setUser(null);
+          setLocalUser(null);
           if (ensureSignedIn) routerRef.current.replace('/');
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLocalLoading(false);
       }
     }
 
@@ -59,7 +74,10 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthResult {
     return () => {
       cancelled = true;
     };
-  }, [ensureSignedIn]);
+  }, [ensureSignedIn, ctx]);
 
-  return { user, loading };
+  if (ctx !== null) {
+    return { user: ctx.user, loading: ctx.loading };
+  }
+  return { user: localUser, loading: localLoading };
 }
