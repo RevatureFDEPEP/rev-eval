@@ -73,6 +73,7 @@ def test_session_start_response_contains_all_required_fields():
     )
     assert resp.session_id == "test-uuid"
     assert resp.first_question is None  # optional, defaults to None
+    assert resp.questions == []  # defaults to empty list
 
 
 def test_session_start_response_accepts_first_question():
@@ -87,6 +88,24 @@ def test_session_start_response_accepts_first_question():
         first_question=question,
     )
     assert resp.first_question["_id"] == "abc123"
+
+
+def test_session_start_response_accepts_questions_list():
+    now = datetime(2026, 6, 18, 10, 0, 0)
+    exp = datetime(2026, 6, 18, 12, 0, 0)
+    q1 = {"_id": "abc123", "question_text": "Q1?", "type": "mcq"}
+    q2 = {"_id": "def456", "question_text": "Q2?", "type": "multi"}
+    resp = SessionStartResponse(
+        session_id="test-uuid",
+        session_token="tok" * 20,
+        server_now=now,
+        expires_at=exp,
+        first_question=q1,
+        questions=[q1, q2],
+    )
+    assert len(resp.questions) == 2
+    assert resp.questions[0]["_id"] == "abc123"
+    assert resp.questions[1]["type"] == "multi"
 
 
 # ── SessionStatus enum ────────────────────────────────────────────────────────

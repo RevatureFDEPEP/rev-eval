@@ -68,7 +68,7 @@ class SessionService:
             int(test.duration.total_seconds()) if test.duration else _DEFAULT_DURATION_SECONDS
         )
 
-        # ── 2. Sample question IDs via $sample ───────────────────────────────
+        # ── 2. Sample questions from question-management-service ─────────────
         outbound_headers: Dict[str, str] = {}
         if correlation_id:
             outbound_headers["X-Correlation-Id"] = correlation_id
@@ -95,22 +95,14 @@ class SessionService:
         sampled_questions: list = sample_resp.json()
         question_ids: List[str] = [q["_id"] for q in sampled_questions if "_id" in q]
 
-        # ── 3. Fetch first question body ─────────────────────────────────────
-        first_question: Optional[Dict[str, Any]] = None
-        if question_ids:
-            first_id = question_ids[0]
-            try:
-                q_resp = await client.get(
-                    f"{_QUESTION_SERVICE_URL}/v1/api/questions/{first_id}",
-                    headers=outbound_headers,
-                )
-                if q_resp.status_code == 200:
-                    first_question = q_resp.json()
-            except httpx.RequestError:
-                # Non-fatal: session is still created, first_question is null
-                pass
+        # Strip correct_answers so they never leave the server boundary
+        questions: list[Dict[str, Any]] = [
+            {k: v for k, v in q.items() if k != "correct_answers"}
+            for q in sampled_questions
+        ]
+        first_question: Optional[Dict[str, Any]] = questions[0] if questions else None
 
-        # ── 4. Build server-authoritative timing ────────────────────────────
+        # ── 3. Build server-authoritative timing ────────────────────────────
         server_now = datetime.utcnow()
         expires_at = server_now + timedelta(seconds=duration_seconds)
         session_id = str(uuid.uuid4())
@@ -134,6 +126,7 @@ class SessionService:
             server_now=server_now,
             expires_at=expires_at,
             first_question=first_question,
+            questions=questions,
         )
 
     @staticmethod
