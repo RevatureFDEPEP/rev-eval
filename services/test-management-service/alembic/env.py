@@ -17,7 +17,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # Import Base so all models register their metadata
+import src.models.idempotency_key  # noqa: F401
 import src.models.session  # noqa: F401
+import src.models.session_answer  # noqa: F401
 
 # Ensure all models are imported so their tables appear in Base.metadata
 import src.models.skill  # noqa: F401

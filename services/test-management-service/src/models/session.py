@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, JSON, String
 from sqlalchemy.orm import relationship
 from src.db.session import Base
 
@@ -12,6 +12,7 @@ class SessionStatus(str, enum.Enum):
     EXPIRED = "EXPIRED"
     COMPLETED = "COMPLETED"
     ABANDONED = "ABANDONED"
+    SUBMITTED = "SUBMITTED"
 
 
 class Session(Base):
@@ -26,6 +27,9 @@ class Session(Base):
     expires_at = Column(DateTime, nullable=False)
     status = Column(Enum(SessionStatus), nullable=False, default=SessionStatus.ACTIVE)
     current_index = Column(Integer, nullable=False, default=0)
+    # Ordered list of question IDs sampled at session creation
+    question_ids = Column(JSON, nullable=True)
+    submitted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
