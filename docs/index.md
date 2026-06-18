@@ -32,8 +32,6 @@ tells you every relevant document to read.
 | W2-F5  | Direct-to-MinIO diagram uploads (pre-signed URLs)   | ❌ Not Started | [features/w2-f5-minio-presigned-uploads.md](features/w2-f5-minio-presigned-uploads.md) | [feature_specs/w2-f5-minio-presigned-uploads.md](feature_specs/w2-f5-minio-presigned-uploads.md)         | —        |
 | W2-F6  | Structured question authoring interface             | 🟡 In Progress | [features/w2-f6-question-authoring-ui.md](features/w2-f6-question-authoring-ui.md)     | [feature_specs/w2-f6-question-authoring-ui.md](feature_specs/w2-f6-question-authoring-ui.md)             | —        |
 | W2-F7  | Alembic migrations & Category domain                | ✅ Completed   | [features/w2-f7-alembic-category-domain.md](features/w2-f7-alembic-category-domain.md) | [feature_specs/w2-f7-alembic-category-domain.md](feature_specs/w2-f7-alembic-category-domain.md)         | —        |
-| W2-F8  | Pre-existing defect cleanup (non-catalog)           | ❌ Not Started | _(not yet created)_                                                                    | _(not yet created)_                                                                                      | —        |
-| W2-M10 | Day 10 milestone: reporting service scaffold        | ❌ Not Started | _(not yet created)_                                                                    | [feature_specs/w2-m10-reporting-service-scaffold.md](feature_specs/w2-m10-reporting-service-scaffold.md) | —        |
 
 ### Week 3 — Days 11–15 (quiz-taking vertical slice)
 
@@ -79,7 +77,6 @@ W2-F7 ──► W3-F1 ──► W3-F2 ──► W3-F4 ──► W3-F6
 W2-F5 ──► W2-F6        W3-F2 ──► W4-F1 ──► W4-F3 ──► W4-F4
 W2-F4 ──► W3-F5                  W4-F1 ──► W4-F5
 W2-F1 ──► W3-F3, W3-F6, W4-F2, W4-F4
-W2-M10 ──► W4-F1
 ```
 
 Full dependency details are in each `feature_specs/{id}.md` under
@@ -89,8 +86,6 @@ Full dependency details are in each `feature_specs/{id}.md` under
 
 ## Missing Files (linked from FEATURE_STATUS.md but not yet created)
 
-| File                                            | Needed for           |
-| ----------------------------------------------- | -------------------- |
-| `features/w2-f8-pre-existing-defects.md`        | W2-F8 step tracking  |
-| `features/w2-m10-reporting-service-scaffold.md` | W2-M10 step tracking |
-| `feature_specs/w3-f7-review-remediation.md`     | W3-F7 spec           |
+| File                                        | Needed for  |
+| ------------------------------------------- | ----------- |
+| `feature_specs/w3-f7-review-remediation.md` | W3-F7 spec  |
