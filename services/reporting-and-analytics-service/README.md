@@ -14,7 +14,7 @@ gateway-routed at `/v1/api/reports/*`.
   is isolated from test-management's chain in the shared DB. It owns no domain
   tables — `0001_baseline` is an empty no-op and stays head.
 
-Rationale in [docs/adr/0001-reporting-cross-service-data-access.md](docs/adr/0001-reporting-cross-service-data-access.md).
+Rationale in [repo-root docs/adr/0001-reporting-cross-service-data-access.md](../../docs/adr/0001-reporting-cross-service-data-access.md).
 
 ## Endpoints (W4-F1)
 

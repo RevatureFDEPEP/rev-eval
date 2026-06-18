@@ -3,7 +3,7 @@
 These tables live in test-management-service's Postgres (``eval_ai_dev``) and
 are owned by that service's Alembic chain — this service only ever SELECTs from
 them, over the dedicated ``tms_engine`` / ``get_tms_db`` in src/db/session.py.
-See docs/adr/0001-reporting-cross-service-data-access.md.
+See repo-root docs/adr/0001-reporting-cross-service-data-access.md.
 
 Containment rules:
 - Every TMS mapping lives here on ``TmsBase`` — never on the reporting ``Base``,
