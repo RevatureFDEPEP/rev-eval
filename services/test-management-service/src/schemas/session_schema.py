@@ -25,11 +25,13 @@ class SessionOut(BaseModel):
 
 class SessionStartResponse(BaseModel):
     """Response body for POST /sessions — all timing state lives server-side."""
+
     session_id: str
     session_token: str
     server_now: datetime
     expires_at: datetime
     first_question: Optional[Dict[str, Any]] = None
+    questions: List[Dict[str, Any]] = []
 
 
 class AnswerSubmit(BaseModel):

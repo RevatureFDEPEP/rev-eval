@@ -379,6 +379,34 @@ export interface QuizSubmitResponse {
   analysis?: string;
 }
 
+// ===== TMS SESSION (test-management-service, server-authoritative) =====
+
+export type TmsQuestionType = "mcq" | "multi" | "true_false" | "text";
+
+export interface TmsQuestionOption {
+  option_id: number;
+  text: string;
+}
+
+export interface TmsQuestion {
+  _id: string;
+  type: TmsQuestionType;
+  question_text: string;
+  options?: TmsQuestionOption[];
+  difficulty?: "easy" | "medium" | "hard";
+  skills?: string[];
+  tags?: string[];
+}
+
+export interface TmsSessionStartResponse {
+  session_id: string;
+  session_token: string;
+  server_now: string;
+  expires_at: string;
+  first_question: TmsQuestion | null;
+  questions: TmsQuestion[];
+}
+
 // ===== TYPE ALIASES (for backwards compatibility) =====
 
 /** @deprecated Use SubmissionStatus instead */

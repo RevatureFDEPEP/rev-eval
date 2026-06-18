@@ -15,6 +15,7 @@ const roleProtectedRoutes: Record<string, string[]> = {
   '/trainer': ['TRAINER', 'ADMIN'],
   '/participant': ['PARTICIPANT'],
   '/dashboard': ['TRAINER', 'PARTICIPANT', 'ADMIN'],
+  '/take': ['PARTICIPANT', 'ADMIN'],
 };
 
 function isPublic(pathname: string): boolean {
