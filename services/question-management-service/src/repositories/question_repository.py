@@ -182,3 +182,22 @@ class QuestionRepository:
             List[Question]: List of matching Question documents
         """
         return await Question.find(In(Question.tags, tags)).limit(limit).to_list()
+
+    @staticmethod
+    async def sample(count: int, skill: str | None = None) -> list[Question]:
+        """
+        Return `count` randomly sampled questions using MongoDB $sample.
+        Optionally filter by skill before sampling.
+
+        Args:
+            count: Number of questions to return
+            skill: Optional skill name to filter by before sampling
+
+        Returns:
+            List[Question]: Randomly sampled Question documents
+        """
+        pipeline = []
+        if skill:
+            pipeline.append({"$match": {"skills": skill}})
+        pipeline.append({"$sample": {"size": count}})
+        return await Question.aggregate(pipeline, projection_model=Question).to_list()

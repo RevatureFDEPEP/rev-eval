@@ -347,6 +347,22 @@ class QuestionService:
         return await QuestionRepository.find_by_tags(cleaned_tags, limit)
 
     @staticmethod
+    async def sample_questions(count: int, skill: str | None = None) -> list[Question]:
+        """
+        Return randomly sampled questions using MongoDB $sample.
+
+        Args:
+            count: Number of questions to return (1-100)
+            skill: Optional skill name to filter before sampling
+
+        Returns:
+            List[Question]: Randomly sampled questions
+        """
+        if skill:
+            skill = skill.strip() or None
+        return await QuestionRepository.sample(count, skill)
+
+    @staticmethod
     async def filter_questions(
         question_type: str | None = None,
         skill: str | None = None,
