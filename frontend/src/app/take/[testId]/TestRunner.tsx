@@ -7,8 +7,12 @@ import { MultiSelectQuestion } from './MultiSelectQuestion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
+// session_token is a server-minted bearer secret and must never reach the
+// client bundle — the server component drops it before passing the session.
+export type ClientSession = Omit<TmsSessionStartResponse, 'session_token'>;
+
 interface TestRunnerProps {
-  session: TmsSessionStartResponse;
+  session: ClientSession;
 }
 
 export function TestRunner({ session }: TestRunnerProps) {
@@ -61,6 +65,7 @@ export function TestRunner({ session }: TestRunnerProps) {
   const answeredCount = answers.size;
   const hasPrevious = currentIndex > 0;
   const hasNext = currentIndex < totalQuestions - 1;
+  const progressPercent = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -101,7 +106,7 @@ export function TestRunner({ session }: TestRunnerProps) {
         <div className="mb-6 h-1.5 w-full rounded-full bg-slate-200">
           <div
             className="h-1.5 rounded-full bg-blue-600 transition-all"
-            style={{ width: `${(answeredCount / totalQuestions) * 100}%` }}
+            style={{ width: `${progressPercent}%` }}
           />
         </div>
 

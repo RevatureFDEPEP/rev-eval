@@ -46,5 +46,9 @@ export default async function TakeTestPage({ params }: TakeTestPageProps) {
     redirect('/participant/tests');
   }
 
-  return <TestRunner session={session} />;
+  // Drop the server-minted bearer secret before it crosses to the client.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { session_token, ...clientSession } = session;
+
+  return <TestRunner session={clientSession} />;
 }
