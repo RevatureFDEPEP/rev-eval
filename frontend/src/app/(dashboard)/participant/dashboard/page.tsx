@@ -172,9 +172,11 @@ export default function AssociateDashboard() {
                 ) : (
                   assignedTests.slice(0, 3).map((test) => {
                     const isQuiz = test.test_type === TestType.QUIZ;
+                    // Quizzes use the server-authoritative quiz-taking slice and
+                    // need the submission id so the attempt links to its record.
                     const href = isQuiz
-                      ? `/participant/tests/take/mcq/${test.test_id}`
-                      : `/participant/tests/take/interview/${test.test_id}`;
+                      ? `/participant/tests/take/quiz/${test.test_id}?submission=${test.submission_id}`
+                      : `/participant/tests/take/interview/${test.test_id}?submission=${test.submission_id}`;
 
                     return (
                       <div key={test.submission_id} className="rounded-lg border border-slate-200 p-4">
@@ -234,15 +236,15 @@ export default function AssociateDashboard() {
                 <CardDescription>Your latest completions</CardDescription>
               </CardHeader>
               <CardContent>
-                {assignedTests.filter(test => 
-                  test.status === SubmissionStatus.GRADED && 
-                  (test.final_score != null || test.ai_score != null)
+                {assignedTests.filter(test =>
+                  (test.status === SubmissionStatus.COMPLETED || test.status === SubmissionStatus.GRADED) &&
+                  test.final_score != null
                 ).length > 0 ? (
                   <div className="space-y-3 text-sm">
                     {assignedTests
-                      .filter(test => 
-                        test.status === SubmissionStatus.GRADED && 
-                        (test.final_score != null || test.ai_score != null)
+                      .filter(test =>
+                        (test.status === SubmissionStatus.COMPLETED || test.status === SubmissionStatus.GRADED) &&
+                        test.final_score != null
                       )
                       .slice(0, 3)
                       .map((test) => (

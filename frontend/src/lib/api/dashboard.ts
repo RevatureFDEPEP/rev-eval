@@ -79,13 +79,17 @@ export async function getParticipantDashboardStats(): Promise<ParticipantDashboa
     s => s.status === SubmissionStatus.IN_PROGRESS
   ).length;
 
-  // Calculate average score - only use GRADED tests (they have scores)
-  const gradedWithScores = submissions.filter(
-    s => s.status === SubmissionStatus.GRADED && 
-         (s.final_score !== null && s.final_score !== undefined || s.ai_score !== null && s.ai_score !== undefined)
+  // Average score across any scored attempt. Auto-scored quizzes finalize as
+  // COMPLETED with a final_score (no trainer-review step), so restricting to
+  // GRADED would hide every quiz result — include COMPLETED + GRADED.
+  const scoredSubmissions = submissions.filter(
+    s =>
+      (s.status === SubmissionStatus.COMPLETED || s.status === SubmissionStatus.GRADED) &&
+      ((s.final_score !== null && s.final_score !== undefined) ||
+        (s.ai_score !== null && s.ai_score !== undefined)),
   );
-  const average_score = gradedWithScores.length > 0
-    ? gradedWithScores.reduce((sum, s) => sum + (s.final_score ?? s.ai_score ?? 0), 0) / gradedWithScores.length
+  const average_score = scoredSubmissions.length > 0
+    ? scoredSubmissions.reduce((sum, s) => sum + (s.final_score ?? s.ai_score ?? 0), 0) / scoredSubmissions.length
     : undefined;
 
   // Tests due this week (exclude completed/graded/abandoned tests)
