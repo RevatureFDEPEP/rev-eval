@@ -37,6 +37,7 @@ SERVICE_PORTS = {
     "user-service": 8002,
     "test-management-service": 8001,
     "question-management-service": 8003,
+    "reporting-and-analytics-service": 8004,
 }
 
 # ===== SERVICE ROUTING CONFIGURATION =====
@@ -51,6 +52,7 @@ ROUTES = [
     {"pattern": r"^/v1/api/skills(/.*)?$", "service": "test-management-service"},
     {"pattern": r"^/v1/api/sessions(/.*)?$", "service": "test-management-service"},
     {"pattern": r"^/v1/api/questions(/.*)?$", "service": "question-management-service"},
+    {"pattern": r"^/reports(/.*)?$", "service": "reporting-and-analytics-service"},
 ]
 
 # Paths that bypass JWT verification (login, register).
