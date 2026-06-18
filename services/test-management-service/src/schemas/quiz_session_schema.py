@@ -41,3 +41,48 @@ class SessionRead(BaseModel):
     server_now: datetime
     expires_at: datetime
     first_question: QuizQuestionOut | None
+
+
+# ===== Answer submission (W3-F2) =====
+class AnswerSubmit(BaseModel):
+    """Request body for ``POST /test-sessions/{session_id}/answer``.
+
+    ``submitted_answers`` is scored server-side against the answer key fetched
+    from question-management-service; the correct answers are NEVER part of this
+    request or its response.
+
+    Answer-encoding contract (MUST match qms — the scoring engine compares the
+    two sets element-for-element with no coercion, so a mismatch silently scores
+    0.0):
+
+    * ``mcq`` / ``multi`` — a list of **1-indexed integer ``option_id``s**, the
+      same 1-indexed positions qms stores in ``correct_answers`` (qms options are
+      numbered from 1). Send ``[2]`` for the second option, not ``[1]``
+      (0-indexed) and not the option *text*. mcq carries exactly one id; multi
+      carries one or more.
+    * ``true_false`` — a single-element list holding a ``bool`` (``[true]`` /
+      ``[false]``), matching the boolean qms stores.
+    * ``text`` — free-text is not auto-scored in W3-F2 (essay/short-answer is a
+      placeholder); send the raw string if present.
+
+    The TestRunner submit path (W3-F3 / #151) MUST emit ``option_id``s here.
+    """
+
+    question_id: str
+    submitted_answers: list = []
+
+
+class AnswerResult(BaseModel):
+    """Response for a scored answer.
+
+    Carries only the candidate-safe outcome (score + correctness flag) and the
+    server-authoritative session cursor/status. The correct-answer key is never
+    included — only whether the submission was right and how much credit it
+    earned.
+    """
+
+    question_id: str
+    score: float
+    is_correct: bool
+    current_index: int
+    status: str
