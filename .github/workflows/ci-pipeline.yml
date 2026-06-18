@@ -22,6 +22,7 @@ jobs:
         service:
           - user-service
           - question-management-service
+          - reporting-and-analytics-service
           - test-management-service
           - api-gateway-service
     steps:
