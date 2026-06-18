@@ -52,6 +52,7 @@ from src.db.session import ASYNC_DATABASE_URL, Base  # noqa: E402
 # Import every model module so all tables register on Base.metadata.
 # (Order does not matter; importing the module is what registers the mappers.)
 from src.models import (  # noqa: E402,F401
+    answer,
     category,
     quiz_session,
     skill,
