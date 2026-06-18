@@ -247,6 +247,21 @@ class QuestionService:
                         raise ValueError("TEXT sample_answer must be at least 10 characters long")
 
     @staticmethod
+    async def get_random_questions(count: int) -> List[Question]:
+        """
+        Return `count` randomly sampled questions via MongoDB $sample.
+
+        Args:
+            count: Number of questions to sample (1–500)
+
+        Returns:
+            List[Question]: Randomly sampled Question documents
+        """
+        if count < 1:
+            raise HTTPException(status_code=400, detail="count must be at least 1")
+        return await QuestionRepository.sample_random(count)
+
+    @staticmethod
     async def delete_question(qid: str) -> bool:
         """
         Delete a question by its ID.
