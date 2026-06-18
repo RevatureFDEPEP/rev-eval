@@ -34,8 +34,10 @@ export default function TrainerDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const userId = user?.id;
+
   useEffect(() => {
-    if (authLoading || !user) return;
+    if (authLoading || !userId) return;
 
     const fetchDashboardData = async () => {
       try {
@@ -59,7 +61,7 @@ export default function TrainerDashboard() {
     };
 
     fetchDashboardData();
-  }, [user?.id, authLoading]);
+  }, [userId, authLoading]);
 
   if (authLoading || !user) {
     return (

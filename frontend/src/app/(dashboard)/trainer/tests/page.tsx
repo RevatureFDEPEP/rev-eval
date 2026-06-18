@@ -135,8 +135,10 @@ export default function TrainerTestsPage() {
     }
   }, []);
 
+  const userId = user?.id;
+
   useEffect(() => {
-    if (authLoading || !user) return;
+    if (authLoading || !userId) return;
     let cancelled = false;
 
     const loadUser = async () => {
@@ -166,7 +168,7 @@ export default function TrainerTestsPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, user?.id, loadTests, loadEvaluatedSubmissions, loadGradedSubmissions]);
+  }, [authLoading, userId, loadTests, loadEvaluatedSubmissions, loadGradedSubmissions]);
 
   const testStats = useMemo(() => {
     const active = tests.filter((test) => test.active).length;
