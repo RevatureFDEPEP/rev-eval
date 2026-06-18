@@ -26,6 +26,7 @@ jobs:
             question-management-service: ['services/question-management-service/**']
             test-management-service: ['services/test-management-service/**']
             api-gateway-service: ['services/api-gateway-service/**']
+            reporting-and-analytics-service: ['services/reporting-and-analytics-service/**']
             backend-shared: ['pyproject.toml', '.github/workflows/ci-pipeline.yml']
             frontend: ['frontend/**', '.github/workflows/ci-pipeline.yml']
 
@@ -35,7 +36,7 @@ jobs:
           CHANGED: ${{ steps.filter.outputs.changes }}
           EVENT: ${{ github.event_name }}
         run: |
-          all='["user-service","question-management-service","test-management-service","api-gateway-service"]'
+          all='["user-service","question-management-service","test-management-service","api-gateway-service","reporting-and-analytics-service"]'
           if [ "$EVENT" = "workflow_dispatch" ]; then
             backend="$all"; frontend=true
           else
