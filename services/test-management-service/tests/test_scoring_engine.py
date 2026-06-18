@@ -253,3 +253,56 @@ def test_unknown_or_none_type_falls_back_to_exact_match(qtype, partial_submit):
     exact = score_question(qtype, ["a", "b", "c"], ["a", "b", "c"])
     assert exact.score == 1.0
     assert exact.is_correct is True
+
+
+# ---------------------------------------------------------------------------
+# Answer-encoding contract (the #149 review hazard): the engine compares the
+# two sets with NO coercion, so the submitted answers MUST use the same
+# 1-indexed option_id encoding qms stores in correct_answers. These tests lock
+# the contract in and document the silent-0.0 failure mode loudly.
+# ---------------------------------------------------------------------------
+def test_mcq_one_indexed_option_id_matches_qms_encoding():
+    """qms stores correct_answers as 1-indexed positions; submitting the same
+    1-indexed option_id scores a full match."""
+    # second option correct (1-indexed) -> submit [2]
+    result = score_question("mcq", [2], [2])
+    assert result.score == 1.0
+    assert result.is_correct is True
+
+
+def test_multi_one_indexed_option_ids_match_qms_encoding():
+    result = score_question("multi", [1, 3], [1, 3])
+    assert result.score == 1.0
+    assert result.is_correct is True
+
+
+def test_mcq_zero_indexed_submission_silently_scores_zero():
+    """REGRESSION GUARD: a frontend that submits a 0-indexed array index instead
+    of the 1-indexed option_id mismatches the key and scores 0.0 with no error.
+    This is the #149 hazard — the fix is the encoding contract, not the engine."""
+    # correct is option_id 2 (1-indexed); a 0-indexed client would send 1
+    result = score_question("mcq", [2], [1])
+    assert result.score == 0.0
+    assert result.is_correct is False
+
+
+def test_multi_zero_indexed_submission_silently_scores_zero():
+    # correct option_ids {2,3} (1-indexed); 0-indexed client sends {1,2}
+    # -> Jaccard {2,3} vs {1,2} = |{2}| / |{1,2,3}| = 1/3, never a full match
+    result = score_question("multi", [2, 3], [1, 2])
+    assert result.score == pytest.approx(1 / 3)
+    assert result.is_correct is False
+
+
+def test_option_text_submission_silently_scores_zero():
+    """Submitting option *text* instead of the integer option_id never matches
+    the integer key -> 0.0. Belt-and-suspenders for the same contract."""
+    result = score_question("mcq", [2], ["Paris"])
+    assert result.score == 0.0
+    assert result.is_correct is False
+
+
+def test_true_false_boolean_encoding_matches():
+    """true_false carries a single bool matching the boolean qms stores."""
+    assert score_question("true_false", [True], [True]).score == 1.0
+    assert score_question("true_false", [True], [False]).score == 0.0

@@ -38,6 +38,19 @@ Edge cases (all handled without raising):
 * heterogeneous element types (``int`` / ``bool`` / ``str``) are compared as-is
   via set membership — the engine does not coerce, so the answer key's own types
   (qms stores ``list[int | bool | str]``) decide equality.
+
+Answer-encoding contract (the engine compares ``correct_answers`` and
+``submitted_answers`` as raw sets with NO coercion, so both sides must use the
+same encoding or the score silently collapses to 0.0):
+
+* ``mcq`` / ``multi`` — **1-indexed integer ``option_id``s**. qms stores
+  ``correct_answers`` as the 1-indexed positions of the options (numbered from
+  1), so the candidate's ``submitted_answers`` must also be those 1-indexed
+  ``option_id`` ints — not 0-indexed array indices and not option text. Submit
+  ``[2]`` for the second option. (See ``AnswerSubmit`` for the wire contract the
+  TestRunner must honor.)
+* ``true_false`` — a single ``bool`` (matching the boolean qms stores).
+* ``text`` — not auto-scored here (essay/short-answer placeholder).
 """
 
 from dataclasses import dataclass
