@@ -138,15 +138,10 @@ export default function TrainerTestsPage() {
 
   useEffect(() => {
     if (authLoading || !userId) return;
-    let cancelled = false;
 
     loadTests();
     loadEvaluatedSubmissions();
     loadGradedSubmissions();
-
-    return () => {
-      cancelled = true;
-    };
   }, [authLoading, userId, loadTests, loadEvaluatedSubmissions, loadGradedSubmissions]);
 
   const testStats = useMemo(() => {
