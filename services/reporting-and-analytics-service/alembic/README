@@ -1,0 +1,5 @@
+Alembic migrations for reporting-and-analytics-service's PRIVATE datastore.
+
+This service owns no domain tables — it reads test-management's schema over a
+read-only engine (ADR 0001). 0001_baseline is an empty no-op and is expected to
+stay head; the chain exists only for an isolated alembic_version.
