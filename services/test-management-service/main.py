@@ -6,6 +6,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import settings
 from src.db.session import init_db
+from src.utils.http_client import close_http_client
+from src.v1.routes.session_route import router as session_router
 from src.v1.routes.skill_route import router as skill_router
 from src.v1.routes.test_route import router as test_router
 from src.v1.routes.test_submission_route import router as test_submission_router
@@ -33,6 +35,7 @@ app.add_middleware(
 app.include_router(test_router, prefix="/v1/api")
 app.include_router(skill_router, prefix="/v1/api")
 app.include_router(test_submission_router, prefix="/v1/api")
+app.include_router(session_router, prefix="/v1/api")
 
 # ---- Health Endpoint ----
 @app.get("/health", tags=["health"])
@@ -43,6 +46,11 @@ def health_check():
 @app.on_event("startup")
 async def on_startup():
     await init_db()
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    await close_http_client()
 
 # ---- Run server ----
 if __name__ == "__main__":

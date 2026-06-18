@@ -37,3 +37,4 @@ class Test(Base):
     # Relationships
     submissions = relationship("TestSubmission", back_populates="test", cascade="all, delete-orphan")
     test_skills = relationship("TestSkill", back_populates="test", cascade="all, delete-orphan")
+    sessions = relationship("Session", back_populates="test", cascade="all, delete-orphan")

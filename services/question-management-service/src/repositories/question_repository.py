@@ -183,3 +183,20 @@ class QuestionRepository:
             List[Question]: List of matching Question documents
         """
         return await Question.find(In(Question.tags, tags)).limit(limit).to_list()
+
+    @staticmethod
+    async def sample_random(count: int) -> List[Question]:
+        """
+        Return `count` randomly sampled questions using MongoDB's $sample aggregation.
+
+        Args:
+            count: Number of questions to sample
+
+        Returns:
+            List[Question]: Randomly sampled Question documents
+        """
+        pipeline = [{"$sample": {"size": count}}]
+        return await Question.aggregate(
+            aggregation_pipeline=pipeline,
+            projection_model=Question,
+        ).to_list()
