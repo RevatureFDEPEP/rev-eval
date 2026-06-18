@@ -21,7 +21,6 @@ import asyncio
 from typing import Any, Dict
 
 import httpx
-
 from src.db.seed_data import QUESTIONS
 
 # Base URL for the question management service
