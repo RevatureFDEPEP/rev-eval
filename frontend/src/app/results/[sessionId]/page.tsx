@@ -10,6 +10,7 @@ import {
 import { AttemptsTable } from '@/components/results/AttemptsTable';
 import { ChartWrapper } from '@/components/results/ChartWrapper';
 import { SectionErrorBoundary } from '@/components/results/SectionErrorBoundary';
+import { SectionErrorFallback } from '@/components/results/SectionErrorFallback';
 import { SummaryHeader } from '@/components/results/SummaryHeader';
 import {
   getUserAttemptsServer,
@@ -32,8 +33,13 @@ interface ResultsPageProps {
  * Server component: resolves the signed-in user from the `auth_token` cookie
  * (via getSession, which reads next/headers) and fetches the reporting
  * envelope server-side. Each data region streams in behind its own Suspense
- * boundary and is isolated by its own error boundary so one failing panel
- * doesn't take down the page.
+ * boundary so one failing panel doesn't take down the page.
+ *
+ * Error isolation is two-part, because a throw inside an async server
+ * component does NOT reach a client error boundary — it unwinds to the route
+ * error.tsx. So each region try/catches its own server-side fetch and renders
+ * SectionErrorFallback inline (handles a reporting 500), while
+ * SectionErrorBoundary wraps the region for client-side render errors.
  */
 export default async function ResultsPage({ params }: ResultsPageProps) {
   const { sessionId } = await params;
@@ -72,7 +78,13 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
 
 /** Fetches the summary envelope and renders the headline. */
 async function SummaryRegion({ userId }: { userId: number }) {
-  const summary = await getUserReportSummaryServer(userId);
+  let summary;
+  try {
+    summary = await getUserReportSummaryServer(userId);
+  } catch (error) {
+    console.error('Failed to load results summary:', error);
+    return <SectionErrorFallback title="summary" />;
+  }
   return <SummaryHeader summary={summary} />;
 }
 
@@ -84,7 +96,13 @@ async function AttemptsTableRegion({
   userId: number;
   sessionId: string;
 }) {
-  const { items } = await getUserAttemptsServer(userId);
+  let items;
+  try {
+    ({ items } = await getUserAttemptsServer(userId));
+  } catch (error) {
+    console.error('Failed to load attempts table:', error);
+    return <SectionErrorFallback title="attempt breakdown" />;
+  }
   return (
     <Card className="border border-slate-200">
       <CardHeader>
@@ -100,7 +118,13 @@ async function AttemptsTableRegion({
 
 /** Fetches attempts and renders the score-per-attempt chart. */
 async function ChartRegion({ userId }: { userId: number }) {
-  const { items } = await getUserAttemptsServer(userId);
+  let items;
+  try {
+    ({ items } = await getUserAttemptsServer(userId));
+  } catch (error) {
+    console.error('Failed to load results chart:', error);
+    return <SectionErrorFallback title="chart" />;
+  }
   return (
     <Card className="border border-slate-200">
       <CardHeader>
