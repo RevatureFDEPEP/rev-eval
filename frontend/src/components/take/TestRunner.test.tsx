@@ -267,4 +267,34 @@ describe("TestRunner (W3-F4 exam client)", () => {
     expect(screen.getByText("Q2: pick many")).toBeInTheDocument();
     expect(submitFn).toHaveBeenCalledTimes(1); // review navigation does not re-submit
   });
+
+  // W5-F3: option-less true_false must render a working control, not the
+  // "No options available" error from the options-based single-select widget.
+  it("renders an option-less true_false and submits True as [1]", async () => {
+    const tf: SanitizedQuestion = {
+      id: "tf1",
+      type: "true_false",
+      question_text: "TF: the sky is blue",
+      options: null,
+    };
+    const submitFn = vi.fn().mockResolvedValue(finalResult);
+    render(
+      <AuthProvider initialUser={identity}>
+        <TestRunner
+          session={{ ...session, question: tf, total_questions: 1 }}
+          initialQuestions={[tf]}
+          submitAnswerFn={submitFn}
+          saveDraftFn={noopSave}
+        />
+      </AuthProvider>,
+    );
+
+    expect(screen.queryByText(/no options available/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("True")).toBeInTheDocument();
+    expect(screen.getByLabelText("False")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("True"));
+    fireEvent.click(screen.getByTestId("submit-button"));
+    await waitFor(() => expect(submitFn).toHaveBeenCalledWith("s1", [1]));
+  });
 });

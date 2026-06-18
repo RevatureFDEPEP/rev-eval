@@ -80,7 +80,7 @@ the intended `page`/`size`/`total` envelope — these predate that pattern.
 
 | Item | Location | Condition under which it matters | Urgency |
 |---|---|---|---|
-| Option-less legacy `true_false` docs render "Error: No options available" | `frontend/src/components/take/SingleSelectQuestion.tsx:30-31` | Pre-W2-F6 question docs (`correct_answers: [true]`, no `options` array) routed to the options-based single-select widget show an error. **Only stale local dev volumes hold such docs**; CI and fresh stacks seed the current shape and never hit it. Fix: a bank data normalization or a dedicated true_false widget in `components/take/`. | low |
+| ✅ **CLOSED (W5-F3)** — Option-less `true_false` docs rendered "Error: No options available" | `frontend/src/components/take/SingleSelectQuestion.tsx:30-31` | **Correction:** option-less is the *canonical* `true_false` shape, not a legacy artifact — W2-F6 authoring stores `correct_answers: [bool]` with no `options` (`frontend/src/components/trainer/question-form-utils.ts:223-226`), so *every* true/false question hit this, not just stale volumes. Fixed by a dedicated `TrueFalseQuestion` widget in `components/take/` (True→`[1]`/False→`[0]`; scores via exact-match bool↔int set-equality, no backend change). See [W5-F3](features/w5-f3-legacy-true-false-rendering.md). **Note:** seed `seed_rag_context_questions.py` has a self-contradictory doc (`correct_answers: [0]` with explanation "True", line 48) — a seed data defect deferred to a separate data/seed fix (not a render bug; full shape migration is §4). | ~~low~~ closed |
 
 ## 8. Cruft & stale artifacts
 
