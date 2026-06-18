@@ -12,15 +12,20 @@
 ## Steps
 
 - [x] **1. Category model** — `Category` SQLAlchemy model in test-management-service with `name`,
-      `description`, and M:N relation to `Test` via `test_categories` join table (`Table` object,
-      composite PK on `category_id` + `test_id`).
-- [x] **2. Alembic migration** — migration `0005_add_categories.py` with `down_revision="0004"`;
-      creates `categories` and `test_categories` tables; `env.py` imports `src.models.category`.
+      `description`, and M:N relation to `Skill` via `skill_categories` join table (`Table` object,
+      composite PK on `category_id` + `skill_id`). *(Initial impl used `test_categories` M2M with
+      `Test`; corrected to `skill_categories` M2M with `Skill` per spec in commit `fb441bc`.)*
+- [x] **2. Alembic migrations** — `0005_add_categories.py` (`down_revision="0004"`) creates
+      `categories` + `test_categories`; `0006_replace_test_categories_with_skill_categories.py`
+      (`down_revision="0005"`) drops `test_categories`, creates `skill_categories`. Head is `0006`
+      after W2-F7; W3-F2 adds `0007`.
 - [x] **3. Domain layers** — `CategoryRepository` (async CRUD), `CategoryService` (raises
       `ValueError` on not-found), Pydantic schemas `CategoryCreate`, `CategoryUpdate`, `CategoryOut`
       (Pydantic v2 `ConfigDict(from_attributes=True)`).
 - [x] **4. Gateway routes** — CRUD endpoints at `/v1/api/categories` through API gateway;
       pattern `^/v1/api/categories(/.*)?$` → test-management-service added to gateway `ROUTES`.
+      Also `POST/DELETE /v1/api/categories/{id}/skills/{skill_id}` link/unlink endpoints
+      (added in `fb441bc`).
 
 ## Reporting Service Scaffold (absorbed from W2-M10)
 
@@ -47,17 +52,19 @@
 ## Evidence
 
 **Branch:** `tianyac-alembic-migrations`
+**Commits:** `117f333` (initial impl), `65806a1` (ruff fixes), `fb441bc` (Skill M2M correction + migration 0006 + link/unlink endpoints)
 
 Files created:
 
 | File | Purpose |
 |---|---|
-| `services/test-management-service/src/models/category.py` | `Category` model + `test_categories` Table |
+| `services/test-management-service/src/models/category.py` | `Category` model + `skill_categories` Table |
 | `services/test-management-service/src/schemas/category_schema.py` | Pydantic v2 schemas |
-| `services/test-management-service/src/repositories/category_repository.py` | Async CRUD |
-| `services/test-management-service/src/services/category_service.py` | Business logic layer |
-| `services/test-management-service/src/v1/routes/category_route.py` | 5 CRUD endpoints |
-| `services/test-management-service/migrations/versions/0005_add_categories.py` | Alembic migration |
+| `services/test-management-service/src/repositories/category_repository.py` | Async CRUD + link/unlink |
+| `services/test-management-service/src/services/category_service.py` | Business logic layer + link/unlink |
+| `services/test-management-service/src/v1/routes/category_route.py` | 5 CRUD + 2 link/unlink endpoints |
+| `services/test-management-service/migrations/versions/0005_add_categories.py` | Creates `categories` + `test_categories` |
+| `services/test-management-service/migrations/versions/0006_replace_test_categories_with_skill_categories.py` | Drops `test_categories`, creates `skill_categories` |
 | `services/reporting-and-analytics-service/main.py` | FastAPI scaffold |
 | `services/reporting-and-analytics-service/requirements.txt` | Dependencies |
 | `services/reporting-and-analytics-service/Dockerfile` | Container definition |
@@ -71,7 +78,8 @@ Files modified:
 
 | File | Change |
 |---|---|
-| `services/test-management-service/src/models/test.py` | Added `categories` relationship |
+| `services/test-management-service/src/models/test.py` | Added (then removed) `categories` relationship |
+| `services/test-management-service/src/models/skill.py` | Added `categories` back-reference |
 | `services/test-management-service/migrations/env.py` | Added `src.models.category` import |
 | `services/test-management-service/src/db/session.py` | Import `category` in `init_db()` |
 | `services/test-management-service/main.py` | Registered `category_router` |

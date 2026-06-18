@@ -31,10 +31,11 @@ on last question, Alembic migration `0007` (`session_answers` + `idempotency_key
 W3-F1 (quiz session backend) ✅ complete on `tianyac-feat-session` (commit
 `ca6877d`); security hardened — `correct_answers` excluded by MongoDB `$project`.
 W2-F7 (Alembic + Category domain + reporting scaffold) ✅ complete on
-`tianyac-alembic-migrations` — migration `0005_add_categories`, full Category
-CRUD stack at `/v1/api/categories`, reporting-and-analytics-service scaffold
-with `reporting-postgres` + Alembic baseline, three defects fixed (skill-500,
-user-service dual-engine, Pydantic v2 audit). W2-F1 (nginx TLS + basic routing),
+`tianyac-alembic-migrations` — migrations `0005_add_categories` + `0006_replace_test_categories_with_skill_categories`
+(Category M2M corrected to Skill per spec; `fb441bc`), full Category CRUD +
+link/unlink endpoints at `/v1/api/categories`, reporting-and-analytics-service
+scaffold with `reporting-postgres` + Alembic baseline, three defects fixed
+(skill-500, user-service dual-engine, Pydantic v2 audit). W2-F1 (nginx TLS + basic routing),
 W2-F2 (frontend + backend unit tests), W2-F4 (Ruff/ESLint CI gates), W2-F6
 (question authoring schema + tests) partially done (🟡). All other W2, remaining
 W3, and all W4 features not yet started on this branch.
