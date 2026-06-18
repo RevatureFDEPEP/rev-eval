@@ -24,11 +24,27 @@ import logging
 
 from src.config.settings import settings
 from src.db.seed_data import QUESTIONS
-from src.models.question import Question
+from src.models.question import Option, Question
+from src.repositories.question_repository import QuestionRepository
 from src.schemas.question import QuestionCreate
-from src.services.question_service import QuestionService
 
 logger = logging.getLogger(__name__)
+
+
+def _to_question(fixture: dict) -> Question:
+    """Validate a fixture via QuestionCreate and build a storable Question.
+
+    Mirrors QuestionService.create_question's conversion (1-indexed option_ids
+    auto-generated from position) without importing the service layer, so the
+    seeder's dependency surface stays minimal.
+    """
+    data = QuestionCreate(**fixture).model_dump()
+    if data.get("options"):
+        data["options"] = [
+            Option(option_id=idx, text=opt["text"])
+            for idx, opt in enumerate(data["options"], start=1)
+        ]
+    return Question(**data)
 
 
 async def seed_question_bank() -> int:
@@ -54,7 +70,7 @@ async def seed_question_bank() -> int:
     skipped = 0
     for i, fixture in enumerate(QUESTIONS, start=1):
         try:
-            await QuestionService.create_question(QuestionCreate(**fixture))
+            await QuestionRepository.create(_to_question(fixture))
             inserted += 1
         except Exception as e:  # validation/HTTP/anything — never fatal
             skipped += 1

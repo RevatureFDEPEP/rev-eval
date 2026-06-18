@@ -25,10 +25,12 @@ but `docker compose up` does not run it — only the E2E CI job does.
 - [x] **2. Implement** — `seed_question_bank()` reuses the existing fixtures via
       the new pure-data module `src/db/seed_data.py` (the 31-question list moved
       verbatim out of `seed_rag_context_questions.py`, which now imports it — no
-      duplication). Seeds through the normal create path
-      (`QuestionService.create_question`); idempotent: only runs when
+      duplication). Validates each fixture via `QuestionCreate` and inserts
+      through `QuestionRepository.create` (option_id generation mirrored in
+      `_to_question`, keeping the seeder's imports minimal so it doesn't pull
+      the service layer into the coverage gate); idempotent: only runs when
       `Question.find_all().count() == 0`, so re-runs insert nothing.
-      Evidence: `src/db/seed.py:43-66`, `src/db/seed_data.py`,
+      Evidence: `src/db/seed.py`, `src/db/seed_data.py`,
       `seed_rag_context_questions.py:24`.
 - [x] **3. Default-on for local dev, opt-out for non-local** — `SEED_QUESTION_BANK`
       defaults `True` (`src/config/settings.py`), set on the compose QMS service
