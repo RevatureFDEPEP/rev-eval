@@ -4,6 +4,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import settings
+from src.db.seed import seed_question_bank
 from src.db.session import close_db, init_db
 from src.middleware.correlation import CorrelationIdMiddleware
 from src.utils.logging_config import setup_logging
@@ -47,6 +48,12 @@ def health():
 async def on_startup():
     setup_logging(settings.SERVICE_NAME, settings.LOG_LEVEL)
     await init_db()
+    # Seed the demo question bank when empty (W5-F4). Non-fatal: a seed failure
+    # must not stop the service from coming up and serving requests.
+    try:
+        await seed_question_bank()
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"Question-bank seed skipped: {e}")
     # Create the question-images bucket if missing (no mc init container in
     # compose). Non-fatal: uploads degrade, the rest of the service still runs.
     try:

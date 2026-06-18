@@ -132,6 +132,9 @@ services:
       MONGO_APPNAME: rev-eval
       SERVICE_NAME: question-management-service
       PORT: 8003
+      # Auto-seed the demo question bank on startup when empty (W5-F4).
+      # Default-on for local dev; set false for prod-like profiles.
+      SEED_QUESTION_BANK: ${SEED_QUESTION_BANK:-true}
       S3_ENDPOINT_URL: http://minio:9000
       # Pre-signed URLs are signed against the browser-resolvable host (SigV4 binds Host)
       S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-http://localhost:9000}
