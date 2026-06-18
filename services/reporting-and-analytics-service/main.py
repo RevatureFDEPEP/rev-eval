@@ -29,7 +29,9 @@ app.add_middleware(
 )
 
 # ---- Routes ----
-app.include_router(report_router)
+# Mounted under /v1/api so the API gateway's `^/v1/api/reports(/.*)?$` route
+# (which forwards the path verbatim) reaches these endpoints.
+app.include_router(report_router, prefix="/v1/api")
 
 
 # ---- Health Endpoint ----

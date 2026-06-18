@@ -80,3 +80,26 @@ is unaffected by how rows arrive.
   rows (a brand-new user simply has zero attempts).
 - If/when an event bus is introduced, only the projection writer changes — the
   schema, repository, and endpoints stay the same.
+
+## Notes on related decisions
+
+### Schema source of truth: Alembic, not `create_all`
+
+The Alembic migration (`alembic/versions/001_…`) is the authority for the
+`session_mirror` schema. `start.sh` runs `alembic upgrade head` on boot (falling
+back to `Base.metadata.create_all` only if that fails, so a fresh local/test DB
+still comes up). `init_db()`’s `create_all` remains for the test fixtures, which
+build the schema directly from the model. The model and the migration are kept
+in lock-step; the migration — not `create_all` — is what runs in real
+environments, so the two cannot silently drift in deployment.
+
+### Database instance: shared Postgres for now
+
+The spec sketches a dedicated `reporting-postgres`. This service currently
+points at the **shared** Postgres instance (its own `session_mirror` table, in
+its own logical space). That keeps the local stack to one database while the
+mirror is still seeded/backfilled rather than fed by a live event stream.
+Because the read path depends only on `session_mirror`, moving to a separate
+reporting database later is a connection-string change plus running this
+service’s migrations against the new instance — no code changes. The
+ownership boundary (the event shape) is unaffected by where the table lives.

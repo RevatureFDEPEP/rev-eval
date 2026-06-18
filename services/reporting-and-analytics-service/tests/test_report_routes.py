@@ -5,7 +5,7 @@ from tests.conftest import USER_ID
 
 
 def test_summary_endpoint_returns_correct_aggregates(client):
-    resp = client.get(f"/reports/user/{USER_ID}")
+    resp = client.get(f"/v1/api/reports/user/{USER_ID}")
     assert resp.status_code == 200
     body = resp.json()
     assert body["user_id"] == USER_ID
@@ -17,7 +17,7 @@ def test_summary_endpoint_returns_correct_aggregates(client):
 
 
 def test_summary_endpoint_empty_user(client):
-    resp = client.get("/reports/user/99999")
+    resp = client.get("/v1/api/reports/user/99999")
     assert resp.status_code == 200
     body = resp.json()
     assert body["total_attempts"] == 0
@@ -28,7 +28,7 @@ def test_summary_endpoint_empty_user(client):
 
 
 def test_attempts_endpoint_default_pagination_meta(client):
-    resp = client.get(f"/reports/user/{USER_ID}/attempts")
+    resp = client.get(f"/v1/api/reports/user/{USER_ID}/attempts")
     assert resp.status_code == 200
     body = resp.json()
     assert body["total"] == 4
@@ -39,7 +39,7 @@ def test_attempts_endpoint_default_pagination_meta(client):
 
 
 def test_attempts_endpoint_pagination(client):
-    resp = client.get(f"/reports/user/{USER_ID}/attempts?page=1&size=2")
+    resp = client.get(f"/v1/api/reports/user/{USER_ID}/attempts?page=1&size=2")
     assert resp.status_code == 200
     body = resp.json()
     assert body["total"] == 4
@@ -49,19 +49,19 @@ def test_attempts_endpoint_pagination(client):
 
 
 def test_attempts_endpoint_size_over_max_is_rejected(client):
-    resp = client.get(f"/reports/user/{USER_ID}/attempts?size=101")
+    resp = client.get(f"/v1/api/reports/user/{USER_ID}/attempts?size=101")
     assert resp.status_code == 422
 
 
 def test_attempts_endpoint_filter_by_test_id(client):
-    resp = client.get(f"/reports/user/{USER_ID}/attempts?test_id=t1")
+    resp = client.get(f"/v1/api/reports/user/{USER_ID}/attempts?test_id=t1")
     body = resp.json()
     assert body["total"] == 2
     assert {i["session_id"] for i in body["items"]} == {"a1", "a2"}
 
 
 def test_attempts_endpoint_filter_by_status(client):
-    resp = client.get(f"/reports/user/{USER_ID}/attempts?status=COMPLETED")
+    resp = client.get(f"/v1/api/reports/user/{USER_ID}/attempts?status=COMPLETED")
     body = resp.json()
     assert body["total"] == 2
     assert {i["session_id"] for i in body["items"]} == {"a1", "a4"}
@@ -69,7 +69,7 @@ def test_attempts_endpoint_filter_by_status(client):
 
 def test_attempts_endpoint_filter_by_date_range(client):
     resp = client.get(
-        f"/reports/user/{USER_ID}/attempts?from=2026-06-05&to=2026-06-10"
+        f"/v1/api/reports/user/{USER_ID}/attempts?from=2026-06-05&to=2026-06-10"
     )
     body = resp.json()
     # a2 (06-05) and a3 (06-10), both inclusive
@@ -78,19 +78,19 @@ def test_attempts_endpoint_filter_by_date_range(client):
 
 
 def test_attempts_endpoint_sort_by_score_desc(client):
-    resp = client.get(f"/reports/user/{USER_ID}/attempts?sort=score:desc")
+    resp = client.get(f"/v1/api/reports/user/{USER_ID}/attempts?sort=score:desc")
     body = resp.json()
     scores = [i["score"] for i in body["items"]]
     assert scores == sorted(scores, reverse=True)
 
 
 def test_attempts_endpoint_invalid_sort_pattern_is_422(client):
-    resp = client.get(f"/reports/user/{USER_ID}/attempts?sort=score-desc")
+    resp = client.get(f"/v1/api/reports/user/{USER_ID}/attempts?sort=score-desc")
     assert resp.status_code == 422
 
 
 def test_attempts_endpoint_unknown_sort_field_is_400(client):
-    resp = client.get(f"/reports/user/{USER_ID}/attempts?sort=bogus:desc")
+    resp = client.get(f"/v1/api/reports/user/{USER_ID}/attempts?sort=bogus:desc")
     assert resp.status_code == 400
 
 
@@ -105,7 +105,7 @@ def test_health_endpoint(client):
 
 def test_cors_allows_frontend_origin(client):
     resp = client.get(
-        f"/reports/user/{USER_ID}",
+        f"/v1/api/reports/user/{USER_ID}",
         headers={"Origin": "http://localhost:3000"},
     )
     assert resp.status_code == 200

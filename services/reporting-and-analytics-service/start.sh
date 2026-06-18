@@ -29,22 +29,24 @@ done
 
 echo "✅ Database is ready!"
 
-echo "📦 Creating database tables..."
-python -c "
+# Alembic migrations are the source of truth for the schema (see ADR 0001).
+# Fall back to metadata create_all only if the migration step fails, so a fresh
+# environment still comes up.
+echo "📦 Applying database migrations (alembic upgrade head)..."
+if alembic upgrade head; then
+    echo "✅ Migrations applied!"
+else
+    echo "⚠️ alembic upgrade failed — falling back to create_all..."
+    python -c "
 import asyncio
 from src.db.session import init_db
 
 async def create_tables():
     await init_db()
-    print('✅ Tables created successfully!')
+    print('✅ Tables created via create_all fallback!')
 
 asyncio.run(create_tables())
 "
-
-if [ $? -eq 0 ]; then
-    echo "✅ Database tables ready!"
-else
-    echo "⚠️ Table creation failed, but continuing..."
 fi
 
 echo "🚀 Starting FastAPI service..."
