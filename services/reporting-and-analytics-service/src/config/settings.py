@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     DB_USERNAME: str
     DB_PASSWORD: str
     DB_NAME: str
+    EVAL_AI_DB_NAME: str = "eval_ai_dev"
     SERVICE_NAME: str = "reporting-and-analytics-service"
     PORT: int = 8004
 
@@ -15,6 +16,13 @@ class Settings(BaseSettings):
         return (
             f"postgresql+psycopg2://{self.DB_USERNAME}:{self.DB_PASSWORD}"
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        )
+
+    @property
+    def EVAL_AI_SQLALCHEMY_DATABASE_URL(self) -> str:
+        return (
+            f"postgresql+psycopg2://{self.DB_USERNAME}:{self.DB_PASSWORD}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.EVAL_AI_DB_NAME}"
         )
 
     class Config:
