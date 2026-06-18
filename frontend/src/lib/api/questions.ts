@@ -7,18 +7,19 @@
 import { api } from './client';
 import { Question, QuestionCreate, QuestionUpdate } from './types';
 
-/**
- * Get all questions
- */
-export async function getQuestions(): Promise<Question[]> {
-  return api.get<Question[]>('/v1/api/questions');
+// MongoDB returns _id; map it to id so callers use question.id consistently
+function normalizeQuestion(q: Question & { _id?: string }): Question {
+  return { ...q, id: q.id ?? q._id };
 }
 
-/**
- * Get a single question by ID
- */
+export async function getQuestions(): Promise<Question[]> {
+  const data = await api.get<(Question & { _id?: string })[]>('/v1/api/questions');
+  return data.map(normalizeQuestion);
+}
+
 export async function getQuestion(id: string): Promise<Question> {
-  return api.get<Question>(`/v1/api/questions/${id}`);
+  const data = await api.get<Question & { _id?: string }>(`/v1/api/questions/${id}`);
+  return normalizeQuestion(data);
 }
 
 /**
