@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronDownIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -57,39 +57,45 @@ export function AssignTestModal({ tests, onSuccess, triggerClassName, defaultTes
     now.getMinutes()
   ).padStart(2, '0')}`;
 
-  useEffect(() => {
-    if (defaultTestId) {
-      setSelectedTestId(`${defaultTestId}`);
-    }
-  }, [defaultTestId, open]);
-
-  useEffect(() => {
-    if (!dueDate || !dueTime) {
-      return;
-    }
-
+  const isPastTimeForDate = (date: Date | undefined, time: string) => {
+    if (!date || !time) return false;
     const current = new Date();
     const isToday =
-      dueDate.getFullYear() === current.getFullYear() &&
-      dueDate.getMonth() === current.getMonth() &&
-      dueDate.getDate() === current.getDate();
+      date.getFullYear() === current.getFullYear() &&
+      date.getMonth() === current.getMonth() &&
+      date.getDate() === current.getDate();
 
-    if (!isToday) {
-      return;
-    }
+    if (!isToday) return false;
 
-    const [hours, minutes] = dueTime.split(':').map(Number);
-    if (Number.isNaN(hours) || Number.isNaN(minutes)) {
-      return;
-    }
+    const [hours, minutes] = time.split(':').map(Number);
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return false;
 
-    const candidate = new Date(dueDate);
+    const candidate = new Date(date);
     candidate.setHours(hours, minutes, 0, 0);
+    return candidate.getTime() <= current.getTime();
+  };
 
-    if (candidate.getTime() <= current.getTime()) {
+  const handleDueDateSelect = (value: Date | undefined) => {
+    const nextDate = value || undefined;
+    setDueDate(nextDate);
+    if (!nextDate || isPastTimeForDate(nextDate, dueTime)) {
       setDueTime('');
     }
-  }, [dueDate, dueTime]);
+    if (nextDate) {
+      setDatePickerOpen(false);
+    }
+  };
+
+  const handleDueTimeChange = (value: string) => {
+    setDueTime(isPastTimeForDate(dueDate, value) ? '' : value);
+  };
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen && defaultTestId) {
+      setSelectedTestId(`${defaultTestId}`);
+    }
+    setOpen(nextOpen);
+  };
 
   const handleSubmit = async () => {
     if (!selectedTestId || !participantEmails.trim()) {
@@ -165,7 +171,7 @@ export function AssignTestModal({ tests, onSuccess, triggerClassName, defaultTes
   const selectedTest = options.find((test) => test.id.toString() === selectedTestId);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button
           className={cn('justify-start transition-transform hover:-translate-y-0.5', triggerClassName ?? 'w-full')}
@@ -249,14 +255,7 @@ export function AssignTestModal({ tests, onSuccess, triggerClassName, defaultTes
                       selected={dueDate}
                       captionLayout="dropdown"
                       disabled={(date) => date < startOfToday}
-                      onSelect={(value) => {
-                        setDueDate(value || undefined);
-                        if (!value) {
-                          setDueTime('');
-                        } else {
-                          setDatePickerOpen(false);
-                        }
-                      }}
+                      onSelect={handleDueDateSelect}
                     />
                   </PopoverContent>
                 </Popover>
@@ -271,7 +270,7 @@ export function AssignTestModal({ tests, onSuccess, triggerClassName, defaultTes
                   step={60}
                   min={isDueDateToday ? minSelectableTime : undefined}
                   value={dueTime}
-                  onChange={(event) => setDueTime(event.target.value)}
+                  onChange={(event) => handleDueTimeChange(event.target.value)}
                   disabled={!dueDate}
                   className="w-32 bg-background appearance-none disabled:cursor-not-allowed [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                 />

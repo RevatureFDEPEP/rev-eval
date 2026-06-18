@@ -107,9 +107,11 @@ def test_session_read_full_shape():
         server_now=now,
         expires_at=now + timedelta(hours=1),
         first_question=q,
+        questions=[q],
     )
     assert sr.session_id == "sess-123"
     assert sr.first_question.question_id == "q1"
+    assert sr.questions[0].question_id == "q1"
     assert set(SessionRead.model_fields) == {
         "session_id",
         "session_token",
@@ -120,6 +122,7 @@ def test_session_read_full_shape():
         "server_now",
         "expires_at",
         "first_question",
+        "questions",
     }
 
 
@@ -137,3 +140,4 @@ def test_session_read_first_question_nullable():
         first_question=None,
     )
     assert sr.first_question is None
+    assert sr.questions == []

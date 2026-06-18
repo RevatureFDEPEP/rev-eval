@@ -7,7 +7,6 @@
 
 import { api } from './client';
 import {
-  TestSessionCreate,
   TestSession,
   PartAQuestionsResponse,
   PartBQuestionsResponse,
@@ -15,39 +14,6 @@ import {
   PartBAnswersSubmit,
   QuizSubmitResponse,
 } from './types';
-
-/**
- * Create a new test session when user starts a quiz
- *
- * @param data - Session creation data (test_id, submission_id, user_id, etc.)
- * @returns Created test session with session_id
- */
-export async function createTestSession(data: TestSessionCreate): Promise<TestSession> {
-  // Backend returns TestSessionOut with 'id' field, we need to map to 'session_id'
-  // The service /v1/api/test-sessions/ is not created yet in the backend.
-  const response = await api.post<any>('/v1/api/test-sessions/', data);
-
-  return {
-    id: response.id,
-    session_id: response.id, // Map 'id' to 'session_id' for backwards compatibility
-    test_id: response.test_id,
-    submission_id: response.submission_id,
-    user_id: response.user_id,
-    status: response.status,
-    started_at: response.started_at,
-    completed_at: response.completed_at,
-    total_questions: response.total_questions,
-    part_a_config: response.part_a_config,
-    part_b_config: response.part_b_config,
-    part_a: response.part_a,
-    part_b: response.part_b,
-    total_score: response.total_score,
-    percentage_score: response.percentage_score,
-    created_at: response.created_at,
-    updated_at: response.updated_at,
-    current_part: null, // Not in backend response, infer from status
-  };
-}
 
 /**
  * Get Part A questions (11 questions: 3 easy, 4 medium, 4 hard)
@@ -106,7 +72,7 @@ export async function submitPartB(data: PartBAnswersSubmit): Promise<QuizSubmitR
  * @returns Complete session information
  */
 export async function getTestSession(sessionId: string): Promise<TestSession> {
-  const response = await api.get<any>(`/v1/api/test-sessions/${sessionId}`);
+  const response = await api.get<TestSession>(`/v1/api/test-sessions/${sessionId}`);
   // Map 'id' to 'session_id' for backwards compatibility
   return {
     ...response,
@@ -121,7 +87,9 @@ export async function getTestSession(sessionId: string): Promise<TestSession> {
  * @returns Test session associated with the submission
  */
 export async function getTestSessionBySubmission(submissionId: number): Promise<TestSession> {
-  const response = await api.get<any>(`/v1/api/test-sessions/by-submission/${submissionId}`);
+  const response = await api.get<TestSession>(
+    `/v1/api/test-sessions/by-submission/${submissionId}`,
+  );
   // Map 'id' to 'session_id' for backwards compatibility and ensure all fields are properly mapped
   return {
     id: response.id,

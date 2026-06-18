@@ -112,7 +112,7 @@ export async function getAllSubmissionsForTrainer(): Promise<TestSubmission[]> {
  * Get full review details for a submission
  * Includes submission, test info, transcript, and AI evaluation
  */
-export async function getSubmissionReviewDetails(submissionId: number): Promise<{
+export async function getSubmissionReviewDetails<TReviewDetails = {
   submission: TestSubmission;
   test: {
     id: number;
@@ -123,9 +123,9 @@ export async function getSubmissionReviewDetails(submissionId: number): Promise<
     duration_seconds?: number;
     skills: Array<{ id: number; name: string; description?: string }>;
   };
-  transcript: any; // Full transcript from interview service
-}> {
-  return api.get(`/v1/api/submissions/${submissionId}/review-details`);
+  transcript: unknown; // Full transcript from interview service
+}>(submissionId: number): Promise<TReviewDetails> {
+  return api.get<TReviewDetails>(`/v1/api/submissions/${submissionId}/review-details`);
 }
 
 /**
@@ -136,7 +136,7 @@ export async function submitTrainerReview(
   data: {
     trainer_score: number;
     feedback?: string;
-    trainer_evaluation?: any;  // Comprehensive trainer evaluation structure
+    trainer_evaluation?: unknown;  // Comprehensive trainer evaluation structure
   }
 ): Promise<{
   submission_id: number;

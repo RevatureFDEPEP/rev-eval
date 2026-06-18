@@ -25,6 +25,15 @@ interface SubmissionReviewSheetProps {
   readOnly?: boolean; // If true, show existing review in read-only mode (for GRADED submissions)
 }
 
+type TrainerSkillBreakdown = Record<
+  string,
+  {
+    score: number;
+    feedback: string;
+    proficiency_level: string;
+  }
+>;
+
 interface ReviewDetails {
   submission: TestSubmission;
   test: {
@@ -141,19 +150,20 @@ export function SubmissionReviewSheet({
 
   useEffect(() => {
     if (!submission || !open) {
-      setDetails(null);
-      setError(null);
-      // Reset all form fields
-      setTrainerScore('');
-      setOverallFeedback('');
-      setStrengths('');
-      setImprovements('');
-      setTechnicalKnowledge('');
-      setProblemSolving('');
-      setCommunication('');
-      setCodeQuality('');
-      setEngagement('');
-      setSkillsAssessment({});
+      queueMicrotask(() => {
+        setDetails(null);
+        setError(null);
+        setTrainerScore('');
+        setOverallFeedback('');
+        setStrengths('');
+        setImprovements('');
+        setTechnicalKnowledge('');
+        setProblemSolving('');
+        setCommunication('');
+        setCodeQuality('');
+        setEngagement('');
+        setSkillsAssessment({});
+      });
       return;
     }
 
@@ -161,7 +171,7 @@ export function SubmissionReviewSheet({
       try {
         setLoading(true);
         setError(null);
-        const data = await getSubmissionReviewDetails(submission.id);
+        const data = await getSubmissionReviewDetails<ReviewDetails>(submission.id);
         setDetails(data);
 
         // In read-only mode, pre-fill with existing trainer evaluation
@@ -271,7 +281,7 @@ export function SubmissionReviewSheet({
                 proficiency_level: data.proficiency,
               };
               return acc;
-            }, {} as Record<string, any>)
+            }, {} as TrainerSkillBreakdown)
           : undefined,
       };
 
