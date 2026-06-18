@@ -1,10 +1,21 @@
-import { describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { AttemptsTable } from "./AttemptsTable"
 import { ChartWrapper } from "./ChartWrapper"
 import { SummaryHeader } from "./SummaryHeader"
 import { SectionErrorBoundary } from "./SectionErrorBoundary"
+import { SectionErrorFallback } from "./SectionErrorFallback"
 import { AttemptStatus, type Attempt, type UserReportSummary } from "@/lib/api/types"
+
+const refresh = vi.fn()
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh }),
+}))
+
+beforeEach(() => {
+  refresh.mockClear()
+})
 
 const attempts: Attempt[] = [
   {
@@ -101,5 +112,23 @@ describe("SectionErrorBoundary", () => {
     )
     expect(screen.getByText(/couldn't load the chart/i)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument()
+  })
+})
+
+describe("SectionErrorFallback", () => {
+  it("refreshes the route on retry by default (server-fetch recovery)", async () => {
+    const user = userEvent.setup()
+    render(<SectionErrorFallback title="summary" />)
+    await user.click(screen.getByRole("button", { name: /retry/i }))
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it("uses a custom onRetry when provided", async () => {
+    const user = userEvent.setup()
+    const onRetry = vi.fn()
+    render(<SectionErrorFallback title="chart" onRetry={onRetry} />)
+    await user.click(screen.getByRole("button", { name: /retry/i }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+    expect(refresh).not.toHaveBeenCalled()
   })
 })
