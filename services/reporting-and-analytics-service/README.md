@@ -13,10 +13,13 @@ read vs. event projection) is documented in
 
 ## Endpoints
 
+Endpoints are mounted under `/v1/api` so the API gateway's
+`^/v1/api/reports(/.*)?$` route (which forwards the path verbatim) reaches them.
+
 | Method | Path | Description |
 | ------ | ---- | ----------- |
-| `GET` | `/reports/user/{user_id}` | Summary envelope: total attempts, average score, best score, total time spent, most recent attempt. |
-| `GET` | `/reports/user/{user_id}/attempts` | Paginated, filtered, sorted attempt history. |
+| `GET` | `/v1/api/reports/user/{user_id}` | Summary envelope: total attempts, average score, best score, total time spent, most recent attempt. |
+| `GET` | `/v1/api/reports/user/{user_id}/attempts` | Paginated, filtered, sorted attempt history. |
 | `GET` | `/health` | Liveness probe. |
 
 ### `GET /reports/user/{user_id}/attempts` query parameters
