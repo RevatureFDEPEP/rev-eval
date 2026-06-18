@@ -34,6 +34,7 @@ class TestSummary(BaseModel):
     test_name: str
     attempt_count: int
     avg_score: Optional[float]
+    median_score: Optional[float] = None
     pass_rate: Optional[float]
     score_distribution: Optional[Dict[str, int]] = None
 
@@ -49,6 +50,7 @@ class RankingEntry(BaseModel):
     rank: int
     user_id: int
     score: float
+    percentile: Optional[float]  # percent_rank() * 100; null when only one row
     completed_at: Optional[datetime]
 
 
@@ -83,3 +85,16 @@ class AttemptsResponse(BaseModel):
     page: int
     page_size: int
     attempts: List[UserSessionEntry]
+
+
+class QuestionStat(BaseModel):
+    question_id: str
+    question_type: str
+    attempt_count: int
+    correct_count: int
+    correct_rate: Optional[float]
+
+
+class TestQuestionsResponse(BaseModel):
+    test_id: int
+    questions: List[QuestionStat]
