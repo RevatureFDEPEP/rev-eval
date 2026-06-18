@@ -166,7 +166,7 @@ export default function TrainerTestsPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, user, loadTests, loadEvaluatedSubmissions, loadGradedSubmissions]);
+  }, [authLoading, user?.id, loadTests, loadEvaluatedSubmissions, loadGradedSubmissions]);
 
   const testStats = useMemo(() => {
     const active = tests.filter((test) => test.active).length;

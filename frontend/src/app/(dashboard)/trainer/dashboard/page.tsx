@@ -59,7 +59,7 @@ export default function TrainerDashboard() {
     };
 
     fetchDashboardData();
-  }, [user, authLoading]);
+  }, [user?.id, authLoading]);
 
   if (authLoading || !user) {
     return (
