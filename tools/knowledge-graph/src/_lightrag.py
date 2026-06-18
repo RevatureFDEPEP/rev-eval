@@ -5,6 +5,7 @@ heavy `lightrag` import + the Ollama connectivity check live in one place.
 """
 from __future__ import annotations
 
+import os
 import sys
 import urllib.error
 import urllib.request
@@ -56,7 +57,14 @@ def make_rag():
         working_dir=str(config.STORAGE_DIR),
         llm_model_func=ollama_model_complete,
         llm_model_name=config.LLM_MODEL,
-        llm_model_kwargs={"host": config.OLLAMA_HOST, "options": {"num_ctx": 8192}},
+        # num_ctx must hold the hybrid-query synthesis context (retrieved
+        # entities + relations + chunks), which overflows 8192 on a populated
+        # graph and degenerates the answer to ~1 token. 16384 covers it; tune
+        # via KG_NUM_CTX. Extraction prompts during ingest are far smaller.
+        llm_model_kwargs={
+            "host": config.OLLAMA_HOST,
+            "options": {"num_ctx": int(os.environ.get("KG_NUM_CTX", "16384"))},
+        },
         embedding_func=EmbeddingFunc(
             embedding_dim=config.EMBED_DIM,
             max_token_size=8192,
