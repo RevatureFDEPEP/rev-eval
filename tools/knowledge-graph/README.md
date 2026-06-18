@@ -66,11 +66,37 @@ python kg.py down                        # stop Ollama, free all model RAM
 
 ## GPU (optional, much faster ingest)
 
-CPU-only by default so `up` works anywhere. To offload to NVIDIA GPU(s): install
-the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
-on the host, then uncomment the `deploy.resources` block in `docker-compose.kg.yml`
-and `python kg.py down && python kg.py up`. CPU-only ingest of all of `docs/` with a
-7B model is slow; a GPU (or a smaller model via `KG_LLM_MODEL`) cuts it dramatically.
+CPU-only by default so `up` works anywhere. CPU ingest of all of `docs/` with a 7B
+model is very slow (hours → ~10h). On an NVIDIA GPU the same ingest runs in ~1.5h.
+
+1. Install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+   on the host and wire it into Docker:
+   ```bash
+   sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker
+   docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi -L   # verify
+   ```
+2. Run with `KG_GPU=1`, which layers `docker-compose.kg.gpu.yml` onto the base
+   compose (the base stays CPU-only):
+   ```bash
+   KG_GPU=1 python kg.py up
+   python kg.py ingest          # talks to the same Ollama; no flag needed
+   KG_GPU=1 python kg.py down
+   ```
+
+By default the whole model packs onto the **single GPU with the most free VRAM**
+(no cross-GPU layer split — best for one fast card, or mixed-speed multi-GPU
+where splitting would let the slowest card bottleneck every token). GPU-mode env
+knobs: `KG_NUM_PARALLEL` (concurrent slots, default 4), `KG_SCHED_SPREAD`
+(`true` splits one model across all GPUs — only for matched cards),
+`KG_GPU_COUNT` (`all` or an integer). A smaller `KG_LLM_MODEL` also cuts time.
+
+> **Known issue — `query` synthesis with LightRAG 1.5.3.** `ingest` and
+> retrieval work, but the final natural-language answer from `kg.py query` can
+> come back as a single token. Verified it is *not* the model (direct Ollama
+> generation is fine), nor cache, nor `num_ctx` (tunable via `KG_NUM_CTX`,
+> default 16384) — it is LightRAG's query-synthesis path. Structural Layer 1
+> (`structure`/`export`) and Layer 2 retrieval are unaffected; pin/patch
+> LightRAG to restore synthesis.
 
 ## Config (env overrides)
 
@@ -81,12 +107,18 @@ and `python kg.py down && python kg.py up`. CPU-only ingest of all of `docs/` wi
 | `KG_EMBED_MODEL` | `nomic-embed-text` | embedding model |
 | `KG_EMBED_DIM` | `768` | embedding dim (must match the embed model) |
 | `KG_KEEP_ALIVE` | `5m` | model idle-unload window; `0` = unload every request (slow) |
+| `KG_NUM_CTX` | `16384` | LLM context window (must hold the query-synthesis context) |
+| `KG_GPU` | _(unset)_ | set to any value to layer the GPU override onto `up`/`down` |
+| `KG_NUM_PARALLEL` | `4` | (GPU) concurrent Ollama slots |
+| `KG_SCHED_SPREAD` | `false` | (GPU) `true` splits one model across all GPUs |
+| `KG_GPU_COUNT` | `all` | (GPU) number of GPUs to expose (`all` or an int) |
 
 ## Layout
 
 ```
 kg.py                     CLI entrypoint (argparse dispatch)
 docker-compose.kg.yml     Ollama service, kg profile, idle-unload keep-alive
+docker-compose.kg.gpu.yml GPU override (layered on when KG_GPU is set)
 requirements.txt          Layer 2 deps (Layer 1 needs none)
 src/config.py             paths + model config
 src/structural.py         Layer 1 parser + `structure`

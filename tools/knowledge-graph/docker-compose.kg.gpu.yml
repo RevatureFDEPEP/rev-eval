@@ -1,0 +1,39 @@
+# GPU override for the knowledge-graph Ollama runtime.
+#
+# NOT applied by default — `kg.py` layers this on top of docker-compose.kg.yml
+# only when KG_GPU is set (e.g. `KG_GPU=1 python kg.py up`). Keeps the base
+# file CPU-only so machines without the NVIDIA Container Toolkit still work.
+#
+# Requires: NVIDIA driver + NVIDIA Container Toolkit on the host
+# (`nvidia-ctk runtime configure --runtime=docker`).
+#
+# Tunables (env, with defaults):
+#   KG_GPU_COUNT     all   — number of GPUs to expose (`all`, or an integer).
+#   KG_NUM_PARALLEL  4      — concurrent Ollama slots; LightRAG fires async, so
+#                             >1 fills the GPU. These are independent slots on
+#                             ONE model instance (no per-token cross-GPU cost).
+#   KG_SCHED_SPREAD  false  — default packs the whole model onto the single GPU
+#                             with the most free VRAM (the 4070 Ti here). Set
+#                             true ONLY to split one model's layers across all
+#                             GPUs — counterproductive with mixed-speed cards
+#                             (every token traverses the slowest card). Ollama
+#                             cannot run one full replica per GPU in a single
+#                             server; that needs N pinned containers + a proxy.
+#
+# Do NOT set CUDA_VISIBLE_DEVICES="" here: an *empty* value hides ALL GPUs from
+# CUDA and silently forces CPU. The NVIDIA Container Toolkit exposes the
+# reserved devices via NVIDIA_VISIBLE_DEVICES automatically.
+name: rev-eval-kg
+
+services:
+  ollama:
+    environment:
+      OLLAMA_NUM_PARALLEL: "${KG_NUM_PARALLEL:-4}"
+      OLLAMA_SCHED_SPREAD: "${KG_SCHED_SPREAD:-false}"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${KG_GPU_COUNT:-all}
+              capabilities: [gpu]

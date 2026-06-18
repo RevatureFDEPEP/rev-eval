@@ -10,6 +10,7 @@ See docs/plans/tool-knowledge-graph.md and ./README.md.
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -20,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from src import config  # noqa: E402
 
 COMPOSE_FILE = config.TOOL_DIR / "docker-compose.kg.yml"
+GPU_OVERRIDE_FILE = config.TOOL_DIR / "docker-compose.kg.gpu.yml"
 CONTAINER = "rev-eval-kg-ollama"
 
 
@@ -27,8 +29,15 @@ CONTAINER = "rev-eval-kg-ollama"
 # Layer 2 lifecycle: containerized Ollama on/off (the "model runtime").
 # --------------------------------------------------------------------------- #
 def _compose(*args: str) -> int:
-    """Run `docker compose -f <kg compose> --profile kg <args>`."""
-    cmd = ["docker", "compose", "-f", str(COMPOSE_FILE), "--profile", "kg", *args]
+    """Run `docker compose -f <kg compose> [-f <gpu override>] --profile kg <args>`.
+
+    Layers the GPU override on top when KG_GPU is set, so GPU offload is opt-in
+    (`KG_GPU=1 python kg.py up`) and the base file stays CPU-only.
+    """
+    files = ["-f", str(COMPOSE_FILE)]
+    if os.environ.get("KG_GPU"):
+        files += ["-f", str(GPU_OVERRIDE_FILE)]
+    cmd = ["docker", "compose", *files, "--profile", "kg", *args]
     print(f"$ {' '.join(cmd)}")
     return subprocess.call(cmd)
 
