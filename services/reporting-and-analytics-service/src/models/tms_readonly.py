@@ -33,7 +33,7 @@ from sqlalchemy.orm import declarative_base
 TmsBase = declarative_base()
 
 
-class SessionStatus(str, enum.Enum):
+class SessionStatus(enum.StrEnum):
     """Mirror of test-management-service's SessionStatus enum."""
 
     ACTIVE = "ACTIVE"
