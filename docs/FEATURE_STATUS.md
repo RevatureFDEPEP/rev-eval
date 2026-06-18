@@ -14,11 +14,12 @@ This file stays at summary level only.
 
 **Last assessed:** 2026-06-17 — **Tianya Chen (`tianyac` branch)**
 
-Work completed across `tianyac-feat-nginx` (merged), `tianyac-feat-unit-test`
-(PR #45 merged), `tianyac` CI pipeline commits, `tianyac-feat-session`
-(W3-F1), `tianyac-alembic-migrations` (W2-F7), and `tianyac-scoring-engine`
-(W3-F2). Documentation system added on `tianyac-feat-doc`: `docs/FEATURE_STATUS.md`
-+ `docs/features/` detail files for all 21 features, replacing `docs/plans/`.
+Work completed across `tianyac-feat-nginx` (merged — W2-F1 fully done at
+commit `52768c3`), `tianyac-feat-unit-test` (PR #45 merged), `tianyac` CI
+pipeline commits, `tianyac-feat-session` (W3-F1), `tianyac-alembic-migrations`
+(W2-F7), and `tianyac-scoring-engine` (W3-F2). Documentation system added on
+`tianyac-feat-doc`: `docs/FEATURE_STATUS.md` + `docs/features/` detail files
+for all 21 features, replacing `docs/plans/`.
 
 **Progress summary:** W3-F2 (scoring engine + attempt locking) ✅ complete on
 `tianyac-scoring-engine` (PR #148, commit `5fc9c05`) — deterministic exact-match
@@ -38,11 +39,10 @@ W2-F2 (frontend + backend unit tests), W2-F4 (Ruff/ESLint CI gates), W2-F6
 (question authoring schema + tests) partially done (🟡). All other W2, remaining
 W3, and all W4 features not yet started on this branch.
 
-**W2-F1** — nginx reverse proxy live: :80→:443 redirect, TLS, `/_next/` WebSocket
-routing, `/→frontend`. Remaining: step 4 BFF bearer pattern (direct
-`/api/v1/→gateway` block still present in `nginx.conf`; must route all data
-calls through the Next.js BFF as the single auth-injection point), JSON access
-logs, request-time DNS resolver (`127.0.0.11`), X-Correlation-Id header.
+**W2-F1** ✅ — nginx reverse proxy fully complete: :80→:443 redirect, TLS,
+`/_next/` WebSocket routing, `/api/v1/*` through Next.js BFF (bearer injection),
+JSON access logs (`json_combined`), `resolver 127.0.0.11`, X-Correlation-Id
+pass-through. Commit `52768c3` on `tianyac-feat-nginx` (merged).
 
 **W2-F2** — Jest 30 + `@testing-library/react` 16 frontend suite (102 tests:
 quiz UI components, landing auth, Zod schemas, lib utilities) + backend
@@ -79,7 +79,7 @@ Spec: `days_6_10_features.md`.
 
 | # | Feature | Spec priority | Status | Detail |
 |---|---|---|---|---|
-| W2-F1 | Nginx path-based routing & local TLS | REQUIRED | 🟡 In Progress | [w2-f1-nginx-routing-tls.md](features/w2-f1-nginx-routing-tls.md) |
+| W2-F1 | Nginx path-based routing & local TLS | REQUIRED | ✅ Completed | [w2-f1-nginx-routing-tls.md](features/w2-f1-nginx-routing-tls.md) |
 | W2-F2 | Unit test scaffolding (frontend + backend) | — | 🟡 In Progress | [w2-f2-unit-test-scaffolding.md](features/w2-f2-unit-test-scaffolding.md) |
 | W2-F3 | Centralized log aggregation (Loki/Grafana) | — | ❌ Not Started | [w2-f3-log-aggregation.md](features/w2-f3-log-aggregation.md) |
 | W2-F4 | CI quality gates (Ruff / ESLint / Trivy / coverage) | REQUIRED | 🟡 In Progress | [w2-f4-ci-quality-gates.md](features/w2-f4-ci-quality-gates.md) |
@@ -120,10 +120,8 @@ commit `058d45c`).
 
 ## Suggested order of attack
 
-1. **W2-F1 finish** — add BFF bearer pattern: route all `/api/v1/*` through
-   `frontend:3000` (the Next.js BFF injects the `Bearer` header), remove the
-   direct nginx→gateway `location /api/v1/` block. Also add JSON access logs
-   + `resolver 127.0.0.11` for Docker DNS.
+1. ~~**W2-F1 finish**~~ — ✅ done on `tianyac-feat-nginx` (commit `52768c3`):
+   BFF bearer pattern, JSON access logs, `resolver 127.0.0.11`, X-Correlation-Id.
 2. **W2-F2 finish** — add multi-stage Dockerfiles (`base → test → production`)
    to all 4 backend services; the `test` stage runs `pytest -q` so CI can gate
    on `docker build --target test`.
