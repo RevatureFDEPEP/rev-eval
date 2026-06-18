@@ -16,20 +16,27 @@ This file stays at summary level only.
 
 Work completed across `tianyac-feat-nginx` (merged), `tianyac-feat-unit-test`
 (PR #45 merged), `tianyac` CI pipeline commits, `tianyac-feat-session`
-(W3-F1), and `tianyac-alembic-migrations` (W2-F7). Documentation system added
-on `tianyac-feat-doc`: `docs/FEATURE_STATUS.md` + `docs/features/` detail files
-for all 21 features, replacing `docs/plans/`.
+(W3-F1), `tianyac-alembic-migrations` (W2-F7), and `tianyac-scoring-engine`
+(W3-F2). Documentation system added on `tianyac-feat-doc`: `docs/FEATURE_STATUS.md`
++ `docs/features/` detail files for all 21 features, replacing `docs/plans/`.
 
-**Progress summary:** W3-F1 (quiz session backend) ✅ complete on
-`tianyac-feat-session` (commit `ca6877d`); security hardened — `correct_answers`
-excluded by MongoDB `$project`. W2-F7 (Alembic + Category domain + reporting
-scaffold) ✅ complete on `tianyac-alembic-migrations` — migration `0005_add_categories`,
-full Category CRUD stack at `/v1/api/categories`, reporting-and-analytics-service
-scaffold with `reporting-postgres` + Alembic baseline, three defects fixed
-(skill-500, user-service dual-engine, Pydantic v2 audit). W2-F1 (nginx TLS +
-basic routing), W2-F2 (frontend + backend unit tests), W2-F4 (Ruff/ESLint CI
-gates), W2-F6 (question authoring schema + tests) partially done (🟡). All
-other W2, remaining W3, and all W4 features not yet started on this branch.
+**Progress summary:** W3-F2 (scoring engine + attempt locking) ✅ complete on
+`tianyac-scoring-engine` (PR #148, commit `5fc9c05`) — deterministic exact-match
+and Jaccard partial-credit scoring, `POST /v1/api/sessions/{id}/answer` with
+pessimistic locking + `begin_nested` SAVEPOINT for concurrent idempotency-key
+dedup, session state machine (`IN_PROGRESS → SUBMITTED`), `ai_score` finalization
+on last question, Alembic migration `0007` (`session_answers` + `idempotency_keys`),
+22 pure-function tests + 6 httpx integration tests (161 total passing).
+W3-F1 (quiz session backend) ✅ complete on `tianyac-feat-session` (commit
+`ca6877d`); security hardened — `correct_answers` excluded by MongoDB `$project`.
+W2-F7 (Alembic + Category domain + reporting scaffold) ✅ complete on
+`tianyac-alembic-migrations` — migration `0005_add_categories`, full Category
+CRUD stack at `/v1/api/categories`, reporting-and-analytics-service scaffold
+with `reporting-postgres` + Alembic baseline, three defects fixed (skill-500,
+user-service dual-engine, Pydantic v2 audit). W2-F1 (nginx TLS + basic routing),
+W2-F2 (frontend + backend unit tests), W2-F4 (Ruff/ESLint CI gates), W2-F6
+(question authoring schema + tests) partially done (🟡). All other W2, remaining
+W3, and all W4 features not yet started on this branch.
 
 **W2-F1** — nginx reverse proxy live: :80→:443 redirect, TLS, `/_next/` WebSocket
 routing, `/→frontend`. Remaining: step 4 BFF bearer pattern (direct
@@ -83,13 +90,13 @@ Spec: `days_6_10_features.md`.
 ## Days 11–15 (Week 3 — quiz-taking vertical slice)
 
 Spec: `days_11_15_features.md`. W3-F1 complete (`tianyac-feat-session`, commit
-`ca6877d`). W2-F7 landed on `tianyac-alembic-migrations` — Alembic at head
-`0005` on test-management-service. W3-F2 through W3-F7 not yet started.
+`ca6877d`). W3-F2 complete (`tianyac-scoring-engine`, PR #148, commit `5fc9c05`
+— Alembic at head `0007`). W3-F3 through W3-F7 not yet started.
 
 | # | Feature | Day | Status | Detail |
 |---|---|---|---|---|
 | W3-F1 | Quiz session creation backend (`POST /sessions`, httpx integration) | 11 | ✅ Completed | [w3-f1-quiz-session-backend.md](features/w3-f1-quiz-session-backend.md) |
-| W3-F2 | Scoring engine + attempt locking (idempotency, state machine) | 12 | ❌ Not Started | [w3-f2-scoring-engine-locking.md](features/w3-f2-scoring-engine-locking.md) |
+| W3-F2 | Scoring engine + attempt locking (idempotency, state machine) | 12 | ✅ Completed | [w3-f2-scoring-engine-locking.md](features/w3-f2-scoring-engine-locking.md) |
 | W3-F3 | Test-taking frontend skeleton (`/take/[testId]`, AuthContext) | 13 | ❌ Not Started | [w3-f3-test-taking-frontend-skeleton.md](features/w3-f3-test-taking-frontend-skeleton.md) |
 | W3-F4 | Auto-saving exam client (server timer, autosave, submit-lock) | 14 | ❌ Not Started | [w3-f4-autosave-exam-client.md](features/w3-f4-autosave-exam-client.md) |
 | W3-F5 | Integration tests vs. real Postgres/Mongo | 15 | ❌ Not Started | [w3-f5-integration-tests-real-db.md](features/w3-f5-integration-tests-real-db.md) |
