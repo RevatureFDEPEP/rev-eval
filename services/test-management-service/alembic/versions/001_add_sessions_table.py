@@ -8,7 +8,6 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects import postgresql
 
 revision: str = "001"
 down_revision: Union[str, None] = None
@@ -19,7 +18,8 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.create_table(
         "sessions",
-        sa.Column("session_id", postgresql.UUID(as_uuid=False), primary_key=True),
+        # String(36) mirrors the SQLAlchemy model so create_all and Alembic produce identical schema.
+        sa.Column("session_id", sa.String(36), primary_key=True),
         sa.Column("test_id", sa.Integer(), sa.ForeignKey("tests.id", ondelete="CASCADE"), nullable=False),
         sa.Column("user_id", sa.Integer(), nullable=False),
         sa.Column("session_token", sa.String(128), nullable=False, unique=True),

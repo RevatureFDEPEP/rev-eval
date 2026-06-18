@@ -7,10 +7,10 @@ from src.schemas.session_schema import SessionCreate, SessionStartResponse
 from src.services.session_service import SessionService
 from src.utils.dependencies import get_current_user_from_headers
 
-router = APIRouter(prefix="/sessions", tags=["Sessions"])
+router = APIRouter(prefix="/sessions", tags=["Sessions"], redirect_slashes=False)
 
 
-@router.post("/", response_model=SessionStartResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=SessionStartResponse, status_code=status.HTTP_201_CREATED)
 async def start_session(
     body: SessionCreate,
     request: Request,
