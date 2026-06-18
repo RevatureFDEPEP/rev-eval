@@ -74,6 +74,30 @@ def score_question(
     return 0.0
 
 
+def grade_part(stored_questions: list, answers: list) -> tuple:
+    """
+    Like score_part but also annotates each question dict in-place with
+    ``is_correct`` and ``scored_value`` for per-question reporting.
+    Returns (correct_count: float, percentage: float 0-100).
+    """
+    answer_map = {a["question_id"]: a["selected_answers"] for a in answers}
+    correct_count = 0.0
+    for q in stored_questions:
+        selected = answer_map.get(q["question_id"], [])
+        pts = score_question(
+            q["question_type"],
+            selected,
+            q.get("correct_answer"),
+            q.get("correct_answers"),
+        )
+        correct_count += pts
+        q["is_correct"] = pts >= 1.0
+        q["scored_value"] = pts
+    total = len(stored_questions)
+    pct = round(correct_count / total * 100, 2) if total > 0 else 0.0
+    return correct_count, pct
+
+
 def score_part(stored_questions: list, answers: list) -> tuple:
     """
     Score all answers for one part.
@@ -423,9 +447,10 @@ class QuizSessionService:
             raise HTTPException(status_code=409, detail="Part A questions not loaded")
 
         answers_dicts = [a.model_dump() for a in body.answers]
-        correct_count, pct = score_part(stored_questions, answers_dicts)
+        correct_count, pct = grade_part(stored_questions, answers_dicts)
 
-        # --- Persist ---
+        # --- Persist (questions now annotated with is_correct / scored_value) ---
+        session.part_a = {"questions": stored_questions}
         session.part_a_score = pct
         session.status = SessionStatus.PART_A_COMPLETED
 
@@ -572,7 +597,10 @@ class QuizSessionService:
             raise HTTPException(status_code=409, detail="Part B questions not loaded")
 
         answers_dicts = [a.model_dump() for a in body.answers]
-        correct_count_b, pct_b = score_part(stored_questions, answers_dicts)
+        correct_count_b, pct_b = grade_part(stored_questions, answers_dicts)
+
+        # --- Persist annotated Part B questions ---
+        session.part_b = {"questions": stored_questions}
 
         # --- Final score: average of Part A % and Part B % ---
         pct_a = session.part_a_score or 0.0

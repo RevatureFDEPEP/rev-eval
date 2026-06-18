@@ -14,6 +14,8 @@ import jwt
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+
+
 from src.config.settings import settings
 
 _bearer = HTTPBearer(auto_error=False)
@@ -98,9 +100,16 @@ async def get_current_trainer(
     return {"id": user_id, "role": x_user_role}
 
 
-async def get_current_user(
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
-    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+def get_current_user(
+    payload: Dict = Depends(verify_jwt),
 ) -> Dict[str, Any]:
-    user_id = _parse_user_id(x_user_id)
-    return {"id": user_id, "role": x_user_role}
+    """Extract identity from Bearer JWT — same token the trainer routes use."""
+    user_id_str = payload.get("sub")
+    try:
+        user_id = int(user_id_str)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid sub claim in token",
+        )
+    return {"id": user_id, "role": (payload.get("role") or "").upper()}

@@ -26,3 +26,7 @@ class ReportService:
     @staticmethod
     async def get_user_attempts(db: AsyncSession, user_id: int, params: AttemptsQueryParams) -> Tuple[int, List[dict]]:
         return await ReportRepository(db).get_user_attempts(user_id, params)
+
+    @staticmethod
+    async def get_test_question_stats(db: AsyncSession, test_id: int):
+        return await ReportRepository(db).get_test_question_stats(test_id)

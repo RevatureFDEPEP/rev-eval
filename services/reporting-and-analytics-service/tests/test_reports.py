@@ -44,6 +44,7 @@ async def _seed():
             Test(id=1, name="Python Basics", active=True, created_at=datetime.utcnow()),
             Test(id=2, name="SQL Fundamentals", active=True, created_at=datetime.utcnow()),
             Test(id=3, name="Empty Test", active=True, created_at=datetime.utcnow()),
+            Test(id=4, name="Questions Test", active=True, created_at=datetime.utcnow()),
         ]
         db.add_all(tests)
         await db.flush()
@@ -60,6 +61,27 @@ async def _seed():
             QuizSession(id="s5", test_id=2, user_id=10, status="COMPLETED", percentage_score=78.0, started_at=now - timedelta(minutes=10), completed_at=now),
             # test1 — abandoned (should NOT count in completed-only endpoints)
             QuizSession(id="s6", test_id=1, user_id=14, status="ABANDONED", percentage_score=None, started_at=None, completed_at=None),
+            # test4 — 2 completed sessions with graded per-question data
+            QuizSession(
+                id="s8", test_id=4, user_id=20, status="COMPLETED", percentage_score=80.0,
+                started_at=now - timedelta(minutes=5), completed_at=now,
+                part_a={"questions": [
+                    {"question_id": "qA1", "question_type": "mcq", "is_correct": True, "scored_value": 1.0},
+                    {"question_id": "qA2", "question_type": "mcq", "is_correct": False, "scored_value": 0.0},
+                ]},
+                part_b={"questions": [
+                    {"question_id": "qB1", "question_type": "multi", "is_correct": True, "scored_value": 1.0},
+                ]},
+            ),
+            QuizSession(
+                id="s9", test_id=4, user_id=21, status="COMPLETED", percentage_score=60.0,
+                started_at=now - timedelta(minutes=3), completed_at=now,
+                part_a={"questions": [
+                    {"question_id": "qA1", "question_type": "mcq", "is_correct": False, "scored_value": 0.0},
+                    {"question_id": "qA2", "question_type": "mcq", "is_correct": True, "scored_value": 1.0},
+                ]},
+                part_b=None,
+            ),
         ]
         db.add_all(sessions)
         await db.commit()
@@ -176,7 +198,7 @@ def test_08_aggregate_success():
     r = client.get("/v1/api/reports/aggregate")
     assert r.status_code == 200
     data = r.json()
-    assert data["total_tests"] == 3
+    assert data["total_tests"] == 4
     assert "tests" in data
     assert len(data["tests"]) <= 20
 
@@ -191,7 +213,8 @@ def test_09_aggregate_pagination():
 
 
 def test_10_aggregate_page_2():
-    r = client.get("/v1/api/reports/aggregate?page=2&size=2")
+    # 4 total tests, size=3 → page 1 has 3, page 2 has 1
+    r = client.get("/v1/api/reports/aggregate?page=2&size=3")
     assert r.status_code == 200
     data = r.json()
     assert len(data["tests"]) == 1
@@ -444,3 +467,73 @@ def test_33_user_attempts_forbidden_wrong_user():
     r = client.get("/v1/api/reports/user/99/attempts")
     assert r.status_code == 403
     app.dependency_overrides.pop(get_current_user, None)
+
+
+# ---------------------------------------------------------------------------
+# median_score in test summary and aggregate
+# ---------------------------------------------------------------------------
+
+def test_34_test_report_median_score():
+    r = client.get("/v1/api/reports/tests/1")
+    data = r.json()
+    # Scores: 45, 62.5, 85, 91 → sorted median = (62.5 + 85) / 2 = 73.75
+    assert "median_score" in data
+    assert abs(data["median_score"] - 73.75) < 0.01
+
+
+def test_35_test_report_median_none_for_empty():
+    r = client.get("/v1/api/reports/tests/3")
+    data = r.json()
+    assert data["median_score"] is None
+
+
+def test_36_aggregate_includes_median_score():
+    r = client.get("/v1/api/reports/aggregate")
+    data = r.json()
+    for test in data["tests"]:
+        assert "median_score" in test
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/api/reports/tests/{test_id}/questions  — per-question stats
+# ---------------------------------------------------------------------------
+
+def test_37_questions_stats_returns_data():
+    r = client.get("/v1/api/reports/tests/4/questions")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["test_id"] == 4
+    questions = {q["question_id"]: q for q in data["questions"]}
+    # qA1: 2 attempts, 1 correct
+    assert questions["qA1"]["attempt_count"] == 2
+    assert questions["qA1"]["correct_count"] == 1
+    assert abs(questions["qA1"]["correct_rate"] - 0.5) < 0.01
+    # qB1: 1 attempt, 1 correct
+    assert questions["qB1"]["attempt_count"] == 1
+    assert questions["qB1"]["correct_count"] == 1
+    assert questions["qB1"]["correct_rate"] == 1.0
+
+
+def test_38_questions_stats_empty_test():
+    r = client.get("/v1/api/reports/tests/3/questions")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["questions"] == []
+
+
+def test_39_questions_stats_404_missing_test():
+    r = client.get("/v1/api/reports/tests/999/questions")
+    assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# get_current_user now requires Bearer JWT (not X-User-* headers)
+# ---------------------------------------------------------------------------
+
+def test_40_user_endpoint_no_token_returns_401():
+    # Remove all overrides so real auth runs
+    app.dependency_overrides.pop(verify_jwt, None)
+    app.dependency_overrides.pop(get_current_user, None)
+    r = client.get("/v1/api/reports/user/10")
+    assert r.status_code == 401
+    app.dependency_overrides[verify_jwt] = override_verify_jwt_trainer
