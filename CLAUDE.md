@@ -80,6 +80,10 @@ alembic revision --autogenerate -m "..."   # after model changes
 
 # Seed demo data (all seeded users share password "password123")
 # users: seeded by user-service on startup; tests/skills/categories: Alembic 0003
+# question bank: auto-seeded by question-management-service on startup when the
+#   bank is empty (idempotent, W5-F4); gated by SEED_QUESTION_BANK (default
+#   true, compose-set). Set SEED_QUESTION_BANK=false for prod-like profiles.
+#   The standalone HTTP script below remains for manual/remote seeding:
 python services/question-management-service/seed_rag_context_questions.py
 ```
 
