@@ -92,13 +92,15 @@ Spec: `days_6_10_features.md`.
 
 Spec: `days_11_15_features.md`. W3-F1 complete (`tianyac-feat-session`, commit
 `ca6877d`). W3-F2 complete (`tianyac-scoring-engine`, PR #148, commit `5fc9c05`
-— Alembic at head `0007`). W3-F3 through W3-F7 not yet started.
+— Alembic at head `0007`). W3-F3 complete (`test-taking-frontend`, commit
+`45eb3f4` — `/take/[testId]` server component, `TestRunner`, `AuthContext`,
+`submitAnswer`, 14 tests). W3-F4 through W3-F7 not yet started.
 
 | # | Feature | Day | Status | Detail |
 |---|---|---|---|---|
 | W3-F1 | Quiz session creation backend (`POST /sessions`, httpx integration) | 11 | ✅ Completed | [w3-f1-quiz-session-backend.md](features/w3-f1-quiz-session-backend.md) |
 | W3-F2 | Scoring engine + attempt locking (idempotency, state machine) | 12 | ✅ Completed | [w3-f2-scoring-engine-locking.md](features/w3-f2-scoring-engine-locking.md) |
-| W3-F3 | Test-taking frontend skeleton (`/take/[testId]`, AuthContext) | 13 | ❌ Not Started | [w3-f3-test-taking-frontend-skeleton.md](features/w3-f3-test-taking-frontend-skeleton.md) |
+| W3-F3 | Test-taking frontend skeleton (`/take/[testId]`, AuthContext) | 13 | ✅ Completed | [w3-f3-test-taking-frontend-skeleton.md](features/w3-f3-test-taking-frontend-skeleton.md) |
 | W3-F4 | Auto-saving exam client (server timer, autosave, submit-lock) | 14 | ❌ Not Started | [w3-f4-autosave-exam-client.md](features/w3-f4-autosave-exam-client.md) |
 | W3-F5 | Integration tests vs. real Postgres/Mongo | 15 | ❌ Not Started | [w3-f5-integration-tests-real-db.md](features/w3-f5-integration-tests-real-db.md) |
 | W3-F6 | Playwright E2E happy path + smoke script | 15 | ❌ Not Started | [w3-f6-playwright-e2e-smoke.md](features/w3-f6-playwright-e2e-smoke.md) |
