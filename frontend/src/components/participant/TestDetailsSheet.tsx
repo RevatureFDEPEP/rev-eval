@@ -93,35 +93,31 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
   // Fetch transcript for completed interviews
   // This useEffect always runs (hooks must be called unconditionally)
   useEffect(() => {
-    // Early return inside useEffect is fine - the hook itself is always called
-    if (!test || !open || isQuiz || !isCompleted || !submissionId || transcript || loadingTranscript) {
-      return;
-    }
-
-    setLoadingTranscript(true);
-    setTranscriptError(null);
-    getInterviewTranscript(submissionId)
-      .then((data) => {
+    if (!test || !open || isQuiz || !isCompleted || !submissionId || transcript || loadingTranscript) return;
+    const load = async () => {
+      setLoadingTranscript(true);
+      setTranscriptError(null);
+      try {
+        const data = await getInterviewTranscript(submissionId);
         setTranscript(data);
-        setLoadingTranscript(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('Failed to load transcript:', err);
         setTranscriptError(err instanceof Error ? err.message : 'Failed to load transcript');
+      } finally {
         setLoadingTranscript(false);
-      });
+      }
+    };
+    load();
   }, [test, open, isQuiz, isCompleted, submissionId, transcript, loadingTranscript]);
 
   // Fetch quiz session data for completed/graded quizzes
   useEffect(() => {
-    if (!test || !open || !isQuiz || !isCompleted || !submissionId || quizSession || loadingQuizSession) {
-      return;
-    }
-
-    setLoadingQuizSession(true);
-    setQuizSessionError(null);
-    getTestSessionBySubmission(submissionId)
-      .then((data) => {
+    if (!test || !open || !isQuiz || !isCompleted || !submissionId || quizSession || loadingQuizSession) return;
+    const load = async () => {
+      setLoadingQuizSession(true);
+      setQuizSessionError(null);
+      try {
+        const data = await getTestSessionBySubmission(submissionId);
         console.log('📊 Quiz session data received:', {
           part_a: data.part_a,
           part_b: data.part_b,
@@ -131,13 +127,14 @@ export function ParticipantTestDetailsSheet({ test, open, onOpenChange }: Partic
           part_b_questions_count: data.part_b?.questions?.length,
         });
         setQuizSession(data);
-        setLoadingQuizSession(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('Failed to load quiz session:', err);
         setQuizSessionError(err instanceof Error ? err.message : 'Failed to load quiz session');
+      } finally {
         setLoadingQuizSession(false);
-      });
+      }
+    };
+    load();
   }, [test, open, isQuiz, isCompleted, submissionId, quizSession, loadingQuizSession]);
 
   // Early return check - AFTER all hooks

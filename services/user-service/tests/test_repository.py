@@ -6,11 +6,10 @@ from the production PostgreSQL engine defined in src/db/session.py.
 """
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
-
+from sqlalchemy.orm import sessionmaker
 from src.db.init_db import Base
-from src.models.user import User, UserRole
+from src.models.user import UserRole
 from src.services.auth_service import AuthService
 
 

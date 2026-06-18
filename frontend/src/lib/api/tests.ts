@@ -10,7 +10,6 @@ import {
   TestCreate,
   TestUpdate,
   BulkTestAssignmentCreate,
-  TestAssignment,
 } from './types';
 
 /**
@@ -55,14 +54,14 @@ export async function deleteTest(testId: number): Promise<void> {
 export async function bulkAssignTest(data: BulkTestAssignmentCreate): Promise<{
   success_count: number;
   failure_count: number;
-  created_submissions: any[];
-  errors: any[];
+  created_submissions: unknown[];
+  errors: unknown[];
 }> {
   return api.post<{
     success_count: number;
     failure_count: number;
-    created_submissions: any[];
-    errors: any[];
+    created_submissions: unknown[];
+    errors: unknown[];
   }>('/v1/api/submissions/bulk-assign', {
     test_id: data.test_id,
     participant_emails: data.participant_emails,

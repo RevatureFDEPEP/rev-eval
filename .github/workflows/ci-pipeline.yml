@@ -44,16 +44,49 @@ jobs:
           pip install -r requirements.txt
           pip install -r ../requirements-dev.txt
 
+      - name: Lint (Ruff)
+        working-directory: services/${{ matrix.service }}
+        run: ruff check .
+
       - name: Run pytest
         working-directory: services/${{ matrix.service }}
         run: |
           if [ -d tests ]; then
-            pytest --cov --cov-report=xml
+            pytest --cov --cov-report=xml --cov-fail-under=70
           else
             echo "No tests/ directory in services/${{ matrix.service }} — skipping pytest."
           fi
 
-      # NOTE: Trivy + Ruff scans added in W2 D7 by candidates (not seeded here)
+      - name: Upload coverage XML
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-${{ matrix.service }}
+          path: services/${{ matrix.service }}/coverage.xml
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -f services/${{ matrix.service }}/Dockerfile \
+            -t rev-eval/${{ matrix.service }}:ci \
+            services/
+
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: rev-eval/${{ matrix.service }}:ci
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-sarif-${{ matrix.service }}
+          path: trivy-${{ matrix.service }}.sarif
 
   frontend-build-test:
     name: Frontend
@@ -79,7 +112,7 @@ jobs:
 
       - name: Lint
         working-directory: frontend
-        run: pnpm lint || echo "Frontend lint has existing issues; not blocking CI yet."
+        run: pnpm lint
 
       - name: Build
         working-directory: frontend

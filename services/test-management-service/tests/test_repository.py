@@ -4,16 +4,20 @@ Repository tests for test-management-service using in-memory SQLite.
 Creates a dedicated async engine per test module, isolated from the
 production asyncpg engine. Uses aiosqlite as the async SQLite driver.
 """
-import pytest
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-
 from src.db.session import Base
-from src.models.test import Test, TestType  # noqa: registers model with Base
-from src.models.skill import Skill  # noqa: registers model with Base
-from src.models.test_skill import TestSkill  # noqa: registers model with Base
-from src.models.test_submission import TestSubmission  # noqa: registers model with Base
+from src.models.skill import (
+    Skill,  # noqa: F401  # registers skills table with Base metadata
+)
+from src.models.test import TestType  # noqa: F401  # registers model with Base metadata
+from src.models.test_skill import (
+    TestSkill,  # noqa: F401  # registers relationship with Base metadata
+)
+from src.models.test_submission import (
+    TestSubmission,  # noqa: F401  # registers relationship with Base metadata
+)
 from src.repositories.test_repository import TestRepository
 from src.schemas.test_schema import TestCreate, TestUpdate
 

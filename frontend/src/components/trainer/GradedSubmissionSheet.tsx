@@ -103,7 +103,7 @@ export function GradedSubmissionSheet({
         setLoading(true);
         setError(null);
         const data = await getSubmissionReviewDetails(submission.id);
-        setDetails(data);
+        setDetails(data as ReviewDetails);
       } catch (err) {
         console.error('Failed to load review details:', err);
         setError(err instanceof Error ? err.message : 'Failed to load details');
@@ -133,10 +133,6 @@ export function GradedSubmissionSheet({
     await audioPlayer.play(audioUrl);
   };
 
-  const handlePauseAudio = () => {
-    audioPlayer.pause();
-  };
-
   const handleRestartAudio = () => {
     audioPlayer.restart();
   };
@@ -149,12 +145,13 @@ export function GradedSubmissionSheet({
     return audioEntry?.audio_url;
   };
 
+  const stopAudio = audioPlayer.stop;
   useEffect(() => {
     return () => {
-      audioPlayer.stop();
+      stopAudio();
       setPlayingAudioIndex(null);
     };
-  }, [open]);
+  }, [open, stopAudio]);
 
   if (!submission) return null;
 
