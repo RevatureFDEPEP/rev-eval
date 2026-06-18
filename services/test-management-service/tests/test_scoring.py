@@ -7,10 +7,8 @@ Covers:
 - Edge cases: empty lists, case normalisation, whitespace stripping
 """
 import pytest
-
 from src.scoring import exact_match, partial_credit
 from src.scoring.models import ScoreResult
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # exact_match
