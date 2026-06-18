@@ -21,6 +21,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.quiz_session import QuizSession, SessionStatus
+from src.models.test_submission import TestSubmission, SubmissionStatus
 from src.repositories.quiz_session_repository import QuizSessionRepository
 from src.repositories.test_repository import TestRepository
 from src.schemas.quiz_session_schema import (
@@ -625,6 +626,20 @@ class QuizSessionService:
             session.part_b_response_cache = result_payload.model_dump()
 
         await QuizSessionRepository.save(db, session)
+
+        # Update test_submission to COMPLETED with final score
+        if session.submission_id:
+            from sqlalchemy import select
+            sub_result = await db.execute(
+                select(TestSubmission).where(TestSubmission.id == session.submission_id)
+            )
+            submission = sub_result.scalar_one_or_none()
+            if submission:
+                submission.status = SubmissionStatus.COMPLETED
+                submission.final_score = round(total_pct)
+                submission.submitted_at = datetime.utcnow()
+                await db.commit()
+
         return result_payload
 
     @staticmethod

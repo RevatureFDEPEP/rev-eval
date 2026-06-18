@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuthContext } from './AuthContext';
 
 export interface AuthUser {
   id: number;
@@ -22,16 +23,30 @@ interface UseAuthResult {
   loading: boolean;
 }
 
-/**
- * Client hook that returns the authenticated user.
- * Authkit-compatible surface: `{ user, loading }` and `ensureSignedIn` option.
- */
 export function useAuth(options: UseAuthOptions = {}): UseAuthResult {
+  const ctx = useAuthContext();
   const router = useRouter();
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const routerRef = useRef(router);
+  routerRef.current = router;
 
+  const ensureSignedIn = options.ensureSignedIn;
+
+  // Fallback state used only when no AuthProvider is present
+  const [localUser, setLocalUser] = useState<AuthUser | null>(null);
+  const [localLoading, setLocalLoading] = useState(true);
+
+  // Redirect when context resolves to unauthenticated
   useEffect(() => {
+    if (ctx === null) return;
+    if (!ctx.loading && !ctx.user && ensureSignedIn) {
+      routerRef.current.replace('/');
+    }
+  }, [ctx, ensureSignedIn]);
+
+  // Standalone fetch — only runs when there is no AuthProvider
+  useEffect(() => {
+    if (ctx !== null) return;
+
     let cancelled = false;
 
     async function load() {
@@ -39,19 +54,19 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthResult {
         const res = await fetch('/api/auth/me', { cache: 'no-store' });
         if (cancelled) return;
         if (!res.ok) {
-          setUser(null);
-          if (options.ensureSignedIn) router.replace('/');
+          setLocalUser(null);
+          if (ensureSignedIn) routerRef.current.replace('/');
           return;
         }
-        const data = await res.json();
-        setUser(data);
+        const data: AuthUser = await res.json();
+        setLocalUser((prev) => (prev?.id === data.id && prev?.role === data.role ? prev : data));
       } catch {
         if (!cancelled) {
-          setUser(null);
-          if (options.ensureSignedIn) router.replace('/');
+          setLocalUser(null);
+          if (ensureSignedIn) routerRef.current.replace('/');
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLocalLoading(false);
       }
     }
 
@@ -59,7 +74,10 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthResult {
     return () => {
       cancelled = true;
     };
-  }, [options.ensureSignedIn, router]);
+  }, [ensureSignedIn, ctx]);
 
-  return { user, loading };
+  if (ctx !== null) {
+    return { user: ctx.user, loading: ctx.loading };
+  }
+  return { user: localUser, loading: localLoading };
 }

@@ -34,8 +34,10 @@ export default function TrainerDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const userId = user?.id;
+
   useEffect(() => {
-    if (authLoading || !user) return;
+    if (authLoading || !userId) return;
 
     const fetchDashboardData = async () => {
       try {
@@ -59,18 +61,9 @@ export default function TrainerDashboard() {
     };
 
     fetchDashboardData();
-  }, [user, authLoading]);
+  }, [userId, authLoading]);
 
-  if (authLoading || !user) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <div className="text-center">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-slate-900" />
-          <p className="mt-4 text-sm text-slate-600">Getting things ready…</p>
-        </div>
-      </div>
-    );
-  }
+  if (!user) return null;
 
   const completionRate = stats.total_submissions > 0
     ? Math.round((stats.completed_submissions / stats.total_submissions) * 100)

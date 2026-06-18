@@ -64,14 +64,15 @@ services:
     image: nginx:alpine
     container_name: rev-eval-nginx
     restart: unless-stopped
+    entrypoint: ["/docker-entrypoint-custom.sh"]
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/docker-entrypoint.sh:/docker-entrypoint-custom.sh:ro
     networks:
-      - public-net
       - backend-net
     depends_on:
       frontend:
@@ -255,6 +256,7 @@ services:
       NEXT_PUBLIC_API_GATEWAY_URL: https://localhost
       NEXT_PUBLIC_SITE_URL: http://frontend:3000
       NODE_ENV: development
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
     ports:
       - "3000:3000"
     volumes:
@@ -262,17 +264,13 @@ services:
       - /app/node_modules
       - /app/.next
     networks:
-      - public-net
       - backend-net
     depends_on:
       - api-gateway
 
 networks:
-  public-net:
-    driver: bridge
   backend-net:
     driver: bridge
-    internal: true
 
 volumes:
   postgres_data:

@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth/useAuth';
+import { useDebounce } from '@/lib/hooks/useDebounce';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,12 +23,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TestDetailsSheet } from '@/components/trainer/TestDetailsSheet';
 import { SubmissionReviewSheet } from '@/components/trainer/SubmissionReviewSheet';
 import { QuizSubmissionSheet } from '@/components/trainer/QuizSubmissionSheet';
 import { BasicSubmissionSheet } from '@/components/trainer/BasicSubmissionSheet';
-import { getTrainerTests, getCurrentUser, getEvaluatedSubmissionsForTrainer, getAllSubmissionsForTrainer } from '@/lib/api';
+import { AggregateCharts } from '@/components/trainer/AggregateCharts';
+import { getTrainerTests, getEvaluatedSubmissionsForTrainer, getAllSubmissionsForTrainer } from '@/lib/api';
 import type { TrainerTestInfo, TestSubmission } from '@/lib/api/types';
 import { Calendar, ClipboardCheck, ClipboardList, Layers, PlusCircle, Star } from 'lucide-react';
 import { formatTableDate } from '@/lib/utils/date';
@@ -34,14 +38,42 @@ import { formatTableDate } from '@/lib/utils/date';
 export default function TrainerTestsPage() {
   const { user, loading: authLoading } = useAuth({ ensureSignedIn: true });
 
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const tab = searchParams.get('tab') ?? 'management';
+
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') ?? '');
+  const debouncedSearch = useDebounce(searchQuery);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    const current = params.get('q') ?? '';
+    if (current === debouncedSearch) return;
+    if (debouncedSearch) {
+      params.set('q', debouncedSearch);
+    } else {
+      params.delete('q');
+    }
+    router.replace(`${pathname}?${params.toString()}`);
+  }, [debouncedSearch, searchParams, router, pathname]);
+
+  const handleTabChange = useCallback(
+    (value: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('tab', value);
+      router.push(`${pathname}?${params.toString()}`);
+    },
+    [searchParams, router, pathname],
+  );
+
   // Test Management state
   const [tests, setTests] = useState<TrainerTestInfo[]>([]);
   const [loadingTests, setLoadingTests] = useState(true);
   const [testsError, setTestsError] = useState<string | null>(null);
   const [selectedTest, setSelectedTest] = useState<TrainerTestInfo | null>(null);
   const [testSheetOpen, setTestSheetOpen] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
-  const [loadingUser, setLoadingUser] = useState(true);
+  const currentUserId = user?.id ?? null;
 
   // Needs Review state (evaluated submissions)
   const [submissions, setSubmissions] = useState<TestSubmission[]>([]);
@@ -102,38 +134,15 @@ export default function TrainerTestsPage() {
     }
   }, []);
 
+  const userId = user?.id;
+
   useEffect(() => {
-    if (authLoading || !user) return;
-    let cancelled = false;
+    if (authLoading || !userId) return;
 
-    const loadUser = async () => {
-      try {
-        setLoadingUser(true);
-        const profile = await getCurrentUser();
-        if (!cancelled) {
-          setCurrentUserId(profile.id);
-        }
-      } catch (err) {
-        console.error('Failed to load current user profile:', err);
-        if (!cancelled) {
-          setCurrentUserId(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingUser(false);
-        }
-      }
-    };
-
-    loadUser();
     loadTests();
     loadEvaluatedSubmissions();
     loadGradedSubmissions();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [authLoading, user, loadTests, loadEvaluatedSubmissions, loadGradedSubmissions]);
+  }, [authLoading, userId, loadTests, loadEvaluatedSubmissions, loadGradedSubmissions]);
 
   const testStats = useMemo(() => {
     const active = tests.filter((test) => test.active).length;
@@ -156,6 +165,12 @@ export default function TrainerTestsPage() {
       : 0;
     return { pendingReviews, avgAIScore };
   }, [submissions]);
+
+  const filteredTests = useMemo(() => {
+    if (!debouncedSearch.trim()) return tests;
+    const q = debouncedSearch.toLowerCase();
+    return tests.filter((t) => t.name.toLowerCase().includes(q));
+  }, [tests, debouncedSearch]);
 
   const handleTestClick = (test: TrainerTestInfo) => {
     setSelectedTest(test);
@@ -232,16 +247,7 @@ export default function TrainerTestsPage() {
     handleReviewSheetClose();
   };
 
-  if (authLoading || loadingUser || !user) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <div className="text-center">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-slate-900" />
-          <p className="mt-4 text-sm text-slate-600">Loading trainer tools…</p>
-        </div>
-      </div>
-    );
-  }
+  if (!user) return null;
 
   return (
     <div className="space-y-6">
@@ -262,9 +268,10 @@ export default function TrainerTestsPage() {
         </Badge>
       </section>
 
-      <Tabs defaultValue="management" className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-3">
+      <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4">
           <TabsTrigger value="management">Management</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="needs-review">
             Pending Review
             {gradingStats.pendingReviews > 0 && (
@@ -346,6 +353,15 @@ export default function TrainerTestsPage() {
                 </Button>
               </CardContent>
             </Card>
+          ) : filteredTests.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center gap-4 py-12 text-center">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">No tests match &ldquo;{debouncedSearch}&rdquo;</h3>
+                  <p className="text-sm text-slate-500">Try a different search term.</p>
+                </div>
+              </CardContent>
+            </Card>
           ) : (
             <Card className="border border-slate-200/70 bg-white/95 shadow-sm">
               <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -353,7 +369,14 @@ export default function TrainerTestsPage() {
                   <CardTitle>All Tests</CardTitle>
                   <CardDescription>Overview of every assessment you&apos;ve created</CardDescription>
                 </div>
-                <DropdownMenu>
+                <div className="flex items-center gap-3">
+                  <Input
+                    placeholder="Search tests…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-48 lg:w-64"
+                  />
+                  <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button className="transition-transform hover:-translate-y-0.5">
                       <PlusCircle className="mr-2 size-4" />
@@ -369,6 +392,7 @@ export default function TrainerTestsPage() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -385,7 +409,7 @@ export default function TrainerTestsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {tests.map((test) => {
+                    {filteredTests.map((test) => {
                       const isQuiz = (test.test_type as string) === 'QUIZ' || (test.test_type as string) === 'MCQ';
                       const friendlyType = isQuiz ? 'Quiz' : 'Interview';
                       const created = formatTableDate(test.created_at);
@@ -422,6 +446,11 @@ export default function TrainerTestsPage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* Analytics Tab */}
+        <TabsContent value="analytics" className="space-y-6">
+          <AggregateCharts />
         </TabsContent>
 
         {/* Grading Tab */}
