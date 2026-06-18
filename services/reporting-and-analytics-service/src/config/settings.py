@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     # no domain tables (reporting reads from test-management over the TMS engine
     # below); the own DB exists so this service has an independent Alembic chain
     # / alembic_version that never collides with test-management's in eval_ai_dev.
-    # See docs/adr/0001-reporting-cross-service-data-access.md.
+    # See repo-root docs/adr/0001-reporting-cross-service-data-access.md.
     DB_HOST: str
     DB_PORT: int = 5432
     DB_USERNAME: str
