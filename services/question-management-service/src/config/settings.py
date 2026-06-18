@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     SERVICE_HOSTNAME: str = "localhost"
     LOG_LEVEL: str = "INFO"
 
+    # Question-bank auto-seed (W5-F4). When true the service seeds the demo
+    # question fixtures on startup *only* if the bank is empty (idempotent).
+    # Default-on for local dev; set false for prod-like profiles so real
+    # deployments are not populated with demo data.
+    SEED_QUESTION_BANK: bool = True
+
     # Optional MongoDB Connection Settings
     MONGO_TIMEOUT_MS: int = 5000
     MONGO_MAX_POOL_SIZE: int = 10
