@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knowledge Graph — rev-eval</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2129;
+    --panel2: #222c36;
+    --line: #2f3a45;
+    --txt: #e6edf3;
+    --muted: #8b98a5;
+    --l1: #06b6d4;
+    --l1-bg: #0a2730;
+    --l2: #a855f7;
+    --l2-bg: #21133a;
+    --res: #10b981;
+    --res-bg: #0e2a22;
+    --warn: #f59e0b;
+    --feat: #3b82f6;
+    --adr: #ec4899;
+    --plan: #8b5cf6;
+    --spec: #f59e0b;
+    --code: #10b981;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--txt);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.45; padding: 28px 20px 60px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h2.sec { font-size: 1.25rem; margin: 34px 0 14px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  .sub { color: var(--muted); margin: 0 0 22px; font-size: 0.95rem; }
+  code { background: #11181f; padding: 1px 6px; border-radius: 4px; font-size: 0.85em; color: #b9d6ff; font-family: ui-monospace, monospace; }
+  p { font-size: 0.92rem; }
+  a { color: #7db3ff; }
+
+  .nav { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+  .nav a {
+    text-decoration: none; font-size: 0.85rem; font-weight: 600;
+    padding: 7px 14px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--muted);
+  }
+  .nav a.here { color: var(--txt); border-color: var(--l1); background: var(--l1-bg); }
+
+  .callout {
+    background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--warn);
+    border-radius: 10px; padding: 12px 18px; margin: 18px 0; font-size: 0.9rem; color: var(--muted);
+  }
+  .callout b { color: var(--txt); }
+
+  /* two-layer cards */
+  .layers { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .layer { border-radius: 12px; padding: 16px 18px; border: 1px solid var(--line); }
+  .layer.l1 { border-left: 5px solid var(--l1); background: linear-gradient(180deg, rgba(6,182,212,0.07), transparent); }
+  .layer.l2 { border-left: 5px solid var(--l2); background: linear-gradient(180deg, rgba(168,85,247,0.07), transparent); }
+  .layer h3 { margin: 0 0 4px; font-size: 1.05rem; }
+  .layer .tagline { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px; }
+  .layer ul { margin: 8px 0 0; padding-left: 18px; font-size: 0.87rem; color: var(--muted); }
+  .layer li { margin-bottom: 5px; }
+  .pill { display: inline-block; font-size: 0.68rem; font-weight: 700; padding: 2px 9px; border-radius: 20px; margin-bottom: 8px; }
+  .pill.nomodel { background: var(--res-bg); color: #6ee7b7; border: 1px solid #1c4d3e; }
+  .pill.model { background: #2a1840; color: #d8b4fe; border: 1px solid #5b2a8a; }
+
+  /* graph schema */
+  .schema { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; }
+  .nodes, .edges { flex: 1; min-width: 260px; }
+  .node-chip {
+    display: inline-flex; align-items: center; gap: 7px; font-size: 0.8rem; font-weight: 600;
+    padding: 5px 12px; border-radius: 8px; margin: 0 6px 8px 0; border: 1px solid var(--line); background: var(--panel);
+  }
+  .node-chip .sw { width: 11px; height: 11px; border-radius: 3px; }
+  table.edges-t { border-collapse: collapse; width: 100%; font-size: 0.84rem; }
+  table.edges-t td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.edges-t td:first-child { white-space: nowrap; }
+  .et { font-family: ui-monospace, monospace; font-size: 0.78rem; color: #b9d6ff; background: #11181f; padding: 2px 7px; border-radius: 5px; }
+
+  /* commands */
+  pre {
+    background: #0a0e13; border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; font-size: 0.82rem; line-height: 1.6; margin: 12px 0;
+  }
+  pre .c { color: #6b7785; }
+  pre .k { color: #7db3ff; }
+
+  /* relation to implement */
+  .touch { border-radius: 10px; padding: 13px 16px; margin-bottom: 12px; background: var(--panel); border: 1px solid var(--line); }
+  .touch.read { border-left: 4px solid var(--l1); }
+  .touch.write { border-left: 4px solid var(--l2); }
+  .touch .when { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 3px; }
+  .touch .title { font-weight: 600; font-size: 0.97rem; margin-bottom: 4px; }
+  .touch .desc { color: var(--muted); font-size: 0.87rem; }
+  .touch .desc .ph { color: #d8b4fe; font-weight: 600; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .mini { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 13px 16px; }
+  .mini h4 { margin: 0 0 7px; font-size: 0.95rem; }
+  .mini p { margin: 0; font-size: 0.85rem; color: var(--muted); }
+  .mini code { font-size: 0.8em; }
+
+  @media (max-width: 720px) {
+    .layers, .grid2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="nav">
+    <a href="implement-workflow.html">/implement workflow</a>
+    <a class="here" href="knowledge-graph.html">Knowledge Graph</a>
+    <a href="docs-map.html">Process Docs</a>
+  </div>
+
+  <h1>🕸️ Knowledge Graph <span style="color:var(--muted);font-weight:400;font-size:1rem">— rev-eval local dev tool</span></h1>
+  <p class="sub">A local, free graph over the <b>codebase + <code>docs/</code></b> (plans, feature specs, ADRs) for navigation and Q&amp;A. Lives at <code>tools/knowledge-graph/</code>; run <code>kg.py</code> from there.</p>
+
+  <div class="callout">
+    🚫 <b>Not part of the deployed stack.</b> It reads the repo read-only, stays out of the root <code>docker-compose.yml</code> and the gateway <code>ROUTES</code>, and is never auto-discovered. Purely a planning/navigation aid for the human + the <code>/implement</code> skill.
+  </div>
+
+  <!-- TWO LAYERS -->
+  <h2 class="sec">Two layers</h2>
+  <p>The graph is split by cost: a deterministic structural layer that needs no model, and a semantic layer that does.</p>
+  <div class="layers">
+    <div class="layer l1">
+      <span class="pill nomodel">✓ no model · offline</span>
+      <h3>Layer 1 — Structural</h3>
+      <div class="tagline">deterministic doc-graph</div>
+      <p style="font-size:0.87rem;color:var(--muted);margin:0">Parses doc conventions into a NetworkX graph of <b>feature ↔ ADR ↔ plan ↔ spec ↔ code</b> edges. Pure stdlib — works with Ollama <b>down</b>.</p>
+      <ul>
+        <li><code>kg.py structure &lt;node&gt;</code> — show a node's edges</li>
+        <li><code>kg.py export --format {mermaid,json,dot}</code></li>
+        <li>Fast, deterministic, always available</li>
+      </ul>
+    </div>
+    <div class="layer l2">
+      <span class="pill model">needs Ollama</span>
+      <h3>Layer 2 — Semantic</h3>
+      <div class="tagline">LightRAG + embeddings</div>
+      <p style="font-size:0.87rem;color:var(--muted);margin:0">LightRAG entity/relation extraction + embeddings over prose → <b>natural-language Q&amp;A</b> ("how was a similar feature built?"). Runs on containerized Ollama.</p>
+      <ul>
+        <li><code>kg.py up</code> → start Ollama (first run ~5GB)</li>
+        <li><code>kg.py ingest</code> → build LightRAG index</li>
+        <li><code>kg.py query "…"</code> → NL query (default <code>hybrid</code>)</li>
+        <li><code>kg.py down</code> → free model RAM</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- GRAPH SCHEMA -->
+  <h2 class="sec">What's in the graph (Layer 1 schema)</h2>
+  <div class="schema">
+    <div class="nodes">
+      <h3 style="font-size:1rem;margin:0 0 10px">Node types</h3>
+      <span class="node-chip"><span class="sw" style="background:var(--feat)"></span>Feature <code>W#-F#</code></span>
+      <span class="node-chip"><span class="sw" style="background:var(--adr)"></span>ADR <code>ADR-0001</code></span>
+      <span class="node-chip"><span class="sw" style="background:var(--plan)"></span>Plan <code>docs/plans/</code></span>
+      <span class="node-chip"><span class="sw" style="background:var(--spec)"></span>Spec <code>days_*_features.md</code></span>
+      <span class="node-chip"><span class="sw" style="background:var(--code)"></span>Code path (evidence)</span>
+      <p style="font-size:0.82rem;color:var(--muted);margin-top:10px">Diagrams drop the ~190 code-evidence nodes for readability unless <code>--include-code</code>; JSON always includes them. Ambiguous code paths (bare <code>main.py</code>) stay <code>(MISSING)</code> rather than being guessed.</p>
+    </div>
+    <div class="edges">
+      <h3 style="font-size:1rem;margin:0 0 10px">Edge types</h3>
+      <table class="edges-t">
+        <tr><td><span class="et">DEPENDS_ON</span></td><td>feature → prerequisite feature</td></tr>
+        <tr><td><span class="et">UNBLOCKS</span></td><td>feature → downstream feature</td></tr>
+        <tr><td><span class="et">DECIDED_BY</span></td><td>feature → ADR (governing decision)</td></tr>
+        <tr><td><span class="et">SPECIFIED_BY</span></td><td>feature → upstream spec section</td></tr>
+        <tr><td><span class="et">DOCUMENTED_BY</span></td><td>feature → plan doc</td></tr>
+        <tr><td><span class="et">EVIDENCED_BY</span></td><td>feature/doc → code path it cites</td></tr>
+        <tr><td><span class="et">RELATES_TO</span></td><td>generic cross-reference</td></tr>
+        <tr><td><span class="et">LINKS_TO</span></td><td>markdown link between docs</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- RELATION TO IMPLEMENT -->
+  <h2 class="sec">⭐ How it relates to <code>/implement</code></h2>
+  <p>The KG is touched at <b>three points</b> in the feature workflow — twice read during planning, once written after the push. <a href="implement-workflow.html">See the full workflow →</a></p>
+
+  <div class="touch read">
+    <div class="when">Before · prerequisite</div>
+    <div class="title">Related-feature lookup (optional, Layer 2)</div>
+    <div class="desc">Before planning, query the semantic layer — <code>kg.py query "how was the scoring engine built?"</code> — to find how similar features were implemented. Needs a prior <code>up</code> + <code>ingest</code>. This is what makes the KG worth keeping current.</div>
+  </div>
+
+  <div class="touch read">
+    <div class="when">Phase 1 · step 2 — read inputs</div>
+    <div class="title">Ground the plan with Layer 1 structure</div>
+    <div class="desc"><span class="ph">Automatic.</span> The skill runs <code>kg.py structure W#-F#</code> (offline, deterministic) and uses the edges to: cross-check the detail doc's <span class="et">DEPENDS_ON</span>/<span class="et">UNBLOCKS</span>, pull governing <span class="et">DECIDED_BY</span> (ADR) / <span class="et">SPECIFIED_BY</span> (spec) / <span class="et">DOCUMENTED_BY</span> (plan) into Context, and use <span class="et">EVIDENCED_BY</span> code paths as the starting touchpoint list. It also runs <code>structure &lt;file&gt;</code> on files it intends to change for an impact check. Contradictions get flagged, not silently trusted.</div>
+  </div>
+
+  <div class="touch write">
+    <div class="when">Phase 2 · step 6 — after the push</div>
+    <div class="title">Re-ingest so future planning sees the new work</div>
+    <div class="desc"><span class="ph">Best-effort, not a gate.</span> New plan / detail doc / ADR / FEATURE_STATUS row get folded back in. <b>Layer 1 is automatic</b> — it reads the repo live, so new docs already resolve. <b>Layer 2</b> needs an explicit <code>up → ingest → down</code>. Deferred (not failed) if Docker/models are unavailable — the push already succeeded and Layer 1 is current regardless.</div>
+  </div>
+
+  <div class="callout" style="border-left-color:var(--l2)">
+    🔁 <b>The virtuous loop:</b> each completed feature re-ingests its docs → the next feature's <code>query</code> can find it → better-grounded plans over time. Skipping the re-ingest only degrades Layer 2 recall; Layer 1 never goes stale.
+  </div>
+
+  <!-- COMMANDS -->
+  <h2 class="sec">Command reference</h2>
+  <pre><span class="c"># Layer 1 — no install, no model, works offline</span>
+<span class="k">python kg.py structure</span> W4-F1            <span class="c"># a node's edges (also ADR-0001, a path, a label substring)</span>
+<span class="k">python kg.py export</span> --format mermaid --out graph.mmd
+<span class="k">python kg.py export</span> --format json --out graph.json --include-code
+
+<span class="c"># Layer 2 — semantic Q&A (use a venv on PEP-668 / Arch)</span>
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+<span class="k">python kg.py up</span>                          <span class="c"># start Ollama + pull models (~5GB first run)</span>
+<span class="k">python kg.py ingest</span>                      <span class="c"># index docs/ (+ evidence source files)</span>
+<span class="k">python kg.py query</span> "Why was Jaccard chosen for multi-select scoring?"
+<span class="k">python kg.py down</span>                        <span class="c"># stop Ollama, free all model RAM</span></pre>
+
+  <!-- TOGGLING + CONFIG -->
+  <h2 class="sec">Memory, toggling &amp; config</h2>
+  <div class="grid2">
+    <div class="mini">
+      <h4>🔌 The "turn it off" switch</h4>
+      <p>Ollama is one container behind the <code>kg</code> Compose profile, so root <code>docker compose up</code> never starts it. <code>kg.py down</code> removes the container — model RAM goes with it. Pulled models persist in the <code>ollama-models</code> volume, so re-<code>up</code> is fast.</p>
+    </div>
+    <div class="mini">
+      <h4>💤 Idle auto-unload</h4>
+      <p>While up, <code>OLLAMA_KEEP_ALIVE</code> (default <code>5m</code>) keeps the model warm during use and auto-unloads after 5 min idle → RAM frees itself. Don't set <code>KG_KEEP_ALIVE=0</code> during <code>ingest</code> (hundreds of calls; reload thrash).</p>
+    </div>
+    <div class="mini">
+      <h4>⚙️ Models (env overrides)</h4>
+      <p>LLM <code>qwen2.5:7b-instruct</code>, embed <code>nomic-embed-text</code> (dim 768). Override via <code>KG_LLM_MODEL</code> / <code>KG_EMBED_MODEL</code> / <code>KG_EMBED_DIM</code>.</p>
+    </div>
+    <div class="mini">
+      <h4>🚀 GPU (optional)</h4>
+      <p>CPU-only by default so <code>up</code> works anywhere. NVIDIA Container Toolkit + uncomment <code>deploy.resources</code> in <code>docker-compose.kg.yml</code> cuts ingest time dramatically.</p>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:26px">
+    🧱 <b>Stack:</b> NetworkX graph + LightRAG over containerized Ollama. Cognee was evaluated and rejected (leans on structured output, underperforms with small local models). Upgrade paths (not built): NetworkX → Neo4j/Kuzu for Cypher; ingest <code>FDE_PEP_Content/</code>; a graph-browsing web UI. Full design: <code>docs/plans/tool-knowledge-graph.md</code>.
+  </div>
+</div>
+</body>
+</html>
