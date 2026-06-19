@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Process Docs — rev-eval</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2129;
+    --panel2: #222c36;
+    --line: #2f3a45;
+    --txt: #e6edf3;
+    --muted: #8b98a5;
+    --spec: #f59e0b;
+    --status: #10b981;
+    --feat: #3b82f6;
+    --plan: #8b5cf6;
+    --adr: #ec4899;
+    --supp: #64748b;
+    --read: #06b6d4;
+    --write: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--txt);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.45; padding: 28px 20px 60px;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h2.sec { font-size: 1.25rem; margin: 36px 0 14px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  .sub { color: var(--muted); margin: 0 0 22px; font-size: 0.95rem; }
+  code { background: #11181f; padding: 1px 6px; border-radius: 4px; font-size: 0.85em; color: #b9d6ff; font-family: ui-monospace, monospace; }
+  p { font-size: 0.92rem; }
+  a { color: #7db3ff; }
+
+  .nav { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+  .nav a {
+    text-decoration: none; font-size: 0.85rem; font-weight: 600;
+    padding: 7px 14px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--muted);
+  }
+  .nav a.here { color: var(--txt); border-color: var(--spec); background: rgba(245,158,11,0.12); }
+
+  /* doc cards */
+  .doc {
+    border-radius: 12px; border: 1px solid var(--line); background: var(--panel);
+    padding: 16px 18px; margin-bottom: 16px;
+  }
+  .doc-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .doc-head .tag {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 3px 9px; border-radius: 6px; color: #0f1419;
+  }
+  .doc-head h3 { margin: 0; font-size: 1.08rem; }
+  .doc-head .path { font-family: ui-monospace, monospace; font-size: 0.8rem; color: var(--muted); }
+  .doc.spec   { border-left: 5px solid var(--spec); }
+  .doc.status { border-left: 5px solid var(--status); }
+  .doc.feat   { border-left: 5px solid var(--feat); }
+  .doc.plan   { border-left: 5px solid var(--plan); }
+  .doc.adr    { border-left: 5px solid var(--adr); }
+  .doc.supp   { border-left: 5px solid var(--supp); }
+  .tag.spec { background: var(--spec); } .tag.status { background: var(--status); }
+  .tag.feat { background: var(--feat); color:#fff; } .tag.plan { background: var(--plan); color:#fff; }
+  .tag.adr { background: var(--adr); color:#fff; } .tag.supp { background: var(--supp); color:#fff; }
+
+  .doc .role { font-size: 0.9rem; margin: 8px 0; }
+  .meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 0.85rem; margin-top: 10px; }
+  .meta .lab { color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .meta .val { color: var(--txt); }
+  .meta .val.read  { color: #67e8f9; }
+  .meta .val.write { color: #d8b4fe; }
+  .sections { font-family: ui-monospace, monospace; font-size: 0.78rem; color: var(--muted); }
+  .count { font-size: 0.72rem; color: var(--muted); background: var(--panel2); border: 1px solid var(--line); border-radius: 20px; padding: 2px 10px; }
+
+  /* read vs write legend / flow */
+  .rw { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+  .rw .col { border-radius: 12px; padding: 14px 18px; border: 1px solid var(--line); }
+  .rw .col.r { border-left: 5px solid var(--read); background: linear-gradient(180deg, rgba(6,182,212,0.06), transparent); }
+  .rw .col.w { border-left: 5px solid var(--write); background: linear-gradient(180deg, rgba(168,85,247,0.06), transparent); }
+  .rw h4 { margin: 0 0 8px; font-size: 0.98rem; }
+  .rw ul { margin: 0; padding-left: 18px; font-size: 0.86rem; color: var(--muted); }
+  .rw li { margin-bottom: 5px; }
+  .rw .doctag { font-size: 0.7rem; font-weight: 700; padding: 1px 7px; border-radius: 5px; color: #0f1419; }
+
+  .callout {
+    background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--spec);
+    border-radius: 10px; padding: 12px 18px; margin: 18px 0; font-size: 0.9rem; color: var(--muted);
+  }
+  .callout b { color: var(--txt); }
+
+  @media (max-width: 720px) { .rw { grid-template-columns: 1fr; } .meta { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="nav">
+    <a href="implement-workflow.html">/implement workflow</a>
+    <a href="knowledge-graph.html">Knowledge Graph</a>
+    <a class="here" href="docs-map.html">Process Docs</a>
+  </div>
+
+  <h1>📚 Process Docs <span style="color:var(--muted);font-weight:400;font-size:1rem">— the paper trail behind every feature</span></h1>
+  <p class="sub">Each feature flows through a fixed set of documents — from the upstream spec down to the committed plan and any decision records. The <a href="implement-workflow.html"><code>/implement</code> skill</a> reads some as source-of-truth and writes others as it executes; the <a href="knowledge-graph.html">Knowledge Graph</a> stitches them together by edge type.</p>
+
+  <!-- DOC TYPES -->
+  <h2 class="sec">The documents, in dependency order</h2>
+
+  <div class="doc spec">
+    <div class="doc-head">
+      <span class="tag spec">Upstream spec</span>
+      <h3>Curriculum feature spec</h3>
+      <span class="path">../days_*_features.md</span>
+      <span class="count">3 files · Days 6–20</span>
+    </div>
+    <div class="role"><b>Source of acceptance criteria.</b> Lives one level <em>above</em> the repo root (<code>days_6_10</code>, <code>days_11_15</code>, <code>days_16_20</code>). Describes <em>what</em> each candidate feature must do, with Implementation Details the detail doc may compress.</div>
+    <div class="meta">
+      <span class="lab">Authored by</span><span class="val">Curriculum (read-only reference)</span>
+      <span class="lab">Used when</span><span class="val read">Phase 1 · read inputs — the final word on acceptance</span>
+      <span class="lab">KG edge</span><span class="val"><code>SPECIFIED_BY</code> (feature → spec section)</span>
+    </div>
+  </div>
+
+  <div class="doc status">
+    <div class="doc-head">
+      <span class="tag status">Tracker</span>
+      <h3>Feature Status Tracker</h3>
+      <span class="path">docs/FEATURE_STATUS.md</span>
+      <span class="count">1 file · all W2–W4</span>
+    </div>
+    <div class="role"><b>Summary-level state for every feature</b> — one row each: id, priority, status (✅ / 🟡 / ❌), link to detail doc, one-line "what landed + where". The map you start from; the detail doc is the full record.</div>
+    <div class="meta">
+      <span class="lab">Authored by</span><span class="val">/implement (and humans)</span>
+      <span class="lab">Used when</span><span class="val read">Phase 1 · pick target + check status</span>
+      <span class="lab">Updated when</span><span class="val write">Phase 2 · requirements review flips the row (same branch as code)</span>
+    </div>
+  </div>
+
+  <div class="doc feat">
+    <div class="doc-head">
+      <span class="tag feat">Detail doc</span>
+      <h3>Feature detail / acceptance checklist</h3>
+      <span class="path">docs/features/w#-f#-&lt;name&gt;.md</span>
+      <span class="count">35 files</span>
+    </div>
+    <div class="role"><b>The acceptance checklist.</b> Header (Status / Spec ref / Depends on / Unblocks / Last updated), then a <code>Steps</code> list of checkboxes — each step carries <b>evidence</b> (file:line, commit, PR) as it's completed.</div>
+    <div class="meta">
+      <span class="lab">Authored by</span><span class="val">/implement (and humans)</span>
+      <span class="lab">Used when</span><span class="val read">Phase 1 · the steps become milestones</span>
+      <span class="lab">Updated when</span><span class="val write">Phase 2 · requirements review checks off steps + adds evidence</span>
+      <span class="lab">KG edges</span><span class="val"><code>DEPENDS_ON</code> · <code>UNBLOCKS</code> · <code>EVIDENCED_BY</code></span>
+    </div>
+  </div>
+
+  <div class="doc plan">
+    <div class="doc-head">
+      <span class="tag plan">Plan</span>
+      <h3>Milestone implementation plan</h3>
+      <span class="path">docs/plans/w#-f#-&lt;name&gt;.md</span>
+      <span class="count">26 files</span>
+    </div>
+    <div class="role"><b>The approved build plan</b>, written before any code. Version-controlled: it's the <em>first commit</em> on the feature branch.</div>
+    <div class="sections">Header · Context · Step 0 (branch &amp; commit workflow) · Milestones (1 commit each) · Testing &amp; validation · Requirements review · Push gate</div>
+    <div class="meta">
+      <span class="lab">Authored by</span><span class="val">/implement (Phase 1, step 3)</span>
+      <span class="lab">Gated by</span><span class="val read">Plan approval — hard stop before any code</span>
+      <span class="lab">Committed when</span><span class="val write">Phase 2 · first commit on the feature branch</span>
+      <span class="lab">KG edge</span><span class="val"><code>DOCUMENTED_BY</code> (feature → plan)</span>
+    </div>
+  </div>
+
+  <div class="doc adr">
+    <div class="doc-head">
+      <span class="tag adr">ADR</span>
+      <h3>Architecture Decision Record</h3>
+      <span class="path">docs/adr/NNNN-&lt;slug&gt;.md</span>
+      <span class="count">2 files</span>
+    </div>
+    <div class="role"><b>One non-obvious decision, captured.</b> Status / Date / Feature / Deciders, then Context → Decision → consequences. Often lifts an in-code rationale (e.g. a module docstring) into standard structure. <em>Example: ADR-0002 — multi-select scored by the Jaccard index (W3-F2).</em></div>
+    <div class="meta">
+      <span class="lab">Authored by</span><span class="val">/implement or human, when a decision warrants it</span>
+      <span class="lab">Used when</span><span class="val read">Phase 1 · governing decisions pulled into plan Context</span>
+      <span class="lab">KG edge</span><span class="val"><code>DECIDED_BY</code> (feature → ADR)</span>
+    </div>
+  </div>
+
+  <div class="doc supp">
+    <div class="doc-head">
+      <span class="tag supp">Supporting</span>
+      <h3>Narrative &amp; debt docs</h3>
+      <span class="path">docs/{technical-narrative,technical-debt,ai-assistance}.md</span>
+    </div>
+    <div class="role">Cross-cutting, not per-feature: <code>technical-narrative.md</code> (the story of the build), <code>technical-debt.md</code> (deferred/adjacent work — where out-of-scope defects get parked), <code>ai-assistance.md</code> (how AI tooling was used). Read for context; updated opportunistically.</div>
+  </div>
+
+  <!-- READ vs WRITE -->
+  <h2 class="sec">What <code>/implement</code> reads vs. writes</h2>
+  <div class="rw">
+    <div class="col r">
+      <h4>📖 Read as source of truth <span style="font-weight:400;font-size:0.82rem;color:var(--muted)">(Phase 1)</span></h4>
+      <ul>
+        <li><span class="doctag" style="background:var(--spec)">SPEC</span> upstream <code>days_*_features.md</code> — acceptance criteria</li>
+        <li><span class="doctag" style="background:var(--status)">STATUS</span> <code>FEATURE_STATUS.md</code> — pick target, check state</li>
+        <li><span class="doctag" style="background:var(--feat);color:#fff">DETAIL</span> feature doc — Steps → milestones, Depends/Unblocks</li>
+        <li><span class="doctag" style="background:var(--adr);color:#fff">ADR</span> governing decisions → plan Context</li>
+        <li><span class="doctag" style="background:var(--plan);color:#fff">PLAN</span> existing plan for this feature → extend, don't restart</li>
+      </ul>
+    </div>
+    <div class="col w">
+      <h4>✍️ Write / update <span style="font-weight:400;font-size:0.82rem;color:var(--muted)">(Phase 2)</span></h4>
+      <ul>
+        <li><span class="doctag" style="background:var(--plan);color:#fff">PLAN</span> new plan — committed <b>first</b> on the branch</li>
+        <li><span class="doctag" style="background:var(--feat);color:#fff">DETAIL</span> check off Steps + add evidence at review</li>
+        <li><span class="doctag" style="background:var(--status)">STATUS</span> flip the row to ✅ — same branch as code</li>
+        <li><span class="doctag" style="background:var(--adr);color:#fff">ADR</span> new record if a decision warrants it</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout">
+    🔗 <b>One branch, one PR.</b> The plan, the code, the checked-off detail doc, and the flipped status row all land on <code>richardh-feat-W#F#</code> together — docs are never a separate commit afterthought. <a href="knowledge-graph.html">The Knowledge Graph</a> then re-ingests them so the next feature's planning sees the new paper trail.
+  </div>
+</div>
+</body>
+</html>

@@ -213,7 +213,10 @@ __marimo__/
 #custom
 
 .vscode
-.claude
+# Ignore local Claude Code state (worktrees, settings, caches) but version-control
+# project skills under .claude/skills/ (e.g. the /implement feature workflow).
+.claude/*
+!.claude/skills/
 .trainer-notes/
 package
 *.zip

@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>/implement Skill Workflow</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2129;
+    --panel2: #222c36;
+    --line: #2f3a45;
+    --txt: #e6edf3;
+    --muted: #8b98a5;
+    --auto: #3b82f6;
+    --auto-bg: #13243d;
+    --gate: #f59e0b;
+    --gate-bg: #3a2c0a;
+    --res: #10b981;
+    --res-bg: #0e2a22;
+    --phase1: #8b5cf6;
+    --phase2: #ec4899;
+    --pre: #06b6d4;
+    --pre-bg: #0a2730;
+    --post: #a3a30d;
+    --post-bg: #2a2a08;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--txt);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.45;
+    padding: 32px 20px 60px;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 4px; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); margin: 0 0 28px; font-size: 0.95rem; }
+  code { background: #11181f; padding: 1px 6px; border-radius: 4px; font-size: 0.85em; color: #b9d6ff; }
+
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 18px; margin-bottom: 30px;
+  }
+  .legend .item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+  .dot { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+
+  .phase {
+    border: 1px solid var(--line); border-radius: 14px;
+    padding: 4px 22px 22px; margin-bottom: 26px; position: relative;
+    background: linear-gradient(180deg, rgba(255,255,255,0.015), transparent);
+  }
+  .phase-tag {
+    display: inline-block; font-size: 0.78rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 4px 12px; border-radius: 0 0 8px 8px; margin-left: 4px;
+    color: #fff;
+  }
+  .p1 { background: var(--phase1); }
+  .p2 { background: var(--phase2); }
+  .phase h2 { font-size: 1.15rem; margin: 14px 0 16px; }
+
+  .step {
+    display: flex; gap: 14px; align-items: stretch; margin-bottom: 10px;
+  }
+  .arrow { text-align: center; color: var(--muted); font-size: 1.1rem; margin: 2px 0 8px 24px; }
+
+  .num {
+    flex: none; width: 30px; height: 30px; border-radius: 50%;
+    background: var(--panel2); border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.85rem; color: var(--muted);
+  }
+  .card {
+    flex: 1; border-radius: 10px; padding: 12px 16px;
+    background: var(--panel); border: 1px solid var(--line);
+  }
+  .card.auto { border-left: 4px solid var(--auto); }
+  .card.gate { border-left: 4px solid var(--gate); background: var(--gate-bg); }
+  .card .title { font-weight: 600; font-size: 0.98rem; margin-bottom: 4px; }
+  .card .desc { color: var(--muted); font-size: 0.88rem; }
+  .badge {
+    display: inline-block; font-size: 0.68rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 2px 8px; border-radius: 20px; margin-left: 8px; vertical-align: middle;
+  }
+  .badge.auto { background: var(--auto-bg); color: #7db3ff; border: 1px solid #2a4d7a; }
+  .badge.gate { background: #4a3708; color: #ffd27d; border: 1px solid #6b5210; }
+
+  .res {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px;
+  }
+  .res span {
+    font-size: 0.72rem; background: var(--res-bg); color: #6ee7b7;
+    border: 1px solid #1c4d3e; border-radius: 5px; padding: 2px 8px;
+    font-family: ui-monospace, monospace;
+  }
+
+  .gate-banner {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--gate-bg); border: 1px dashed var(--gate);
+    border-radius: 10px; padding: 14px 18px; margin: 18px 0;
+  }
+  .gate-banner .ico { font-size: 1.4rem; }
+  .gate-banner .t { font-weight: 700; color: #ffd27d; }
+  .gate-banner .d { color: var(--muted); font-size: 0.88rem; }
+
+  .band {
+    border: 1px solid var(--line); border-radius: 14px;
+    padding: 4px 22px 20px; margin-bottom: 26px;
+  }
+  .band.pre { border-color: var(--pre); background: linear-gradient(180deg, rgba(6,182,212,0.06), transparent); }
+  .band.post { border-color: var(--post); background: linear-gradient(180deg, rgba(163,163,13,0.06), transparent); }
+  .band-tag {
+    display: inline-block; font-size: 0.78rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 4px 12px; border-radius: 0 0 8px 8px; margin-left: 4px; color: #0f1419;
+  }
+  .band.pre .band-tag { background: var(--pre); }
+  .band.post .band-tag { background: var(--post); }
+  .band h2 { font-size: 1.1rem; margin: 14px 0 14px; }
+
+  .pre-item, .post-item {
+    border-radius: 10px; padding: 11px 16px; margin-bottom: 10px;
+    background: var(--panel); border: 1px solid var(--line);
+  }
+  .band.pre .pre-item { border-left: 4px solid var(--pre); }
+  .band.post .post-item { border-left: 4px solid var(--post); }
+  .pre-item .title, .post-item .title { font-weight: 600; font-size: 0.96rem; margin-bottom: 3px; }
+  .pre-item .desc, .post-item .desc { color: var(--muted); font-size: 0.87rem; }
+
+  .flowdiv { text-align: center; color: var(--muted); font-size: 1.6rem; margin: 6px 0 14px; }
+
+  .nav { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+  .nav a {
+    text-decoration: none; font-size: 0.85rem; font-weight: 600;
+    padding: 7px 14px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--muted);
+  }
+  .nav a.here { color: var(--txt); border-color: var(--phase1); background: rgba(139,92,246,0.12); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="nav">
+    <a class="here" href="implement-workflow.html">/implement workflow</a>
+    <a href="knowledge-graph.html">Knowledge Graph</a>
+    <a href="docs-map.html">Process Docs</a>
+  </div>
+  <h1>🛠️ <code>/implement</code> — Feature Workflow</h1>
+  <p class="sub">Spec → written plan → <b>approval gate</b> → branch + milestone commits → test → requirements review → <b>push gate</b> → KG re-ingest. All work inside <code>rev-eval/</code>.</p>
+
+  <div class="legend">
+    <div class="item"><span class="dot" style="background:var(--pre)"></span> Prerequisite (before)</div>
+    <div class="item"><span class="dot" style="background:var(--auto)"></span> Automatic step</div>
+    <div class="item"><span class="dot" style="background:var(--gate)"></span> Human-in-the-loop gate</div>
+    <div class="item"><span class="dot" style="background:var(--res)"></span> Resource read/written</div>
+    <div class="item"><span class="dot" style="background:var(--post)"></span> Outcome / follow-up (after)</div>
+  </div>
+
+  <!-- BEFORE RUNNING -->
+  <div class="band pre">
+    <span class="band-tag">Before running · Prerequisites</span>
+    <h2>What must already be true for <code>/implement</code> to have a source of truth</h2>
+
+    <div class="pre-item">
+      <div class="title">① Feature is documented</div>
+      <div class="desc">The detail doc <code>docs/features/w#-f#-&lt;name&gt;.md</code> exists with <b>Steps / Depends on / Unblocks / Notes</b>, a row in <code>docs/FEATURE_STATUS.md</code>, and the upstream section in <code>days_*_features.md</code>. These are the acceptance checklist — no doc, nothing to plan from.</div>
+    </div>
+
+    <div class="pre-item">
+      <div class="title">② Prerequisite features are done (or the gap is known)</div>
+      <div class="desc">Everything in the feature's <b>Depends on</b> is ✅ in FEATURE_STATUS. If not, the skill surfaces the gap rather than planning on an unmet prerequisite.</div>
+    </div>
+
+    <div class="pre-item">
+      <div class="title">③ Knowledge Graph ready for related-feature lookup</div>
+      <div class="desc"><b>Layer 1</b> (<code>kg.py structure W#-F#</code>) is offline/deterministic — always available, no setup. For semantic "how was a similar feature built" lookups, <b>Layer 2</b> needs <code>kg.py up</code> then a prior <code>kg.py ingest</code>, then <code>kg.py query "…"</code> — needs Docker + ~5GB Ollama models.</div>
+    </div>
+
+    <div class="pre-item">
+      <div class="title">④ Repo state clean &amp; on <code>richardh</code></div>
+      <div class="desc">cwd is the <code>rev-eval/</code> repo root (has <code>docker-compose.yml</code> + <code>docs/features/</code>); local <code>richardh</code> fetched/pulled, working tree clean, origin reachable.</div>
+    </div>
+  </div>
+
+  <div class="flowdiv">⬇ run <code style="font-size:0.6em">/implement W#-F#</code> ⬇</div>
+
+  <!-- PHASE 1 -->
+  <div class="phase">
+    <span class="phase-tag p1">Phase 1 · Analyze &amp; Plan</span>
+    <h2>From spec to an approved, written plan</h2>
+
+    <div class="step">
+      <div class="num">1</div>
+      <div class="card auto">
+        <div class="title">Identify target feature <span class="badge auto">auto</span></div>
+        <div class="desc">Use the named <code>W#-F#</code>, or propose the next from the suggested order. Check status — if ✅ already done, confirm before redoing.</div>
+        <div class="res"><span>FEATURE_STATUS.md</span></div>
+      </div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="step">
+      <div class="num">2</div>
+      <div class="card auto">
+        <div class="title">Read the inputs (source of truth) <span class="badge auto">auto</span></div>
+        <div class="desc">Feature detail doc Steps/Depends/Unblocks, status row, upstream spec, unmet prerequisites. Plus <b>Knowledge Graph Layer 1</b> (<code>kg.py structure</code>) — offline, deterministic dep/ADR/code edges to ground the plan &amp; flag spec contradictions.</div>
+        <div class="res"><span>docs/features/w#-f#.md</span><span>FEATURE_STATUS.md</span><span>days_*_features.md</span><span>docs/plans/ (existing)</span><span>kg.py structure</span></div>
+      </div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="step">
+      <div class="num">3</div>
+      <div class="card auto">
+        <div class="title">Write the plan <span class="badge auto">auto</span></div>
+        <div class="desc">Save to <code>docs/plans/w#-f#-&lt;name&gt;.md</code>. Header + Context + Step 0 (branch/commit workflow) + Milestones (1 commit each) + Testing + Requirements review + Push gate.</div>
+        <div class="res"><span>docs/plans/w#-f#.md (written)</span></div>
+      </div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="gate-banner">
+      <div class="ico">🚦</div>
+      <div>
+        <div class="t">GATE 1 — Plan approval (hard stop)</div>
+        <div class="d">Present plan via EnterPlanMode/ExitPlanMode. <b>Wait for explicit approval.</b> No branch, no code until approved. Apply requested edits to the plan file first.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 2 -->
+  <div class="phase">
+    <span class="phase-tag p2">Phase 2 · Execute</span>
+    <h2>Only after approval — branch to pushed feature</h2>
+
+    <div class="step">
+      <div class="num">1</div>
+      <div class="card auto">
+        <div class="title">Branch <span class="badge auto">auto</span></div>
+        <div class="desc"><code>git fetch &amp;&amp; git pull origin richardh</code>, then create <code>richardh-feat-W#F#</code> off <code>richardh</code>. Confirm current branch before editing.</div>
+        <div class="res"><span>git · richardh-feat-W#F#</span></div>
+      </div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="step">
+      <div class="num">2</div>
+      <div class="card auto">
+        <div class="title">Commit plan, then milestones <span class="badge auto">auto</span></div>
+        <div class="desc">First commit = the plan file. Then implement milestone by milestone, one scoped Conventional Commit each. Endpoints → add pattern to gateway <code>ROUTES</code>; TMS schema → Alembic.</div>
+        <div class="res"><span>services/*</span><span>frontend/*</span><span>alembic/versions/</span><span>api-gateway ROUTES</span></div>
+      </div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="step">
+      <div class="num">3</div>
+      <div class="card auto">
+        <div class="title">Test &amp; validate <span class="badge auto">auto</span></div>
+        <div class="desc">Per plan: <code>pytest --cov</code> per service, <code>pnpm lint</code>/<code>build</code>, <code>docker compose up --build</code> + smoke check. Capture <b>real</b> output — never report a green bar you didn't see. Fix or surface failures.</div>
+        <div class="res"><span>pytest</span><span>pnpm</span><span>docker compose</span></div>
+      </div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="step">
+      <div class="num">4</div>
+      <div class="card auto">
+        <div class="title">Requirements review <span class="badge auto">auto</span></div>
+        <div class="desc">Re-read detail doc Steps + spec; verify each against the actual diff (file:line / commit evidence). Check off steps in detail doc, flip the FEATURE_STATUS row, commit doc updates.</div>
+        <div class="res"><span>docs/features/w#-f#.md (✅)</span><span>FEATURE_STATUS.md (✅)</span></div>
+      </div>
+    </div>
+    <div class="arrow">↓</div>
+
+    <div class="gate-banner">
+      <div class="ico">🚦</div>
+      <div>
+        <div class="t">GATE 2 — Push gate (conditional, self-checked)</div>
+        <div class="d">Push <code>-u origin richardh-feat-W#F#</code> <b>only if</b> tests pass <b>AND</b> every Step is confirmed. Otherwise: stop, leave branch local, report exactly what's outstanding.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">5</div>
+      <div class="card auto">
+        <div class="title">Re-ingest into Knowledge Graph <span class="badge auto">auto · best-effort</span></div>
+        <div class="desc">After push, fold new docs into the KG. Layer 1 is live (no action). Layer 2 semantic index needs <code>kg.py up → ingest → down</code>. <b>Not a gate</b> — needs Docker + ~5GB models; skip &amp; note if unavailable. Push already succeeded.</div>
+        <div class="res"><span>kg.py up/ingest/down</span><span>Ollama (local)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flowdiv">⬇ skill finishes ⬇</div>
+
+  <!-- AFTER RUNNING -->
+  <div class="band post">
+    <span class="band-tag">After running · Outcomes &amp; follow-ups</span>
+    <h2>End state when the gates pass — and the manual steps the skill leaves to you</h2>
+
+    <div class="post-item">
+      <div class="title">✓ Feature branch pushed (gates passed)</div>
+      <div class="desc"><code>richardh-feat-W#F#</code> on origin — but <b>only</b> if tests were green and every Step was confirmed. If a gate failed, the branch stays local and the skill reports exactly what's outstanding (no push).</div>
+    </div>
+
+    <div class="post-item">
+      <div class="title">✓ Docs updated in-branch</div>
+      <div class="desc">Plan committed in <code>docs/plans/</code>; detail-doc Steps checked off with evidence (file:line / commit); the <code>FEATURE_STATUS.md</code> row flipped to ✅ — all on the feature branch.</div>
+    </div>
+
+    <div class="post-item">
+      <div class="title">✓ Knowledge Graph re-ingested (best-effort)</div>
+      <div class="desc">New plan / detail doc / ADR / status row folded into the KG so future planning sees them. Layer 1 is live automatically; Layer 2 needs <code>kg.py up → ingest → down</code>. Deferred (not failed) if Docker/models unavailable.</div>
+    </div>
+
+    <div class="post-item">
+      <div class="title">↪ Manual follow-up (outside the skill)</div>
+      <div class="desc">Open PR <code>richardh-feat-W#F#</code> → <code>richardh</code>, review, merge. File any adjacent defects spotted during the work as <b>separate</b> features — the skill never expands scope.</div>
+    </div>
+  </div>
+
+  <p class="sub" style="margin-top:24px">Conventions: branches always base off <code>richardh</code> (never <code>main</code>); branch name has no dash between W&amp;F (<code>richardh-feat-W2F4</code>); plans are version-controlled; scope never exceeds the feature spec (adjacent defects → separate feature); KG is a local dev tool, never in compose/ROUTES.</p>
+</div>
+</body>
+</html>
