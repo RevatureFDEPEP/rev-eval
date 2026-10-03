@@ -4,7 +4,7 @@ The five FastAPI backend services behind the Rev-Eval assessment platform. Each 
 
 | Service | Responsibility | Storage | Port |
 |---------|----------------|---------|------|
-| `api-gateway-service/` | Verifies the JWT cookie, forwards identity headers (`X-User-Id`, `X-User-Email`, `X-User-Role`) and routes `/v1/api/*` to the services below | none | 8000 |
+| `api-gateway-service/` | Verifies the Bearer JWT, forwards identity headers (`X-User-Id`, `X-User-Email`, `X-User-Role`) and routes `/v1/api/*` to the services below | none | 8000 |
 | `test-management-service/` | Tests, skills, test sessions, submissions and scoring | PostgreSQL | 8001 |
 | `user-service/` | Registration, login and users (JWT, bcrypt) | PostgreSQL | 8002 |
 | `question-management-service/` | Question bank and file uploads | MongoDB, MinIO | 8003 |
