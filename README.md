@@ -1,60 +1,89 @@
-# rev-eval
+# Rev-Eval
 
-Revature Evaluation Platform — PEP brownfield substrate.
+A multi-service skills assessment platform. Trainers create and assign tests, participants take them under a timer, and the system scores each submission and reports analytics.
 
-Local-first multi-service application:
-- **FastAPI** microservices (Python 3.11)
-- **Next.js 16** frontend (React 19, TypeScript)
-- **PostgreSQL 15** + **MongoDB 7** for persistence
-- **MinIO** for S3-compatible object storage
-- **Nginx** reverse proxy (candidates wire routes on W2 D6)
+This was a team Forward Deployed Engineering (FDE) project that started from a partially built, brownfield codebase. **This is the `kalabek` integration branch, which holds one contributor's work** (Kalabe Kebede); the organization's `main` branch does not contain it.
 
----
+## What this branch adds
 
-## Quick start
+- **Scoring engine** with idempotent submissions and row locking, so a retried or concurrent submit cannot double-score
+- **Timed quiz experience**: polymorphic question rendering, a timer, autosave and a submit state machine
+- **Reporting & Analytics service**: a working FastAPI service with Alembic migrations, per-test reports, aggregates, per-question statistics, rankings and per-user attempt history, reading the shared Postgres directly (see its ADR 0001)
+- **Authentication and authorization**: JWT verification at the gateway, service-level role checks (`TRAINER`, `PARTICIPANT`) and signature verification in the frontend middleware
+- **Routing and traceability**: Nginx and gateway routing across all services, and `X-Request-Id` propagation for tracing across services
+- **Testing and CI**: PostgreSQL integration tests, frontend tests and an optional Playwright end-to-end run
 
-You need Docker (or Colima / Docker Desktop) running.
+## Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | FastAPI microservices (Python 3.11 images) |
+| Frontend | Next.js 16, React 19, TypeScript, Vitest |
+| Data | PostgreSQL 15, MongoDB 7, MinIO (S3-compatible object storage) |
+| Edge | Nginx reverse proxy with TLS, plus a JWT-verifying API gateway |
+| Delivery | Docker Compose, GitHub Actions |
+
+## Architecture
+
+```
+Browser
+  ↓
+Nginx            HTTP→HTTPS redirect, rate limiting, security headers, gzip
+  ├── pages ──────→ Next.js frontend
+  └── /v1/api/* ──→ API gateway    verifies the JWT cookie, forwards identity headers
+                       ↓
+   ┌───────────────┬──────────────────────────┬─────────────────────────────┬────────────────────────────────┐
+   user-service    test-management-service    question-management-service   reporting-and-analytics-service
+   (Postgres)      (Postgres)                 (MongoDB + MinIO)             (read-only queries on the shared Postgres)
+```
+
+The login flow is a POST to `user-service`, which issues an HS256 JWT stored in an httpOnly cookie. The gateway verifies it on every request and forwards `X-User-Id`, `X-User-Email` and `X-User-Role` to the downstream services.
+
+## Services
+
+| Path | Service | Port | Storage |
+|------|---------|------|---------|
+| `services/api-gateway-service/` | JWT verification and request routing | 8000 | none |
+| `services/test-management-service/` | Tests, skills, test sessions, submissions and scoring | 8001 | PostgreSQL |
+| `services/user-service/` | Authentication and users (JWT, bcrypt) | 8002 | PostgreSQL |
+| `services/question-management-service/` | Question bank and file uploads | 8003 | MongoDB, MinIO |
+| `services/reporting-and-analytics-service/` | Reports, aggregates, rankings and attempt history | 8004 | PostgreSQL |
+| `frontend/` | Next.js app (trainer and participant UI) | 3000 | none |
+
+The gateway routes `/v1/api/auth`, `users`, `dashboard`, `tests`, `submissions`, `skills`, `questions`, `test-sessions` and `reports` to the services above.
+
+## Run locally
+
+You need Docker (Docker Desktop or Colima).
 
 ```bash
-cp .env.example .env             # adjust JWT_SECRET, secrets if needed
+cp .env.example .env     # review the values; they are local development defaults
 docker compose up --build
 ```
 
-Once the stack is healthy:
-
 | URL | What |
 |-----|------|
-| http://localhost:3000 | Frontend (Next.js, login / dashboards) |
-| http://localhost:8000/health | API gateway health |
-| http://localhost:8000/routes | Configured routing table |
-| http://localhost:8001/docs | test-management-service Swagger |
-| http://localhost:8002/docs | user-service Swagger |
-| http://localhost:8003/docs | question-management-service Swagger |
-| http://localhost:9001 | MinIO console (`minioadmin` / `minioadmin`) |
-| http://localhost | Nginx — returns 502 by design (W2 D6 target) |
+| https://localhost | Nginx front door (self-signed certificate generated on first start; HTTP on port 80 redirects here) |
+| http://localhost:3000 | Frontend directly |
+| http://localhost:8000/health | Gateway health |
+| http://localhost:8000/routes | Gateway routing table |
+| http://localhost:8001/docs, 8002/docs, 8003/docs | Swagger UI for the test, user and question services |
+| http://localhost:9001 | MinIO console |
 
-Default seeded users share password `password123` (see
-`services/test-management-service/seed_db.py`).
+Synthetic demo users and sample tests are seeded for local development by `services/test-management-service/seed_db.py`. Local credentials for the demo accounts, MinIO and the databases come from `.env.example` and that script; they are development defaults only, so change them before running anywhere beyond your own machine.
 
----
+A quick health check of every service: `./scripts/smoke.sh`.
 
-## Services in scope
+## Testing and CI
 
-| Path | Service | Port | DB |
-|------|---------|------|----|
-| `services/user-service/` | Auth + users (JWT + bcrypt) | 8002 | Postgres |
-| `services/question-management-service/` | Question bank + MinIO uploads | 8003 | Mongo |
-| `services/test-management-service/` | Tests, skills, submissions | 8001 | Postgres |
-| `services/api-gateway-service/` | JWT verify + request routing | 8000 | — |
-| `services/reporting-and-analytics-service/` | (empty — W2 D10 candidate task) | — | — |
+`.github/workflows/ci-pipeline.yml` runs on every push, on pull requests, and on manual dispatch:
 
-`frontend/` is the Next.js app. Authentication is a local POST to
-user-service that issues a HS256 JWT stored in an httpOnly cookie; the
-gateway verifies the cookie's JWT on each request and forwards
-`X-User-Id`, `X-User-Email`, `X-User-Role` to downstream services.
+- **Backend, one job per service** (user, question-management, test-management, api-gateway, reporting-and-analytics), with PostgreSQL 15 and MongoDB 7 service containers: `ruff` lint, `pytest` with coverage, and a **diff-coverage gate of 80 % on changed lines**
+- **Trivy** filesystem scan of each service, failing on fixed CRITICAL or HIGH findings
+- **Frontend**: lint with zero warnings, production build, build-provenance attestation, and `vitest`
+- **Playwright end-to-end** (`e2e/`): runs only when started manually with `run_e2e=true`, because it needs the full stack
+- A final **CI Gate** job that fails if the backend, frontend or Trivy jobs fail
 
-## CI
+## Scope
 
-`.github/workflows/ci-pipeline.yml` runs build + test for the four
-backend services (matrix) and the frontend on every push / PR to
-`main`.
+A local, team-built training project with seeded demo data. It is not deployed anywhere, and no compliance or certification is claimed.

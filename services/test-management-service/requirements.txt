@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
-SQLAlchemy
+SQLAlchemy>=2.0,<2.1
 pydantic
 pydantic-settings
 python-dotenv
