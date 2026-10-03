@@ -30,14 +30,14 @@ Browser
   ↓
 Nginx            HTTP→HTTPS redirect, rate limiting, security headers, gzip
   ├── pages ──────→ Next.js frontend
-  └── /v1/api/* ──→ API gateway    verifies the JWT cookie, forwards identity headers
+  └── /v1/api/* ──→ API gateway    verifies the Bearer JWT, forwards identity headers
                        ↓
    ┌───────────────┬──────────────────────────┬─────────────────────────────┬────────────────────────────────┐
    user-service    test-management-service    question-management-service   reporting-and-analytics-service
    (Postgres)      (Postgres)                 (MongoDB + MinIO)             (read-only queries on the shared Postgres)
 ```
 
-The login flow is a POST to `user-service`, which issues an HS256 JWT stored in an httpOnly cookie. The gateway verifies it on every request and forwards `X-User-Id`, `X-User-Email` and `X-User-Role` to the downstream services.
+The login flow is a POST to `user-service`, which issues an HS256 JWT stored in an httpOnly cookie. The Next.js server reads that cookie and sends the token to the gateway as a Bearer header; the gateway verifies it on every request and forwards `X-User-Id`, `X-User-Email` and `X-User-Role` to the downstream services.
 
 ## Services
 

@@ -1,41 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Rev-Eval Frontend
 
-## Getting Started
+The Next.js app for Rev-Eval: a trainer interface for creating and reviewing assessments and a participant interface for taking them.
 
-First, run the development server:
+- **Stack:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, Vitest
+- **Package manager:** pnpm 9 (`pnpm-lock.yaml`)
+
+## Roles and routing
+
+`src/middleware.ts` verifies the session JWT (from an httpOnly cookie) with `jose` on every non-public request, then routes by role:
+
+| Path | Allowed roles |
+|------|---------------|
+| `/trainer/*` (dashboard, tests, questions) | `TRAINER`, `ADMIN` |
+| `/participant/*` (dashboard, tests) | `PARTICIPANT` |
+| `/dashboard` | redirects to the trainer or participant dashboard by role |
+
+Unauthenticated users are redirected to the sign-in page (`/`), and users without the right role to `/unauthorized`.
+
+## How it reaches the backend
+
+The browser never holds the token in JavaScript. Login (`src/app/api/auth/login`) calls the API gateway and stores the returned JWT in an httpOnly cookie. Requests to `/api/v1/*` go through a server-side proxy route (`src/app/api/v1/[...path]`) that reads the cookie and forwards the call to the gateway with `Authorization: Bearer <token>`. The gateway address comes from `API_GATEWAY_URL`.
+
+## Run locally
+
+The frontend is normally started with the rest of the stack from the repository root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env
+docker compose up --build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The app is then at http://localhost:3000. To run it on its own against an already running gateway:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cd frontend
+pnpm install
+pnpm dev          # needs API_GATEWAY_URL and the same JWT_SECRET the backend uses
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Scripts
 
-## Learn More
+| Command | What it does |
+|---------|--------------|
+| `pnpm dev` | development server |
+| `pnpm build` | production build |
+| `pnpm start` | serve the production build |
+| `pnpm lint` | ESLint with zero warnings allowed |
+| `pnpm test` | Vitest unit tests |
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-## Deployment
-
-PEP cohort runs this app locally via the repo-root `docker-compose.yml`
-(see `../README.md`). No cloud deploy target is configured.
+End-to-end Playwright tests live in [`../e2e/`](../e2e/). See the [root README](../README.md) for the architecture and what CI runs.
