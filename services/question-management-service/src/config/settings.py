@@ -35,6 +35,11 @@ class Settings(BaseSettings):
 
     # S3 / MinIO Configuration (object storage for question images)
     S3_ENDPOINT_URL: str = "http://minio:9000"
+    # Origin the *browser* uses to reach object storage. Presigned URLs are
+    # signed for this host (SigV4 covers the Host header), so it must be the
+    # address the client actually requests, e.g. the Nginx edge that proxies
+    # the bucket path to MinIO. Unset: presign against S3_ENDPOINT_URL.
+    S3_PUBLIC_ENDPOINT_URL: Optional[str] = None
     S3_ACCESS_KEY: str = "minioadmin"
     S3_SECRET_KEY: str = "minioadmin"
     S3_BUCKET_NAME: str = "question-images"
