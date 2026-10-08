@@ -13,7 +13,8 @@ from fastapi.responses import Response
 # Hop-by-hop headers (RFC 9110 section 7.6.1) and headers that describe the
 # upstream encoding rather than the body we send. httpx has already decoded
 # any content-encoding, and Starlette sets content-length for the new body.
-# CORS and request-id headers are owned by the gateway's own middleware.
+# CORS headers (including Vary: Origin) and X-Request-Id are owned by the
+# gateway's own middleware, so forwarding them would duplicate values.
 _DROPPED_RESPONSE_HEADERS = frozenset(
     {
         "connection",
@@ -35,6 +36,7 @@ _DROPPED_RESPONSE_HEADERS = frozenset(
         "access-control-allow-headers",
         "access-control-expose-headers",
         "access-control-max-age",
+        "vary",
     }
 )
 

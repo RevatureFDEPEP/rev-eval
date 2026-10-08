@@ -92,6 +92,7 @@ class TestBuildProxyResponse:
                 "transfer-encoding": "chunked",
                 "x-request-id": "downstream-id",
                 "access-control-allow-origin": "*",
+                "vary": "Origin",
                 "cache-control": "no-store",
                 "location": "/v1/api/tests/7",
             },
@@ -102,7 +103,13 @@ class TestBuildProxyResponse:
         assert resp.headers["content-type"] == "text/plain"
         assert resp.headers["cache-control"] == "no-store"
         assert resp.headers["location"] == "/v1/api/tests/7"
-        for dropped in ("connection", "transfer-encoding", "x-request-id", "access-control-allow-origin"):
+        for dropped in (
+            "connection",
+            "transfer-encoding",
+            "x-request-id",
+            "access-control-allow-origin",
+            "vary",
+        ):
             assert dropped not in resp.headers
 
     def test_304_has_no_body_or_length(self):
