@@ -1,7 +1,8 @@
 /**
  * Happy-path E2E: participant registers, logs in, takes a quiz, submits, sees results.
  *
- * Requires the full stack (docker compose up) to be running.
+ * Requires the full stack with the dev override (docker-compose.dev.yml), which
+ * publishes the frontend and gateway ports used below.
  * Point PLAYWRIGHT_BASE_URL at http://localhost:3000 (default) or the deployed URL.
  *
  * The API_BASE_URL env var (default: http://localhost:8000) is used by beforeAll

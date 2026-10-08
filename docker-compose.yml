@@ -1,3 +1,7 @@
+# Base stack: only Nginx publishes host ports (80 -> HTTPS redirect, 443).
+# Every other container is reachable only on the private backend-net network.
+# For direct service, database and MinIO ports during development, add the
+# override:  docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 services:
   postgres:
     image: postgres:15-alpine
@@ -7,8 +11,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-root}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-root}
       POSTGRES_DB: ${POSTGRES_DB:-eval_ai_dev}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -27,8 +29,6 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:-admin}
       MONGO_INITDB_DATABASE: ${MONGO_DB:-evalai}
-    ports:
-      - "27017:27017"
     volumes:
       - mongo_data:/data/db
     networks:
@@ -47,9 +47,6 @@ services:
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
     volumes:
       - minio_data:/data
     networks:
@@ -99,8 +96,6 @@ services:
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_EXPIRY_MINUTES: ${JWT_EXPIRY_MINUTES:-60}
       ALLOW_ORIGINS: http://localhost:3000
-    ports:
-      - "8002:8002"
     networks:
       - backend-net
     depends_on:
@@ -131,8 +126,6 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME:-question-images}
       ALLOW_ORIGINS: http://localhost:3000
-    ports:
-      - "8003:8003"
     networks:
       - backend-net
     depends_on:
@@ -165,8 +158,6 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       USER_SERVICE_URL: http://user-service:8002
       ALLOW_ORIGINS: http://localhost:3000
-    ports:
-      - "8001:8001"
     networks:
       - backend-net
     depends_on:
@@ -198,8 +189,6 @@ services:
       SERVICE_HOSTNAME: reporting-and-analytics-service
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       ALLOW_ORIGINS: http://localhost:3000
-    ports:
-      - "8004:8004"
     networks:
       - backend-net
     depends_on:
@@ -224,8 +213,6 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ALLOW_ORIGINS: http://localhost:3000
-    ports:
-      - "8000:8000"
     networks:
       - backend-net
     depends_on:
@@ -257,8 +244,6 @@ services:
       NEXT_PUBLIC_SITE_URL: http://frontend:3000
       NODE_ENV: development
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
-    ports:
-      - "3000:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules

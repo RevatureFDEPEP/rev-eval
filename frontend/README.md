@@ -30,7 +30,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-The app is then at http://localhost:3000. To run it on its own against an already running gateway:
+The app is then served through Nginx at https://localhost. Its dev server is reachable directly at http://localhost:3000 only with the development override (`docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build`). To run it on its own against an already running gateway:
 
 ```bash
 cd frontend
