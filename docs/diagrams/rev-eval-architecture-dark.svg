@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1150" width="1400" height="1150" role="img" aria-label="Rev-Eval logical architecture. Trainers and participants reach Nginx over HTTPS. Nginx terminates TLS, redirects HTTP to HTTPS, rate-limits the API path and adds security headers, then forwards page and BFF traffic to the Next.js frontend and /v1/api traffic to the API gateway. The Next.js BFF reads the JWT from an httpOnly cookie and calls the gateway with a Bearer token. Inside the private Docker network the gateway verifies the JWT and routes to user-service, test-management, reporting-and-analytics and question-management with identity headers and a request ID. User, test, session and score data live in PostgreSQL, which reporting reads with read-only queries; questions live in MongoDB and question images in MinIO. GitHub Actions CI runs lint, tests with a diff-coverage gate, Trivy scans and the frontend build.">
+<style>text{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}</style>
+<rect width="1400" height="1150" fill="#0d1117"/>
+<rect x="40" y="20" width="1320" height="130" rx="18" fill="#11161d" stroke="#4a5280" stroke-width="1.6" stroke-dasharray="7 6"/>
+<text x="62" y="46" font-size="14" font-weight="700" fill="#9aa4b2" text-anchor="start">Public / external</text>
+<rect x="500" y="40" width="400" height="90" rx="12" fill="#11161d" stroke="#8b93e8" stroke-width="2"/>
+<text x="700.0" y="80.0" font-size="18" font-weight="700" fill="#e6edf3" text-anchor="middle">Browser</text>
+<text x="700.0" y="104.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">trainer  ·  participant</text>
+<rect x="40" y="180" width="1320" height="160" rx="18" fill="#2b2410" stroke="#e3b341" stroke-width="1.6" stroke-dasharray="7 6"/>
+<text x="62" y="206" font-size="14" font-weight="700" fill="#e3b341" text-anchor="start">Nginx edge</text>
+<rect x="400" y="210" width="600" height="108" rx="12" fill="#0d1117" stroke="#e3b341" stroke-width="2"/>
+<text x="700.0" y="248.0" font-size="18" font-weight="700" fill="#e3b341" text-anchor="middle">Nginx reverse proxy</text>
+<text x="700.0" y="272.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">TLS 1.2 / 1.3 termination  ·  HTTP → HTTPS redirect</text>
+<text x="700.0" y="293.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">rate limit on /v1/api  ·  security headers</text>
+<path d="M700.0,130.0 L700.0,197.0" fill="none" stroke="#8b93e8" stroke-width="2.5"/>
+<path d="M700.0,210.0 L707.0,197.0 L693.0,197.0 z" fill="#8b93e8"/>
+<text x="714" y="176" font-size="13.5" font-weight="600" fill="#8b93e8" text-anchor="start">HTTPS</text>
+<rect x="40" y="370" width="1320" height="410" rx="18" fill="#11161d" stroke="#4a5280" stroke-width="1.6" stroke-dasharray="7 6"/>
+<text x="62" y="396" font-size="14" font-weight="700" fill="#9aa4b2" text-anchor="start">Private Docker network  (application services, internal HTTP)</text>
+<rect x="110" y="430" width="460" height="112" rx="12" fill="#11161d" stroke="#8b93e8" stroke-width="2"/>
+<text x="340.0" y="470.0" font-size="18" font-weight="700" fill="#e6edf3" text-anchor="middle">Next.js frontend + BFF</text>
+<text x="340.0" y="494.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">pages  ·  role-based routing</text>
+<text x="340.0" y="515.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">httpOnly JWT cookie → Bearer header</text>
+<rect x="830" y="430" width="460" height="112" rx="12" fill="#11161d" stroke="#8b93e8" stroke-width="2"/>
+<text x="1060.0" y="470.0" font-size="18" font-weight="700" fill="#8b93e8" text-anchor="middle">API gateway</text>
+<text x="1060.0" y="494.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">JWT verification  ·  path routing</text>
+<text x="1060.0" y="515.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">X-User-* identity  ·  X-Request-Id</text>
+<path d="M500.0,318.0 L500.0,417.0" fill="none" stroke="#8b93e8" stroke-width="2.5"/>
+<path d="M500.0,430.0 L507.0,417.0 L493.0,417.0 z" fill="#8b93e8"/>
+<text x="512" y="414" font-size="13.5" font-weight="600" fill="#8b93e8" text-anchor="start">pages · /api (BFF)</text>
+<path d="M900.0,318.0 L900.0,417.0" fill="none" stroke="#8b93e8" stroke-width="2.5"/>
+<path d="M900.0,430.0 L907.0,417.0 L893.0,417.0 z" fill="#8b93e8"/>
+<text x="912" y="414" font-size="13.5" font-weight="600" fill="#8b93e8" text-anchor="start">/v1/api/*</text>
+<path d="M570.0,486.0 L817.0,486.0" fill="none" stroke="#8b93e8" stroke-width="2.5"/>
+<path d="M830.0,486.0 L817.0,479.0 L817.0,493.0 z" fill="#8b93e8"/>
+<text x="700" y="476" font-size="13.5" font-weight="600" fill="#8b93e8" text-anchor="middle">REST · Bearer JWT</text>
+<path d="M1060.0,542.0 L1060.0,595.0" fill="none" stroke="#8b93e8" stroke-width="2.5"/>
+<path d="M200.0,595.0 L1200.0,595.0" fill="none" stroke="#8b93e8" stroke-width="2.5"/>
+<text x="700" y="583" font-size="13.5" font-weight="600" fill="#8b93e8" text-anchor="middle">internal HTTP  ·  X-User-*  ·  X-Request-Id</text>
+<path d="M200.0,595.0 L200.0,627.0" fill="none" stroke="#8b93e8" stroke-width="2.5"/>
+<path d="M200.0,640.0 L207.0,627.0 L193.0,627.0 z" fill="#8b93e8"/>
+<rect x="60" y="640" width="280" height="112" rx="12" fill="#161b22" stroke="#8b93e8" stroke-width="2"/>
+<text x="200.0" y="680.0" font-size="18" font-weight="700" fill="#e6edf3" text-anchor="middle">user-service</text>
+<text x="200.0" y="704.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">register · login</text>
+<text x="200.0" y="725.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">issues JWT · bcrypt</text>
+<path d="M533.0,595.0 L533.0,627.0" fill="none" stroke="#8b93e8" stroke-width="2.5"/>
+<path d="M533.0,640.0 L540.0,627.0 L526.0,627.0 z" fill="#8b93e8"/>
+<rect x="393" y="640" width="280" height="112" rx="12" fill="#161b22" stroke="#8b93e8" stroke-width="2"/>
+<text x="533.0" y="680.0" font-size="18" font-weight="700" fill="#e6edf3" text-anchor="middle">test-management</text>
+<text x="533.0" y="704.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">tests · timed sessions · scoring</text>
+<text x="533.0" y="725.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">row lock · idempotency key</text>
+<path d="M866.0,595.0 L866.0,627.0" fill="none" stroke="#8b93e8" stroke-width="2.5"/>
+<path d="M866.0,640.0 L873.0,627.0 L859.0,627.0 z" fill="#8b93e8"/>
+<rect x="726" y="640" width="280" height="112" rx="12" fill="#161b22" stroke="#8b93e8" stroke-width="2"/>
+<text x="866.0" y="680.0" font-size="18" font-weight="700" fill="#e6edf3" text-anchor="middle">reporting-and-analytics</text>
+<text x="866.0" y="704.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">reports · aggregates</text>
+<text x="866.0" y="725.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">rankings · attempt history</text>
+<path d="M1200.0,595.0 L1200.0,627.0" fill="none" stroke="#8b93e8" stroke-width="2.5"/>
+<path d="M1200.0,640.0 L1207.0,627.0 L1193.0,627.0 z" fill="#8b93e8"/>
+<rect x="1060" y="640" width="280" height="112" rx="12" fill="#161b22" stroke="#8b93e8" stroke-width="2"/>
+<text x="1200.0" y="680.0" font-size="18" font-weight="700" fill="#e6edf3" text-anchor="middle">question-management</text>
+<text x="1200.0" y="704.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">question bank</text>
+<text x="1200.0" y="725.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">presigned image URLs</text>
+<rect x="40" y="810" width="1320" height="180" rx="18" fill="#0f2430" stroke="#4fb3cf" stroke-width="1.6" stroke-dasharray="7 6"/>
+<text x="62" y="836" font-size="14" font-weight="700" fill="#4fb3cf" text-anchor="start">Data layer</text>
+<rect x="90" y="860" width="900" height="104" rx="12" fill="#0d1117" stroke="#4fb3cf" stroke-width="2"/>
+<text x="540.0" y="896.0" font-size="18" font-weight="700" fill="#4fb3cf" text-anchor="middle">PostgreSQL</text>
+<text x="540.0" y="920.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">users · tests · sessions · submissions · scores</text>
+<text x="540.0" y="941.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">shared database; reporting issues read-only queries (ADR 0001)</text>
+<rect x="1030" y="860" width="150" height="104" rx="12" fill="#0d1117" stroke="#4fb3cf" stroke-width="2"/>
+<text x="1105.0" y="907.0" font-size="18" font-weight="700" fill="#4fb3cf" text-anchor="middle">MongoDB</text>
+<text x="1105.0" y="931.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">questions</text>
+<rect x="1200" y="860" width="140" height="104" rx="12" fill="#0d1117" stroke="#4fb3cf" stroke-width="2"/>
+<text x="1270.0" y="896.0" font-size="18" font-weight="700" fill="#4fb3cf" text-anchor="middle">MinIO</text>
+<text x="1270.0" y="920.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">question</text>
+<text x="1270.0" y="941.0" font-size="14.5" font-weight="400" fill="#9aa4b2" text-anchor="middle">images</text>
+<path d="M200.0,752.0 L200.0,847.0" fill="none" stroke="#4fb3cf" stroke-width="2.5"/>
+<path d="M200.0,860.0 L207.0,847.0 L193.0,847.0 z" fill="#4fb3cf"/>
+<text x="212" y="800" font-size="13.5" font-weight="600" fill="#4fb3cf" text-anchor="start">SQL</text>
+<path d="M533.0,752.0 L533.0,847.0" fill="none" stroke="#4fb3cf" stroke-width="2.5"/>
+<path d="M533.0,860.0 L540.0,847.0 L526.0,847.0 z" fill="#4fb3cf"/>
+<text x="545" y="800" font-size="13.5" font-weight="600" fill="#4fb3cf" text-anchor="start">SQL</text>
+<path d="M866.0,752.0 L866.0,847.0" fill="none" stroke="#4fb3cf" stroke-width="2.5" stroke-dasharray="7 6"/>
+<path d="M866.0,860.0 L873.0,847.0 L859.0,847.0 z" fill="#4fb3cf"/>
+<text x="878" y="800" font-size="13.5" font-weight="600" fill="#4fb3cf" text-anchor="start">read-only SQL</text>
+<path d="M1105.0,752.0 L1105.0,847.0" fill="none" stroke="#4fb3cf" stroke-width="2.5"/>
+<path d="M1105.0,860.0 L1112.0,847.0 L1098.0,847.0 z" fill="#4fb3cf"/>
+<path d="M1270.0,752.0 L1270.0,847.0" fill="none" stroke="#4fb3cf" stroke-width="2.5"/>
+<path d="M1270.0,860.0 L1277.0,847.0 L1263.0,847.0 z" fill="#4fb3cf"/>
+<text x="1262" y="800" font-size="13.5" font-weight="600" fill="#4fb3cf" text-anchor="end">S3 API</text>
+<rect x="40" y="1020" width="1320" height="110" rx="16" fill="#161a20" stroke="#9aa4b2" stroke-width="1.6"/>
+<text x="70" y="1052" font-size="14" font-weight="700" fill="#9aa4b2" text-anchor="start">Operations  ·  cross-cutting</text>
+<text x="700" y="1080" font-size="14.5" font-weight="400" fill="#e6edf3" text-anchor="middle">Docker Compose stack  ·  GitHub Actions CI: ruff · pytest + 80 % diff coverage · Postgres / MongoDB integration tests</text>
+<text x="700" y="1106" font-size="14.5" font-weight="400" fill="#e6edf3" text-anchor="middle">Trivy scan per service  ·  ESLint (zero warnings) · Next.js build · Vitest · build-provenance attestation  ·  Playwright E2E on demand</text>
+</svg>
