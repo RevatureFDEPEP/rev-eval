@@ -1,89 +1,145 @@
 # Rev-Eval
 
-A multi-service skills assessment platform. Trainers create and assign tests, participants take them under a timer, and the system scores each submission and reports analytics.
+**Skills Assessment & Analytics Platform.** Trainers build and assign tests, participants take them under a timer, and FastAPI microservices behind an Nginx TLS edge and a JWT-verifying API gateway score each submission exactly once and turn the results into reports and rankings.
 
-This was a team Forward Deployed Engineering (FDE) project that started from a partially built, brownfield codebase. **This is the `kalabek` integration branch, which holds one contributor's work** (Kalabe Kebede); the organization's `main` branch does not contain it.
+[![CI Pipeline](https://github.com/RevatureFDEPEP/rev-eval/actions/workflows/ci-pipeline.yml/badge.svg?branch=kalabek)](https://github.com/RevatureFDEPEP/rev-eval/actions/workflows/ci-pipeline.yml?query=branch%3Akalabek)
 
-## What this branch adds
+The `kalabek` integration branch contains Kalabe Kebede's implemented Rev-Eval contributions.
 
-- **Scoring engine** with idempotent submissions and row locking, so a retried or concurrent submit cannot double-score
-- **Timed quiz experience**: polymorphic question rendering, a timer, autosave and a submit state machine
-- **Reporting & Analytics service**: a working FastAPI service with Alembic migrations, per-test reports, aggregates, per-question statistics, rankings and per-user attempt history, reading the shared Postgres directly (see its ADR 0001)
-- **Authentication and authorization**: JWT verification at the gateway, service-level role checks (`TRAINER`, `PARTICIPANT`) and signature verification in the frontend middleware
-- **Routing and traceability**: Nginx and gateway routing across all services, and `X-Request-Id` propagation for tracing across services
-- **Testing and CI**: PostgreSQL integration tests, frontend tests and an optional Playwright end-to-end run
+## What it demonstrates
 
-## Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Backend | FastAPI microservices (Python 3.11 images) |
-| Frontend | Next.js 16, React 19, TypeScript, Vitest |
-| Data | PostgreSQL 15, MongoDB 7, MinIO (S3-compatible object storage) |
-| Edge | Nginx reverse proxy with TLS, plus a JWT-verifying API gateway |
-| Delivery | Docker Compose, GitHub Actions |
+- **Microservices behind one edge**: Nginx terminates TLS in front of a Next.js BFF and a FastAPI API gateway that routes to four domain services
+- **Correct scoring under retries and races**: row-level locking (`SELECT ... FOR UPDATE`) plus SHA-256-hashed idempotency keys, tested against real PostgreSQL
+- **Layered authentication and authorization**: JWT in an httpOnly cookie, verified in the Next.js middleware and at the gateway, with role and ownership checks inside the services
+- **Polyglot persistence**: PostgreSQL for users, tests and sessions; MongoDB for the question bank; MinIO object storage through presigned URLs
+- **Reporting and analytics**: per-test reports, aggregates, per-question statistics, rankings and attempt history from a dedicated service
+- **CI/CD quality gates**: per-service lint, tests and an 80 % diff-coverage gate, Trivy scans, a zero-warning frontend build and build-provenance attestation
 
 ## Architecture
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/rev-eval-architecture-dark.svg">
+  <img src="docs/diagrams/rev-eval-architecture.svg" alt="Rev-Eval logical architecture. Trainers and participants reach Nginx over HTTPS. Nginx terminates TLS, redirects HTTP to HTTPS, rate-limits the API path and adds security headers, then forwards pages and BFF calls to the Next.js frontend and /v1/api calls to the API gateway. The Next.js BFF reads the JWT from an httpOnly cookie and calls the gateway with a Bearer token. Inside the private Docker network the gateway verifies the JWT and routes to user-service, test-management, reporting-and-analytics and question-management, forwarding identity headers and a request ID. User, test, session and score data live in PostgreSQL, which reporting reads with read-only queries; questions live in MongoDB and question images in MinIO. A cross-cutting operations strip shows Docker Compose and GitHub Actions CI with lint, tests, diff coverage, Trivy and the frontend build." width="1000">
+</picture>
+
+A browser request reaches **Nginx** over HTTPS. Pages and the Next.js `/api` routes go to the **frontend**, whose server-side BFF takes the JWT from an httpOnly cookie and calls the **API gateway** with a Bearer token; `/v1/api/*` goes to the gateway directly. The gateway verifies the token, picks the owning service by path prefix, and forwards the call on the private Docker network with the caller's identity and a request ID. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+<details>
+<summary>Text version</summary>
+
 ```
-Browser
-  ↓
-Nginx            HTTP→HTTPS redirect, rate limiting, security headers, gzip
-  ├── pages ──────→ Next.js frontend
-  └── /v1/api/* ──→ API gateway    verifies the Bearer JWT, forwards identity headers
-                       ↓
-   ┌───────────────┬──────────────────────────┬─────────────────────────────┬────────────────────────────────┐
-   user-service    test-management-service    question-management-service   reporting-and-analytics-service
-   (Postgres)      (Postgres)                 (MongoDB + MinIO)             (read-only queries on the shared Postgres)
+Browser (trainer, participant)
+  │ HTTPS
+Nginx              TLS 1.2/1.3 · HTTP→HTTPS redirect · rate limit on /v1/api · security headers
+  ├── pages, /api ──→ Next.js frontend + BFF   httpOnly JWT cookie → Bearer header
+  │                         │ REST
+  └── /v1/api/* ─────→ API gateway             verifies JWT · X-User-* · X-Request-Id
+                            │ internal HTTP
+   ┌──────────────┬─────────┴────────┬─────────────────────────┬─────────────────────┐
+   user-service   test-management    reporting-and-analytics   question-management
+   PostgreSQL     PostgreSQL         PostgreSQL (read-only)    MongoDB + MinIO
 ```
 
-The login flow is a POST to `user-service`, which issues an HS256 JWT stored in an httpOnly cookie. The Next.js server reads that cookie and sends the token to the gateway as a Bearer header; the gateway verifies it on every request and forwards `X-User-Id`, `X-User-Email` and `X-User-Role` to the downstream services.
+</details>
 
-## Services
+**Key design decisions**
 
-| Path | Service | Port | Storage |
-|------|---------|------|---------|
-| `services/api-gateway-service/` | JWT verification and request routing | 8000 | none |
-| `services/test-management-service/` | Tests, skills, test sessions, submissions and scoring | 8001 | PostgreSQL |
-| `services/user-service/` | Authentication and users (JWT, bcrypt) | 8002 | PostgreSQL |
-| `services/question-management-service/` | Question bank and file uploads | 8003 | MongoDB, MinIO |
-| `services/reporting-and-analytics-service/` | Reports, aggregates, rankings and attempt history | 8004 | PostgreSQL |
-| `frontend/` | Next.js app (trainer and participant UI) | 3000 | none |
+- **Gateway plus BFF**: one API entry point for token verification and routing, and a BFF so the token never reaches browser JavaScript, at the cost of an extra hop.
+- **Reporting reads the shared database**: aggregate SQL runs where the data lives instead of paging records over HTTP or running an event pipeline; the cost is schema coupling, recorded in [ADR 0001](services/reporting-and-analytics-service/adr/0001-direct-db-read.md).
+- **Exactly-once scoring enforced by the database**: a row lock and a stored idempotency hash, not client behaviour, prevent double scoring.
+- **One published edge**: the base Compose stack publishes only Nginx; services, databases and MinIO stay on the private network.
 
-The gateway routes `/v1/api/auth`, `users`, `dashboard`, `tests`, `submissions`, `skills`, `questions`, `test-sessions` and `reports` to the services above.
+## Engineering highlights
+
+| Area | Implementation |
+|------|----------------|
+| Scoring | Exact match for single-answer questions, Jaccard partial credit for multi-select |
+| Idempotency | `Idempotency-Key` stored as a SHA-256 hash per test part; a retry replays the original result, a different key after finalization is rejected |
+| Concurrency | Session row read with `SELECT ... FOR UPDATE` on submit, so concurrent submits serialize |
+| Timed sessions | Polymorphic question rendering, timer, draft autosave and an explicit submit state machine in the frontend |
+| Reporting | Per-test reports, aggregates, per-question statistics, rankings and paginated attempt history; Alembic-managed indexes |
+| Object storage | Question images through time-limited presigned MinIO URLs, so image bytes bypass the service |
+| Traceability | `X-Request-Id` accepted or generated at the gateway, forwarded to services and echoed on responses |
+
+## Security & Trust Boundaries
+
+The system is grouped into four zones: **public** (browsers), the **Nginx edge**, the **private Docker network** (frontend, gateway, services) and the **data layer**. Current controls:
+
+- **TLS at the edge**: Nginx terminates TLS 1.2/1.3, redirects HTTP to HTTPS, and is the only container publishing host ports in the base stack.
+- **JWT verification in depth**: the gateway verifies every token except on login and registration; the Next.js middleware verifies the session JWT before serving protected pages; question-management and reporting verify it again.
+- **httpOnly cookie through a BFF**: the token lives in an httpOnly cookie and is attached server-side as a Bearer header.
+- **Service-level RBAC**: `TRAINER` / `PARTICIPANT` role and ownership checks run inside the services, not only at the gateway.
+- **Trusted identity forwarding**: the gateway drops client-supplied `X-User-*` headers, sets them from the verified token, and adds an `X-Request-Id`.
+- **Edge hardening**: rate limiting on `/v1/api/`, plus HSTS, `X-Frame-Options`, `X-Content-Type-Options` and `Referrer-Policy` headers.
+- **Supply-chain checks**: a Trivy scan of every service in CI and build-provenance attestation for the frontend.
+
+Traffic inside the private network is plain HTTP. Control details and known limits: [docs/SECURITY.md](docs/SECURITY.md).
+
+## Reliability and observability
+
+- Compose health checks gate startup in order: databases, then services, then the gateway, then Nginx.
+- Submission retries and concurrent submits are safe by construction (idempotency hash plus row lock).
+- Draft answers autosave during a timed session.
+- Request IDs correlate a call across the gateway and services, and the gateway returns the ID to the caller.
+
+## Testing
+
+`.github/workflows/ci-pipeline.yml` runs on every push and pull request:
+
+- **Backend matrix (five services)** with PostgreSQL 15 and MongoDB 7 service containers: `ruff`, `pytest` with coverage, and an **80 % diff-coverage gate on changed lines**. Includes PostgreSQL integration tests for authentication and the session row lock, and MongoDB integration tests for the question bank.
+- **Trivy** filesystem scan per service, failing on fixed CRITICAL or HIGH findings.
+- **Frontend**: ESLint with zero warnings, production build, build-provenance attestation, and Vitest (results chart, autosave, timer, submit state machine).
+- **Playwright end-to-end** happy path (register, take a test, submit, see results) against the full Compose stack, on manual dispatch with `run_e2e=true`.
+- **CI Gate** fails the run if the backend, frontend or Trivy jobs fail.
+
+## Technology
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, Vitest |
+| Backend | FastAPI microservices, SQLAlchemy, Alembic, Beanie (MongoDB), PyJWT, bcrypt |
+| Data | PostgreSQL 15, MongoDB 7, MinIO (S3-compatible) |
+| Edge | Nginx (TLS, rate limiting, security headers), FastAPI API gateway |
+| Delivery | Docker Compose, GitHub Actions, Trivy, Playwright |
+
+## Project scope
+
+Runs locally with seeded demo data.
 
 ## Run locally
 
 You need Docker (Docker Desktop or Colima).
 
 ```bash
-cp .env.example .env     # review the values; they are local development defaults
-docker compose up --build
+cp .env.example .env          # local development defaults; change them before running anywhere else
+docker compose up --build     # or ./start.sh, which also waits until Nginx is serving
 ```
 
-| URL | What |
-|-----|------|
-| https://localhost | Nginx front door (self-signed certificate generated on first start; HTTP on port 80 redirects here) |
-| http://localhost:3000 | Frontend directly |
-| http://localhost:8000/health | Gateway health |
-| http://localhost:8000/routes | Gateway routing table |
-| http://localhost:8001/docs, 8002/docs, 8003/docs | Swagger UI for the test, user and question services |
-| http://localhost:9001 | MinIO console |
+Open **https://localhost** (a self-signed certificate is generated on first start; HTTP on port 80 redirects). Check the stack with `./scripts/smoke.sh` and stop it with `docker compose down` (add `-v` to remove the data volumes).
 
-Synthetic demo users and sample tests are seeded for local development by `services/test-management-service/seed_db.py`. Local credentials for the demo accounts, MinIO and the databases come from `.env.example` and that script; they are development defaults only, so change them before running anywhere beyond your own machine.
+`services/test-management-service/seed_db.py` seeds synthetic demo users and sample tests. Their credentials, like the database and MinIO credentials in `.env.example`, are development defaults only.
 
-A quick health check of every service: `./scripts/smoke.sh`.
+### Developer endpoints
 
-## Testing and CI
+The base stack publishes only Nginx. For direct access to the services, databases and MinIO, add the development override:
 
-`.github/workflows/ci-pipeline.yml` runs on every push, on pull requests, and on manual dispatch:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build   # or ./start.sh --dev
+```
 
-- **Backend, one job per service** (user, question-management, test-management, api-gateway, reporting-and-analytics), with PostgreSQL 15 and MongoDB 7 service containers: `ruff` lint, `pytest` with coverage, and a **diff-coverage gate of 80 % on changed lines**
-- **Trivy** filesystem scan of each service, failing on fixed CRITICAL or HIGH findings
-- **Frontend**: lint with zero warnings, production build, build-provenance attestation, and `vitest`
-- **Playwright end-to-end** (`e2e/`): runs only when started manually with `run_e2e=true`, because it needs the full stack
-- A final **CI Gate** job that fails if the backend, frontend or Trivy jobs fail
+| Address | What |
+|---------|------|
+| http://localhost:3000 | Next.js dev server directly |
+| http://localhost:8000/health, http://localhost:8000/routes | API gateway health and routing table |
+| http://localhost:8001/docs, :8002/docs, :8003/docs, :8004/docs | Swagger UI: test-management, user, question-management, reporting |
+| localhost:5432, localhost:27017 | PostgreSQL, MongoDB |
+| http://localhost:9001 | MinIO console (S3 API on 9000) |
 
-## Scope
+`./scripts/smoke.sh --direct` checks each service's `/health` on these ports, and the Playwright suite in [`e2e/`](e2e/) uses the frontend and gateway ports.
 
-A local, team-built training project with seeded demo data. It is not deployed anywhere, and no compliance or certification is claimed.
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md): request flow, routing table, data ownership, scoring and design decisions
+- [Security](docs/SECURITY.md): trust boundaries, controls and known limits
+- [ADR 0001: reporting data access](services/reporting-and-analytics-service/adr/0001-direct-db-read.md)
+- Service READMEs: [overview](services/README.md), [API gateway](services/api-gateway-service/README.md), [test management](services/test-management-service/README.md), [question management](services/question-management-service/README.md), [reporting and analytics](services/reporting-and-analytics-service/README.md), [frontend](frontend/README.md)

@@ -249,11 +249,14 @@ export default function CreateQuestionPage() {
       const { url } = await api.post<{ url: string; key: string; expires_in: number }>(
         `/v1/api/questions/${questionId}/image/upload-url?content_type=${encodeURIComponent(file.type)}`
       );
-      await fetch(url, {
+      const res = await fetch(url, {
         method: "PUT",
         body: file,
         headers: { "Content-Type": file.type },
       });
+      if (!res.ok) {
+        throw new Error(`Image upload failed (HTTP ${res.status})`);
+      }
     } finally {
       setUploadingImage(false);
     }

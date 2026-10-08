@@ -83,6 +83,21 @@ class TestAddUserContextHeaders:
         result = add_user_context_headers({}, {"user_id": 42, "email": "", "role": ""})
         assert result["X-User-Id"] == "42"
 
+    def test_client_supplied_identity_headers_are_dropped(self):
+        # Starlette lower-cases incoming header names; a forged value must not
+        # be forwarded alongside the verified one.
+        result = add_user_context_headers(
+            {"x-user-id": "999", "X-USER-ROLE": "TRAINER", "x-user-email": "evil@test.com", "accept": "*/*"},
+            {"user_id": "7", "email": "bob@test.com", "role": "PARTICIPANT"},
+        )
+        user_headers = {k: v for k, v in result.items() if k.lower().startswith("x-user-")}
+        assert user_headers == {
+            "X-User-Id": "7",
+            "X-User-Email": "bob@test.com",
+            "X-User-Role": "PARTICIPANT",
+        }
+        assert result["accept"] == "*/*"
+
 
 # ---------------------------------------------------------------------------
 # verify_jwt_token (async FastAPI dependency, called directly)

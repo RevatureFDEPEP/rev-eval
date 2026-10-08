@@ -1,0 +1,45 @@
+# Development override: publishes direct host ports for debugging.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# The base docker-compose.yml publishes only Nginx (80/443). This file adds the
+# frontend dev server, the API gateway, each service (Swagger UI at /docs),
+# PostgreSQL, MongoDB and the MinIO API/console on localhost. The Playwright
+# end-to-end run and scripts/smoke.sh --direct use these ports.
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  mongo:
+    ports:
+      - "27017:27017"
+
+  minio:
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  user-service:
+    ports:
+      - "8002:8002"
+
+  question-management-service:
+    ports:
+      - "8003:8003"
+
+  test-management-service:
+    ports:
+      - "8001:8001"
+
+  reporting-and-analytics-service:
+    ports:
+      - "8004:8004"
+
+  api-gateway:
+    ports:
+      - "8000:8000"
+
+  frontend:
+    ports:
+      - "3000:3000"

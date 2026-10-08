@@ -203,7 +203,8 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Start full stack
-        run: docker compose up -d --build
+        # The dev override publishes the frontend (3000) and gateway (8000) ports the tests use.
+        run: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 
       - name: Wait for stack to be healthy
         run: |
