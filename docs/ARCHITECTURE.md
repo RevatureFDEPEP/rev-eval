@@ -52,7 +52,7 @@ Implemented in `services/test-management-service/src/services/quiz_session_servi
 - **Gateway plus BFF.** The gateway is the single API entry for verification and routing; the Next.js BFF keeps the token in an httpOnly cookie. Trade-off: two hops for browser API calls, in exchange for no token in browser JavaScript.
 - **Defence in depth on authorization.** The gateway rejects unauthenticated traffic, and services apply their own role and ownership checks (details in [SECURITY.md](SECURITY.md)).
 - **Reporting reads the shared database directly.** Chosen over an HTTP API or an event projection to keep aggregate SQL in the database and avoid N+1 calls; the cost is schema coupling to test-management. See [ADR 0001](../services/reporting-and-analytics-service/adr/0001-direct-db-read.md).
-- **Presigned object URLs.** Question images move between client and MinIO through time-limited presigned URLs, so image bytes do not pass through the question service.
+- **Presigned object URLs.** Question images move between client and MinIO through time-limited presigned URLs, so image bytes do not pass through the question service. URLs are signed for the browser-facing origin (`S3_PUBLIC_ENDPOINT_URL`), and Nginx proxies `/question-images/` to MinIO with the original `Host`, because the SigV4 signature covers it.
 - **Single private network.** All containers share one Compose bridge network (`backend-net`); only Nginx is published to the host in the base stack.
 
 ## Local topology
