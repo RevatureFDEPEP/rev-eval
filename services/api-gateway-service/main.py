@@ -1,5 +1,4 @@
 from fastapi import FastAPI, Request, HTTPException, Depends
-from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 import httpx
@@ -20,6 +19,7 @@ load_dotenv()
 
 # Import JWT middleware — after load_dotenv() so env vars are available at import time
 from src.middleware.auth import verify_jwt_token, add_user_context_headers  # noqa: E402
+from src.proxy import build_proxy_response  # noqa: E402
 
 app = FastAPI(title="API Gateway")
 
@@ -164,13 +164,7 @@ async def public_auth_proxy(auth_path: str, request: Request):
             request.method, target_url, content=body, headers=headers, timeout=30.0,
         )
 
-    if resp.headers.get("content-type", "").startswith("application/json"):
-        return JSONResponse(content=resp.json(), status_code=resp.status_code)
-    return Response(
-        content=resp.content,
-        status_code=resp.status_code,
-        media_type=resp.headers.get("content-type"),
-    )
+    return build_proxy_response(resp)
 
 # ===== SMART ROUTING (NO SERVICE NAME IN URL) =====
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
@@ -240,25 +234,12 @@ async def smart_gateway(
         # Log errors
         if resp.status_code >= 400:
             logger.error("❌ Error Response:")
-            try:
-                logger.error(f"   {resp.json()}")
-            except Exception:
-                logger.error(f"   {resp.text[:200]}")
+            logger.error(f"   {resp.text[:200]}")
         
         logger.info("=" * 80)
         
-        # Return response with correct status code
-        if resp.headers.get("content-type", "").startswith("application/json"):
-            return JSONResponse(
-                content=resp.json(),
-                status_code=resp.status_code
-            )
-        else:
-            return Response(
-                content=resp.content,
-                status_code=resp.status_code,
-                media_type=resp.headers.get("content-type")
-            )
+        # Pass status, body bytes and content type through unchanged
+        return build_proxy_response(resp)
             
     except HTTPException:
         raise
@@ -321,14 +302,7 @@ async def legacy_gateway(
         logger.info(f"✅ Response: {resp.status_code}")
         logger.info("=" * 80)
 
-        if resp.headers.get("content-type", "").startswith("application/json"):
-            return JSONResponse(content=resp.json(), status_code=resp.status_code)
-        else:
-            return Response(
-                content=resp.content,
-                status_code=resp.status_code,
-                media_type=resp.headers.get("content-type")
-            )
+        return build_proxy_response(resp)
 
     except HTTPException:
         raise
