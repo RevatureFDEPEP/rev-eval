@@ -42,7 +42,7 @@ services:
   minio:
     # minio/minio is no longer published on Docker Hub; pgsty/minio is a
     # maintained community build of the upstream server. Pinned for reproducibility.
-    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z@sha256:b6bfe7239bfc83fb90d31612d9704d86039dd714f7904b3f1ad68f211e602372  # community build of upstream MinIO (official images are no longer published on Docker Hub)
     container_name: rev-eval-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -60,7 +60,7 @@ services:
       retries: 10
 
   nginx:
-    image: nginx:1.30.5-alpine
+    image: nginx:1.30.5-alpine@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94
     container_name: rev-eval-nginx
     restart: unless-stopped
     entrypoint: ["/docker-entrypoint-custom.sh"]
