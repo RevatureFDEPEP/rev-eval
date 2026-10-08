@@ -4,7 +4,7 @@
 
 [![CI Pipeline](https://github.com/RevatureFDEPEP/rev-eval/actions/workflows/ci-pipeline.yml/badge.svg?branch=kalabek)](https://github.com/RevatureFDEPEP/rev-eval/actions/workflows/ci-pipeline.yml?query=branch%3Akalabek)
 
-A team Forward Deployed Engineering project built on a brownfield codebase. This work lives on the `kalabek` integration branch (Kalabe Kebede), not the organization's `main`.
+The `kalabek` integration branch contains Kalabe Kebede's implemented Rev-Eval contributions.
 
 ## What it demonstrates
 
@@ -104,7 +104,7 @@ Traffic inside the private network is plain HTTP. Control details and known limi
 
 ## Project scope
 
-A local, team-built training system with seeded synthetic data. It runs under Docker Compose on a developer machine; it is not deployed, and no compliance or certification is claimed. Hardening that is not implemented (per-service database credentials, asymmetric token signing, internal TLS, a Content-Security-Policy) is listed in [docs/SECURITY.md](docs/SECURITY.md#known-limits-and-production-considerations).
+Runs locally with seeded demo data.
 
 ## Run locally
 

@@ -1,6 +1,6 @@
 # Rev-Eval Security
 
-Current security controls, where each one lives, and the known limits of this local, team-built stack. The [README](../README.md#security--trust-boundaries) summarizes them; the [architecture document](ARCHITECTURE.md) describes the request flow.
+Current security controls, where each one lives, and the known limits of this local stack. The [README](../README.md#security--trust-boundaries) summarizes them; the [architecture document](ARCHITECTURE.md) describes the request flow.
 
 ## Trust boundaries
 
