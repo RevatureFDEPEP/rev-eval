@@ -75,8 +75,12 @@ async def verify_jwt_token(authorization: Optional[str] = Header(None)) -> Dict[
 
 
 def add_user_context_headers(headers: dict, user_context: Dict[str, str]) -> dict:
-    """Inject X-User-* headers for downstream services."""
-    headers_copy = headers.copy()
+    """Inject X-User-* headers for downstream services.
+
+    Any client-supplied X-User-* header is dropped first (header names are
+    case-insensitive), so only the identity from the verified token is forwarded.
+    """
+    headers_copy = {k: v for k, v in headers.items() if not k.lower().startswith("x-user-")}
     headers_copy["X-User-Id"] = str(user_context.get("user_id") or "")
     headers_copy["X-User-Email"] = str(user_context.get("email") or "")
     headers_copy["X-User-Role"] = str(user_context.get("role") or "")
