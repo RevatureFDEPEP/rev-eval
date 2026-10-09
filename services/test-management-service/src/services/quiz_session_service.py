@@ -127,8 +127,9 @@ def score_part(stored_questions: list, answers: list) -> tuple:
 
 def question_service_headers() -> dict:
     """Headers for calls to question-management-service: this service's
-    internal token, when configured. Sent to no other service."""
-    token = settings.INTERNAL_SERVICE_TOKEN
+    internal token, when one may be used. Sent to no other service. Without
+    one, question-management refuses the request and the quiz fails closed."""
+    token = settings.internal_service_token
     return {"X-Internal-Service-Token": token} if token else {}
 
 

@@ -1,7 +1,20 @@
 # src/config/settings.py
 from typing import Optional
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 from urllib.parse import quote_plus
+
+# The value .env.example and docker-compose.yml use for local development. It is
+# accepted only when APP_ENV=development.
+DEV_INTERNAL_SERVICE_TOKEN = "change-me-internal-service-token"
+
+
+def internal_token_allowed(token: Optional[str], app_env: str) -> bool:
+    token = (token or "").strip()
+    if not token:
+        return False
+    return token != DEV_INTERNAL_SERVICE_TOKEN or app_env.strip().lower() == "development"
+
 
 
 class Settings(BaseSettings):
@@ -23,8 +36,13 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "change-me-in-production"
 
     # Shared secret that test-management-service sends in X-Internal-Service-Token
-    # to read answer keys for scoring. Unset: no caller is treated as internal.
+    # to read the question bank, answer keys included, for scoring. Unset or
+    # empty: no caller is treated as internal.
     INTERNAL_SERVICE_TOKEN: Optional[str] = None
+
+    # "development" allows the placeholder internal token; anything else
+    # refuses to start with it.
+    APP_ENV: str = "production"
 
     # Service Configuration
     ALLOW_ORIGINS: str = "*"
@@ -49,6 +67,23 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str = "question-images"
     S3_REGION: str = "us-east-1"
     S3_PRESIGN_EXPIRY_SECONDS: int = 3600
+
+    @model_validator(mode="after")
+    def _refuse_dev_internal_token_outside_development(self):
+        placeholder = (self.INTERNAL_SERVICE_TOKEN or "").strip() == DEV_INTERNAL_SERVICE_TOKEN
+        if placeholder and self.APP_ENV.strip().lower() != "development":
+            raise ValueError(
+                "INTERNAL_SERVICE_TOKEN is the development placeholder; set a long random "
+                "value, or APP_ENV=development for local development"
+            )
+        return self
+
+    @property
+    def internal_service_token(self) -> Optional[str]:
+        """The token to use, or None when it must not be used: unset, empty, or
+        the development placeholder outside APP_ENV=development."""
+        token = (self.INTERNAL_SERVICE_TOKEN or "").strip()
+        return token if internal_token_allowed(token, self.APP_ENV) else None
 
     @property
     def mongo_url(self) -> str:

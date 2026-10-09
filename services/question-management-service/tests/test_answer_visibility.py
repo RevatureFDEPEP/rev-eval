@@ -1,10 +1,13 @@
 """
-Who may see answer keys, and who may call the question endpoints at all.
+Who may read the question bank, and who may see answer keys.
 
-Every endpoint needs a caller. Read endpoints serve trainers and participants,
-but correct_answers, sample_answer and answer_explanation go only to trainers
-and to test-management-service (internal token), which scores submissions.
-A participant gets the question without them. Image upload is trainer-only.
+Every endpoint needs a caller. The question bank (every read route and image
+download URLs) is for trainers and for test-management-service (internal
+token), which needs correct_answers to score submissions. A participant gets
+403 and the bank is not queried: participants receive their own quiz
+session's questions from test-management-service, without answer keys.
+Image upload is trainer-only. The development placeholder internal token
+works only with APP_ENV=development.
 
 QuestionService is mocked, so no MongoDB is needed.
 """
@@ -22,6 +25,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 import src.utils.dependencies as deps  # noqa: E402
 from main import app  # noqa: E402
+from pydantic import ValidationError  # noqa: E402
+from src.config.settings import DEV_INTERNAL_SERVICE_TOKEN, Settings  # noqa: E402
 
 ROUTES = "src.v1.routes.question_routes"
 INTERNAL = "internal-test-token"
@@ -90,6 +95,7 @@ def client():
             p.start()
         try:
             with TestClient(app) as c:
+                c.mocks = mocks
                 yield c
         finally:
             for p in patches:
@@ -112,23 +118,27 @@ def test_read_with_invalid_token_is_401(client, path, _):
     assert client.get(path, headers=bad).status_code == 401
 
 
-@pytest.mark.parametrize("path,_", READ_ROUTES)
-def test_participant_gets_questions_without_answer_keys(client, path, _):
+@pytest.mark.parametrize("path,method", READ_ROUTES)
+def test_participant_cannot_read_the_question_bank(client, path, method):
     resp = client.get(path, headers=_bearer("PARTICIPANT"))
-    assert resp.status_code == 200
-    for item in _items(resp):
-        for field in ANSWER_FIELDS:
-            assert field not in item
-        assert item["question_text"] and item["_id"]
-    mcq = next(i for i in _items(resp) if i["type"] == "mcq")
-    assert mcq["options"] == _MCQ["options"]
+    assert resp.status_code == 403
+    assert "question_text" not in resp.text
+    client.mocks[method].assert_not_awaited()
+
+
+@pytest.mark.parametrize("path,method", READ_ROUTES)
+def test_unknown_role_cannot_read_the_question_bank(client, path, method):
+    assert client.get(path, headers=_bearer("GUEST")).status_code == 403
+    client.mocks[method].assert_not_awaited()
 
 
 @pytest.mark.parametrize("path,_", READ_ROUTES)
-def test_trainer_gets_answer_keys(client, path, _):
+def test_trainer_reads_questions_with_answer_keys(client, path, _):
     resp = client.get(path, headers=_bearer("TRAINER"))
     assert resp.status_code == 200
     mcq = next(i for i in _items(resp) if i["type"] == "mcq")
+    assert mcq["question_text"] == _MCQ["question_text"]
+    assert mcq["options"] == _MCQ["options"]
     assert mcq["correct_answers"] == [2]
     assert mcq["answer_explanation"] == "Two and two make four."
 
@@ -141,10 +151,8 @@ def test_internal_service_gets_answer_keys(client, path, _):
     assert mcq["correct_answers"] == [2]
 
 
-def test_sample_answer_hidden_from_participant_and_shown_to_trainer(client):
-    participant = client.get("/v1/api/questions/", headers=_bearer("PARTICIPANT")).json()
+def test_trainer_sees_sample_answer(client):
     trainer = client.get("/v1/api/questions/", headers=_bearer("TRAINER")).json()
-    assert "sample_answer" not in next(q for q in participant if q["type"] == "text")
     assert next(q for q in trainer if q["type"] == "text")["sample_answer"] == "A function that calls itself."
 
 
@@ -156,18 +164,60 @@ def test_wrong_internal_token_alone_is_401(client):
 def test_wrong_internal_token_with_participant_jwt_is_a_participant(client):
     headers = {**_bearer("PARTICIPANT"), "X-Internal-Service-Token": "guess"}
     resp = client.get("/v1/api/questions/", headers=headers)
-    assert resp.status_code == 200
-    assert all("correct_answers" not in q for q in resp.json())
+    assert resp.status_code == 403
+    client.mocks["get_all_questions"].assert_not_awaited()
 
 
-def test_internal_token_ignored_when_not_configured(client):
-    with patch.object(deps.settings, "INTERNAL_SERVICE_TOKEN", None):
+@pytest.mark.parametrize("configured", [None, "", "   "])
+def test_internal_token_ignored_when_not_configured(client, configured):
+    with patch.object(deps.settings, "INTERNAL_SERVICE_TOKEN", configured):
         resp = client.get("/v1/api/questions/", headers={"X-Internal-Service-Token": INTERNAL})
+        assert resp.status_code == 401
+        resp = client.get("/v1/api/questions/", headers={"X-Internal-Service-Token": configured or ""})
         assert resp.status_code == 401
         resp = client.get(
             "/v1/api/questions/", headers={**_bearer("PARTICIPANT"), "X-Internal-Service-Token": ""}
         )
-        assert all("correct_answers" not in q for q in resp.json())
+        assert resp.status_code == 403
+    client.mocks["get_all_questions"].assert_not_awaited()
+
+
+class TestDevelopmentPlaceholderToken:
+    """The placeholder from .env.example works only with APP_ENV=development."""
+
+    def test_placeholder_refused_outside_development(self, client):
+        with patch.object(deps.settings, "INTERNAL_SERVICE_TOKEN", DEV_INTERNAL_SERVICE_TOKEN), \
+                patch.object(deps.settings, "APP_ENV", "production"):
+            resp = client.get(
+                "/v1/api/questions/", headers={"X-Internal-Service-Token": DEV_INTERNAL_SERVICE_TOKEN}
+            )
+        assert resp.status_code == 401
+        client.mocks["get_all_questions"].assert_not_awaited()
+
+    def test_placeholder_accepted_in_development(self, client):
+        with patch.object(deps.settings, "INTERNAL_SERVICE_TOKEN", DEV_INTERNAL_SERVICE_TOKEN), \
+                patch.object(deps.settings, "APP_ENV", "development"):
+            resp = client.get(
+                "/v1/api/questions/", headers={"X-Internal-Service-Token": DEV_INTERNAL_SERVICE_TOKEN}
+            )
+        assert resp.status_code == 200
+        assert next(i for i in resp.json() if i["type"] == "mcq")["correct_answers"] == [2]
+
+    def test_service_refuses_to_start_with_placeholder_outside_development(self):
+        with pytest.raises(ValidationError, match="development placeholder"):
+            Settings(SERVICE_NAME="qm", INTERNAL_SERVICE_TOKEN=DEV_INTERNAL_SERVICE_TOKEN, APP_ENV="production")
+
+    def test_service_starts_with_placeholder_in_development(self):
+        s = Settings(SERVICE_NAME="qm", INTERNAL_SERVICE_TOKEN=DEV_INTERNAL_SERVICE_TOKEN, APP_ENV="development")
+        assert s.internal_service_token == DEV_INTERNAL_SERVICE_TOKEN
+
+    def test_real_token_is_used_in_any_environment(self):
+        s = Settings(SERVICE_NAME="qm", INTERNAL_SERVICE_TOKEN="  a-long-random-value  ", APP_ENV="production")
+        assert s.internal_service_token == "a-long-random-value"
+
+    @pytest.mark.parametrize("value", [None, "", "  "])
+    def test_unset_token_is_never_used(self, value):
+        assert Settings(SERVICE_NAME="qm", INTERNAL_SERVICE_TOKEN=value).internal_service_token is None
 
 
 class TestImageRoutes:
@@ -204,10 +254,21 @@ class TestImageRoutes:
     def test_download_url_requires_a_token(self, client):
         assert client.get(f"/v1/api/questions/{_MCQ['_id']}/image/download-url").status_code == 401
 
-    def test_signed_in_user_gets_download_url(self, client):
-        with patch(f"{ROUTES}.generate_presigned_get_url", return_value="https://s3/get"):
+    def test_participant_cannot_get_download_url(self, client):
+        with patch(f"{ROUTES}.generate_presigned_get_url") as presign:
             resp = client.get(
                 f"/v1/api/questions/{_MCQ['_id']}/image/download-url", headers=_bearer("PARTICIPANT")
             )
+        assert resp.status_code == 403
+        presign.assert_not_called()
+        client.mocks["get_question_by_id"].assert_not_awaited()
+
+    @pytest.mark.parametrize("headers", [
+        pytest.param(lambda: _bearer("TRAINER"), id="trainer"),
+        pytest.param(lambda: {"X-Internal-Service-Token": INTERNAL}, id="internal"),
+    ])
+    def test_trainer_and_internal_service_get_download_url(self, client, headers):
+        with patch(f"{ROUTES}.generate_presigned_get_url", return_value="https://s3/get"):
+            resp = client.get(f"/v1/api/questions/{_MCQ['_id']}/image/download-url", headers=headers())
         assert resp.status_code == 200
         assert resp.json()["url"] == "https://s3/get"
