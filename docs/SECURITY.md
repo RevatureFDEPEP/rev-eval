@@ -28,14 +28,20 @@ Traffic inside the Compose network (Nginx to frontend and gateway, gateway to se
 - **user-service** hashes passwords with bcrypt and issues HS256 JWTs (`sub`, `email`, `role`, `exp`; lifetime `JWT_EXPIRY_MINUTES`, default 60).
 - **httpOnly cookie via the BFF.** The Next.js login route stores the token in an httpOnly, `SameSite=Lax` cookie (`Secure` when `NODE_ENV=production`). The BFF proxy reads it server-side and sends `Authorization: Bearer`; browser JavaScript never sees the token.
 - **Frontend middleware** (`frontend/src/middleware.ts`) verifies the cookie's JWT signature with `jose` before serving protected pages and routes by role (`/trainer/*`, `/participant/*`).
-- **API gateway** (`services/api-gateway-service/src/middleware/auth.py`) verifies the JWT signature and expiry on every request except `/v1/api/auth/login` and `/v1/api/auth/register`, and rejects missing, malformed or expired tokens with `401`.
+- **API gateway** (`services/api-gateway-service/src/middleware/auth.py`) verifies the JWT signature and expiry on every request except `/v1/api/auth/login` and `/v1/api/auth/register`, and rejects missing, malformed or expired tokens with `401`. It forwards the verified identity but applies no role policy itself; role and ownership rules are enforced in the services below.
+- **Registration** (`/v1/api/auth/register`) is public, so it never grants privilege: it always stores a `PARTICIPANT`, and a request for any other role is refused with `403` and creates nothing. Trainer accounts are provisioned through a trusted path (`seed_db.py`, or a direct database insert).
 
 ### Authorization (inside the services)
 
 - **question-management-service**: create, update and delete re-verify the JWT and require `TRAINER`.
 - **reporting-and-analytics-service**: re-verifies the JWT on every report route; per-test, aggregate, per-question and ranking reports require `TRAINER`; a participant can read only their own summary and attempts.
-- **user-service**: `/me` routes verify the token and reject inactive users.
-- **test-management-service**: resolves the caller from the gateway-forwarded identity headers and applies role and ownership checks on tests and submissions (for example, a participant reading another user's data gets `403`).
+- **user-service**: every `/users/*` route resolves the caller from the signed Bearer JWT (not from `X-User-*` headers) and rejects inactive users with `401`. A participant can read only their own record (`/users/me`, their own id or email); listing users, reading others, inviting and patching other accounts require `TRAINER` or are refused with `403`. Trainers can read and list users and invite participant accounts only. `PATCH /users/{id}` changes only the caller's own name; nobody can change email, role or active status through the API.
+- **test-management-service** verifies the Bearer JWT itself and loads the token subject from user-service with the caller's own token; `X-User-*` headers are not used for identity. Rules (`src/utils/authorization.py`):
+  - **Tests**: only trainers create them; only the trainer who created a test updates or deletes it (tests with no recorded creator, from before ownership was tracked, can be managed by any trainer). Participants list and read only the tests assigned to them.
+  - **Skills**: any signed-in user reads the catalogue; only trainers change it.
+  - **Submissions**: a participant lists and reads only their own, and asking for another `user_id` is refused. Creating, assigning (`bulk-assign`), updating, deleting, the review surfaces (`trainer/evaluated`, `trainer/all`, `graded`, `review-details`) and grading (`trainer-review`) require `TRAINER` and, for a specific test or submission, the trainer who manages that test.
+  - **Quiz sessions**: a participant starts a session only for their own submission and its test; only the session's participant reads questions, autosaves and submits it; the trainer who manages the test can read it.
+  - Every check runs before the route reads or writes the record. Its calls to user-service forward the caller's own Bearer token, so user-service applies its policy to them.
 
 ### Identity forwarding and tracing
 
@@ -59,7 +65,9 @@ Traffic inside the Compose network (Nginx to frontend and gateway, gateway to se
 
 These are deliberate scope limits of a local stack, not hidden features:
 
-- **Header trust needs network isolation.** test-management-service relies on gateway-forwarded `X-User-*` headers, and test-session routes have no service-level identity check. That is safe only while services are unreachable except through the gateway: the base Compose file publishes no service ports, but `docker-compose.dev.yml` does, for local debugging only.
+- **Question reads are gateway-protected only.** question-management requires `TRAINER` for create, update and delete, but its read routes (which return `correct_answers`) and the image upload-URL route accept any token the gateway accepts, so a signed-in participant can read the answer key. Restricting them needs a service credential for test-management's question fetch during scoring; it is not done yet. `docker-compose.dev.yml` also publishes service ports for local debugging, where those routes have no check at all.
+- **Trainer scope is broad for listings.** A trainer can list every submission (`GET /submissions/` without `user_id`), any user's submissions, and tests by any creator; changes and reviews are limited to the tests they manage.
+- **Legacy tests** with no recorded creator can be managed by any trainer.
 - **Shared HS256 secret.** The gateway, frontend and services verify tokens with the same `JWT_SECRET`; asymmetric signing would let services verify without holding a signing key.
 - **Reporting is read-only by code, not by credentials.** It uses the same database user as test-management; a read-only role would enforce ADR 0001 in the database.
 - **Internal traffic is unencrypted** inside the Compose network, and database connections do not use TLS.

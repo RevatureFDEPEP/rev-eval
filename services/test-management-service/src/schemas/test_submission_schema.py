@@ -103,7 +103,7 @@ class BulkAssignRequest(BaseModel):
     test_id: int
     participant_emails: list[str]
     due_date: Optional[datetime] = None
-    # Note: assigned_by_id is extracted from JWT by get_current_user_from_headers dependency
+    # Note: assigned_by_id is extracted from JWT by get_current_user dependency
 
     @field_validator('due_date', mode='before')
     @classmethod

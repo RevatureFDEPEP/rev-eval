@@ -29,7 +29,7 @@ from src.models.skill import Skill  # noqa: F401
 from src.models.test_skill import TestSkill  # noqa: F401
 from src.models.test_submission import TestSubmission  # noqa: F401
 from src.models.quiz_session import QuizSession  # noqa: F401
-from src.utils.dependencies import get_current_user_from_headers
+from src.utils.dependencies import get_current_user
 
 # Bind test sessions to the same SQLite engine
 TestingAsyncSession = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
@@ -55,15 +55,32 @@ async def override_get_db():
 FAKE_TRAINER = {"id": 1, "email": "trainer@test.com", "role": "TRAINER", "full_name": "Test Trainer"}
 
 
+# The authenticated caller; tests switch it with _act_as. Defaults to the trainer.
+_CALLER = {"user": FAKE_TRAINER}
+
+
 async def override_get_current_user():
-    # Skip X-User-* header resolution and user-service HTTP call
-    return FAKE_TRAINER
+    # Skip JWT verification and the user-service lookup; return the test caller
+    return _CALLER["user"]
+
+
+def _act_as(user):
+    _CALLER["user"] = user
 
 
 app.dependency_overrides[get_db] = override_get_db
-app.dependency_overrides[get_current_user_from_headers] = override_get_current_user
+app.dependency_overrides[get_current_user] = override_get_current_user
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _identity():
+    """Each test starts with this module's overrides, signed in as the trainer."""
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
+    _act_as(FAKE_TRAINER)
+    yield
 
 
 class TestHealth:
@@ -127,7 +144,7 @@ class TestSkills:
 
 
 class TestTests:
-    # Create/Update/Delete use get_current_user_id which reads from get_current_user_from_headers
+    # Create/Update/Delete use get_current_user_id which reads from get_current_user
     # The override returns FAKE_TRAINER (id=1), so all created tests have created_by_id=1
 
     def test_create_test(self):
@@ -472,50 +489,143 @@ class TestSubmissionsExtended:
 # Unit tests for src/utils/dependencies.py
 # ---------------------------------------------------------------------------
 
+def _recording_client(get_status=200, get_data=None, post_status=201, post_data=None):
+    """An httpx.AsyncClient stand-in that records the headers each call carries."""
+    seen = []
+
+    class _Client:
+        def __init__(self, **kwargs):
+            self._base = dict(kwargs.get("headers") or {})
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            pass
+
+        async def get(self, url, headers=None, **k):
+            seen.append(("GET", url, {**self._base, **(headers or {})}))
+            return _FakeResp(get_status, get_data or {})
+
+        async def post(self, url, headers=None, **k):
+            seen.append(("POST", url, {**self._base, **(headers or {})}))
+            return _FakeResp(post_status, post_data or {})
+
+    return _Client, seen
+
+
+class TestUserServiceTokenForwarding:
+    """user-service authorizes /users/* from the caller's own JWT, so every call
+    this service makes to it must carry the Authorization header it received."""
+
+    def test_user_service_headers_only_forwards_bearer(self):
+        from src.utils.dependencies import user_service_headers
+
+        assert user_service_headers("Bearer abc") == {"Authorization": "Bearer abc"}
+        assert user_service_headers(None) == {}
+        assert user_service_headers("Basic xyz") == {}
+
+    def test_identity_lookup_forwards_token(self):
+        from src.utils.dependencies import get_current_user
+
+        Client, seen = _recording_client(get_data={"id": 1, "role": "PARTICIPANT"})
+
+        async def call():
+            with patch("httpx.AsyncClient", Client):
+                return await get_current_user({"sub": "1"}, "Bearer caller-token")
+
+        assert asyncio.run(call())["id"] == 1
+        assert seen and seen[0][2].get("Authorization") == "Bearer caller-token"
+
+    @pytest.mark.parametrize("status_code", [401, 403])
+    def test_identity_lookup_refused_by_user_service_is_401(self, status_code):
+        from fastapi import HTTPException
+        from src.utils.dependencies import get_current_user
+
+        Client, _ = _recording_client(get_status=status_code)
+
+        async def call():
+            with patch("httpx.AsyncClient", Client):
+                return await get_current_user({"sub": "1"}, "Bearer t")
+
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(call())
+        assert exc.value.status_code == 401
+
+    def test_bulk_assign_forwards_token_to_lookup_and_invite(self):
+        test = client.post("/v1/api/tests/", json={"name": "FwdTest", "test_type": "QUIZ"}).json()
+        Client, seen = _recording_client(get_status=404, post_data={"id": 77, "email": "fwd@test.com"})
+        with patch("httpx.AsyncClient", Client):
+            resp = client.post(
+                "/v1/api/submissions/bulk-assign",
+                json={"test_id": test["id"], "participant_emails": ["fwd@test.com"]},
+                headers={"Authorization": "Bearer trainer-token"},
+            )
+        assert resp.status_code == 201
+        calls = [(m, u.split("/v1/api")[-1]) for m, u, _ in seen]
+        assert ("GET", "/users/by-email/fwd@test.com") in calls
+        assert ("POST", "/users/invite") in calls
+        assert all(h.get("Authorization") == "Bearer trainer-token" for _, _, h in seen)
+
+    def test_trainer_submission_lists_forward_token(self):
+        Client, seen = _recording_client(get_data={"id": 9, "first_name": "A", "last_name": "B", "email": "a@t.com"})
+        with patch("httpx.AsyncClient", Client):
+            for path in ("/v1/api/submissions/trainer/all", "/v1/api/submissions/trainer/evaluated"):
+                resp = client.get(path, headers={"Authorization": "Bearer trainer-token"})
+                assert resp.status_code == 200
+        assert all(h.get("Authorization") == "Bearer trainer-token" for _, _, h in seen)
+
+
 class TestDependencies:
     """Call dependency functions directly to cover auth/role logic."""
 
-    def test_missing_headers_raises_401(self):
+    def test_user_service_returning_another_user_raises_401(self):
         from fastapi import HTTPException
-        from src.utils.dependencies import get_current_user_from_headers
+        from src.utils.dependencies import get_current_user
+
+        Mock = _mock_client(get_data={"id": 2, "role": "TRAINER"})
+
+        async def call():
+            with patch("httpx.AsyncClient", Mock):
+                return await get_current_user({"sub": "1"}, "Bearer t")
 
         with pytest.raises(HTTPException) as exc:
-            asyncio.run(get_current_user_from_headers(None, None, None))
+            asyncio.run(call())
         assert exc.value.status_code == 401
 
-    def test_resolve_by_user_id(self):
-        from src.utils.dependencies import get_current_user_from_headers
+    def test_resolves_the_token_subject(self):
+        from src.utils.dependencies import get_current_user
 
         Mock = _mock_client(get_data={"id": 1, "role": "TRAINER"})
 
         async def call():
             with patch("httpx.AsyncClient", Mock):
-                return await get_current_user_from_headers("1", None, None)
+                return await get_current_user({"sub": "1"}, "Bearer t")
 
         result = asyncio.run(call())
         assert result["role"] == "TRAINER"
 
-    def test_resolve_by_email(self):
-        from src.utils.dependencies import get_current_user_from_headers
+    def test_lookup_is_by_token_subject_only(self):
+        from src.utils.dependencies import get_current_user
 
-        Mock = _mock_client(get_data={"id": 2, "role": "PARTICIPANT"})
+        Client, seen = _recording_client(get_data={"id": 5, "role": "PARTICIPANT"})
 
         async def call():
-            with patch("httpx.AsyncClient", Mock):
-                return await get_current_user_from_headers(None, "x@test.com", None)
+            with patch("httpx.AsyncClient", Client):
+                return await get_current_user({"sub": "5"}, "Bearer t")
 
-        result = asyncio.run(call())
-        assert result["id"] == 2
+        assert asyncio.run(call())["id"] == 5
+        assert [u.split("/v1/api")[-1] for _, u, _ in seen] == ["/users/5"]
 
     def test_user_not_found_raises_401(self):
         from fastapi import HTTPException
-        from src.utils.dependencies import get_current_user_from_headers
+        from src.utils.dependencies import get_current_user
 
         Mock = _mock_client(get_status=404)
 
         async def call():
             with patch("httpx.AsyncClient", Mock):
-                return await get_current_user_from_headers("9", None, None)
+                return await get_current_user({"sub": "9"}, "Bearer t")
 
         with pytest.raises(HTTPException) as exc:
             asyncio.run(call())
@@ -523,13 +633,13 @@ class TestDependencies:
 
     def test_service_5xx_raises_503(self):
         from fastapi import HTTPException
-        from src.utils.dependencies import get_current_user_from_headers
+        from src.utils.dependencies import get_current_user
 
         Mock = _mock_client(get_status=500)
 
         async def call():
             with patch("httpx.AsyncClient", Mock):
-                return await get_current_user_from_headers("1", None, None)
+                return await get_current_user({"sub": "1"}, "Bearer t")
 
         with pytest.raises(HTTPException) as exc:
             asyncio.run(call())
@@ -538,7 +648,7 @@ class TestDependencies:
     def test_request_error_raises_503(self):
         import httpx as _httpx
         from fastapi import HTTPException
-        from src.utils.dependencies import get_current_user_from_headers
+        from src.utils.dependencies import get_current_user
 
         class ErrClient:
             def __init__(self, **kw):
@@ -555,7 +665,7 @@ class TestDependencies:
 
         async def call():
             with patch("httpx.AsyncClient", ErrClient):
-                return await get_current_user_from_headers("1", None, None)
+                return await get_current_user({"sub": "1"}, "Bearer t")
 
         with pytest.raises(HTTPException) as exc:
             asyncio.run(call())
@@ -600,10 +710,10 @@ class TestRouteEdgeCases:
     def _set_user(self, user_dict):
         async def _u():
             return user_dict
-        app.dependency_overrides[get_current_user_from_headers] = _u
+        app.dependency_overrides[get_current_user] = _u
 
     def _restore_user(self):
-        app.dependency_overrides[get_current_user_from_headers] = override_get_current_user
+        app.dependency_overrides[get_current_user] = override_get_current_user
 
     # test_route.py line 21: get_current_user_id raises 401 when user has no id
     def test_create_test_user_without_id(self):
@@ -644,12 +754,12 @@ class TestRouteEdgeCases:
         finally:
             self._restore_user()
 
-    # test_submission_route.py line 101: /trainer/evaluated 401 when no current_user
-    def test_evaluated_no_current_user(self):
-        self._set_user(None)
+    # /trainer/evaluated is a trainer route: a participant is refused before any work
+    def test_evaluated_participant_is_403(self):
+        self._set_user({"id": 5, "role": "PARTICIPANT"})
         try:
             resp = client.get("/v1/api/submissions/trainer/evaluated")
-            assert resp.status_code == 401
+            assert resp.status_code == 403
         finally:
             self._restore_user()
 
@@ -662,12 +772,12 @@ class TestRouteEdgeCases:
         finally:
             self._restore_user()
 
-    # test_submission_route.py line 125: /trainer/all 401 when no current_user
-    def test_all_subs_no_current_user(self):
-        self._set_user(None)
+    # /trainer/all is a trainer route: a participant is refused before any work
+    def test_all_subs_participant_is_403(self):
+        self._set_user({"id": 5, "role": "PARTICIPANT"})
         try:
             resp = client.get("/v1/api/submissions/trainer/all")
-            assert resp.status_code == 401
+            assert resp.status_code == 403
         finally:
             self._restore_user()
 
@@ -680,21 +790,21 @@ class TestRouteEdgeCases:
         finally:
             self._restore_user()
 
-    # test_submission_route.py line 144: /graded 401 when no current_user
-    def test_graded_no_current_user(self):
-        self._set_user(None)
+    # /graded is a trainer route: a participant is refused before any work
+    def test_graded_participant_is_403(self):
+        self._set_user({"id": 5, "role": "PARTICIPANT"})
         try:
             resp = client.get("/v1/api/submissions/graded")
-            assert resp.status_code == 401
+            assert resp.status_code == 403
         finally:
             self._restore_user()
 
-    # test_submission_route.py line 165: /review-details 401 when no current_user
-    def test_review_details_no_current_user(self):
-        self._set_user(None)
+    # /review-details is a trainer route: a participant is refused before any work
+    def test_review_details_participant_is_403(self):
+        self._set_user({"id": 5, "role": "PARTICIPANT"})
         try:
             resp = client.get("/v1/api/submissions/1/review-details")
-            assert resp.status_code == 401
+            assert resp.status_code == 403
         finally:
             self._restore_user()
 
@@ -702,17 +812,19 @@ class TestRouteEdgeCases:
     def test_review_details_unexpected_exception(self):
         from unittest.mock import AsyncMock
         from src.services.test_submission_service import TestSubmissionService
+        test = client.post("/v1/api/tests/", json={"name": "BoomTest", "test_type": "QUIZ"}).json()
+        sub = client.post("/v1/api/submissions/", json={"test_id": test["id"], "user_id": 5}).json()
         with patch.object(TestSubmissionService, "get_submission_review_details",
                           new=AsyncMock(side_effect=RuntimeError("boom"))):
-            resp = client.get("/v1/api/submissions/1/review-details")
+            resp = client.get(f"/v1/api/submissions/{sub['id']}/review-details")
         assert resp.status_code == 500
 
-    # test_submission_route.py line 194: /trainer-review 401 when no current_user
-    def test_trainer_review_no_current_user(self):
-        self._set_user(None)
+    # /trainer-review is a trainer route: a participant is refused before any work
+    def test_trainer_review_participant_is_403(self):
+        self._set_user({"id": 5, "role": "PARTICIPANT"})
         try:
             resp = client.post("/v1/api/submissions/1/trainer-review", json={"trainer_score": 75})
-            assert resp.status_code == 401
+            assert resp.status_code == 403
         finally:
             self._restore_user()
 
@@ -729,9 +841,11 @@ class TestRouteEdgeCases:
     def test_trainer_review_unexpected_exception(self):
         from unittest.mock import AsyncMock
         from src.services.test_submission_service import TestSubmissionService
+        test = client.post("/v1/api/tests/", json={"name": "BoomTest2", "test_type": "QUIZ"}).json()
+        sub = client.post("/v1/api/submissions/", json={"test_id": test["id"], "user_id": 5}).json()
         with patch.object(TestSubmissionService, "submit_trainer_review",
                           new=AsyncMock(side_effect=RuntimeError("boom"))):
-            resp = client.post("/v1/api/submissions/1/trainer-review", json={"trainer_score": 75})
+            resp = client.post(f"/v1/api/submissions/{sub['id']}/trainer-review", json={"trainer_score": 75})
         assert resp.status_code == 500
 
 
@@ -1010,18 +1124,26 @@ async def _fake_fetch(question_service_url, test_id, config, exclude_ids):
 
 
 class TestQuizSessions:
+    # The trainer creates the test and assigns it; participant 200 takes it.
+    PARTICIPANT = {"id": 200, "email": "p200@test.com", "role": "PARTICIPANT"}
+
     def _create_test(self) -> int:
+        _act_as(FAKE_TRAINER)
         return client.post(
             "/v1/api/tests/",
             json={"name": "QS Test", "test_type": "QUIZ", "number_of_questions": 11},
         ).json()["id"]
 
     def _create_submission(self, test_id: int) -> int:
-        return client.post(
+        _act_as(FAKE_TRAINER)
+        sub_id = client.post(
             "/v1/api/submissions/", json={"test_id": test_id, "user_id": 200}
         ).json()["id"]
+        _act_as(self.PARTICIPANT)
+        return sub_id
 
     def _create_session(self, test_id: int, sub_id: int) -> dict:
+        _act_as(self.PARTICIPANT)
         resp = client.post(
             "/v1/api/test-sessions/",
             json={"test_id": test_id, "submission_id": sub_id, "user_id": 200},

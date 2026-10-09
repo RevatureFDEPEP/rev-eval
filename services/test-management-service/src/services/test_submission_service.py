@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import httpx
 import logging
 import uuid
@@ -19,6 +19,7 @@ from src.schemas.test_submission_schema import (
     SubmissionStatus
 )
 from src.config import settings
+from src.utils.dependencies import user_service_headers
 
 logger = logging.getLogger(__name__)
 
@@ -179,7 +180,9 @@ class TestSubmissionService:
         return [TestSubmissionOut.from_orm(s) for s in submissions]
 
     @staticmethod
-    async def bulk_assign_test(db: AsyncSession, request: BulkAssignRequest, current_user: dict) -> BulkAssignResult:
+    async def bulk_assign_test(
+        db: AsyncSession, request: BulkAssignRequest, current_user: dict, auth_header: Optional[str] = None
+    ) -> BulkAssignResult:
         """
         Bulk assign a test to multiple participants.
         For each email:
@@ -207,7 +210,9 @@ class TestSubmissionService:
         user_service_url = settings.USER_SERVICE_URL
 
         request_id = str(uuid.uuid4())
-        async with httpx.AsyncClient(timeout=30.0, headers={"X-Request-Id": request_id}) as client:
+        async with httpx.AsyncClient(
+            timeout=30.0, headers={"X-Request-Id": request_id, **user_service_headers(auth_header)}
+        ) as client:
             for email in request.participant_emails:
                 try:
                     # Check if user exists (direct call to user-service)
@@ -280,7 +285,9 @@ class TestSubmissionService:
         )
 
     @staticmethod
-    async def get_evaluated_submissions_for_trainer(db: AsyncSession, trainer_id: int) -> List[TestSubmissionOut]:
+    async def get_evaluated_submissions_for_trainer(
+        db: AsyncSession, trainer_id: int, auth_header: Optional[str] = None
+    ) -> List[TestSubmissionOut]:
         """
         Get list of EVALUATED submissions for any trainer to review.
 
@@ -313,7 +320,9 @@ class TestSubmissionService:
         submission_outs = []
 
         request_id = str(uuid.uuid4())
-        async with httpx.AsyncClient(timeout=30.0, headers={"X-Request-Id": request_id}) as client:
+        async with httpx.AsyncClient(
+            timeout=30.0, headers={"X-Request-Id": request_id, **user_service_headers(auth_header)}
+        ) as client:
             for submission in submissions:
                 submission_out = TestSubmissionOut.from_orm(submission)
 
@@ -374,7 +383,9 @@ class TestSubmissionService:
         return [TestSubmissionOut.from_orm(s) for s in submissions]
 
     @staticmethod
-    async def get_all_submissions_for_trainer(db: AsyncSession, trainer_id: int) -> List[TestSubmissionOut]:
+    async def get_all_submissions_for_trainer(
+        db: AsyncSession, trainer_id: int, auth_header: Optional[str] = None
+    ) -> List[TestSubmissionOut]:
         """
         Get ALL submissions for tests created by this trainer across all statuses.
 
@@ -411,7 +422,9 @@ class TestSubmissionService:
         submission_outs = []
 
         request_id = str(uuid.uuid4())
-        async with httpx.AsyncClient(timeout=30.0, headers={"X-Request-Id": request_id}) as client:
+        async with httpx.AsyncClient(
+            timeout=30.0, headers={"X-Request-Id": request_id, **user_service_headers(auth_header)}
+        ) as client:
             for submission in submissions:
                 submission_out = TestSubmissionOut.from_orm(submission)
 

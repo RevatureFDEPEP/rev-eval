@@ -35,7 +35,8 @@ pytestmark = pytest.mark.skipif(
 from main import app  # noqa: E402
 from src.db.session import get_db  # noqa: E402
 from src.db.init_db import Base  # noqa: E402
-from src.models.user import User  # noqa: E402, F401
+from src.models.user import User, UserRole  # noqa: E402
+from src.services.auth_service import AuthService  # noqa: E402
 
 _PG_URL = "postgresql://test:test@localhost:5432/test"
 
@@ -51,6 +52,7 @@ class TestAuthFlowPostgres:
         Base.metadata.drop_all(bind=cls.pg_engine)
         Base.metadata.create_all(bind=cls.pg_engine)
         factory = sessionmaker(autocommit=False, autoflush=False, bind=cls.pg_engine)
+        cls.factory = factory
 
         cls._prev_get_db = app.dependency_overrides.get(get_db)
 
@@ -158,28 +160,65 @@ class TestAuthFlowPostgres:
         assert resp.status_code == 200, resp.text
         assert resp.json()["email"] == "pg_me@example.com"
 
-    def test_get_user_by_email_postgres(self):
-        self.client.post(
+    def _token(self, email: str, role: str) -> dict:
+        if role == "TRAINER":
+            # Trainers are provisioned directly, never through public registration.
+            db = self.factory()
+            try:
+                user = AuthService.create_user(
+                    db, email=email, password="Pass123!", full_name="PG Trainer", role=UserRole.TRAINER
+                )
+                token = AuthService.create_access_token(
+                    data={"sub": str(user.id), "email": user.email, "role": user.role.value}
+                )
+            finally:
+                db.close()
+            return {"Authorization": f"Bearer {token}"}
+        reg = self.client.post(
             "/v1/api/auth/register",
-            json={
-                "email": "pg_byemail@example.com",
-                "password": "Pass123!",
-                "full_name": "By Email PG",
-                "role": "PARTICIPANT",
-            },
+            json={"email": email, "password": "Pass123!", "full_name": "PG User", "role": role},
         )
-        resp = self.client.get("/v1/api/users/by-email/pg_byemail@example.com")
+        assert reg.status_code in (200, 201), reg.text
+        return {"Authorization": f"Bearer {reg.json()['access_token']}"}
+
+    def test_get_user_by_email_postgres(self):
+        me = self._token("pg_byemail@example.com", "PARTICIPANT")
+        resp = self.client.get("/v1/api/users/by-email/pg_byemail@example.com", headers=me)
         assert resp.status_code == 200
         assert resp.json()["email"] == "pg_byemail@example.com"
 
     def test_invite_then_login_fails_postgres(self):
         """Invited (inactive) users cannot log in — Postgres enforces same rules."""
-        self.client.post(
+        trainer = self._token("pg_trainer@example.com", "TRAINER")
+        invite = self.client.post(
             "/v1/api/users/invite",
             json={"email": "pg_invited@example.com"},
+            headers=trainer,
         )
+        assert invite.status_code == 201, invite.text
         resp = self.client.post(
             "/v1/api/auth/login",
             json={"email": "pg_invited@example.com", "password": "anypass"},
         )
         assert resp.status_code == 401
+
+    def test_participant_cannot_escalate_role_postgres(self):
+        """A denied self role change leaves the Postgres row unchanged."""
+        me = self._token("pg_escalate@example.com", "PARTICIPANT")
+        user_id = self.client.get("/v1/api/users/me", headers=me).json()["id"]
+        resp = self.client.patch(f"/v1/api/users/{user_id}", json={"role": "TRAINER"}, headers=me)
+        assert resp.status_code == 403
+        assert self.client.get("/v1/api/users/me", headers=me).json()["role"] == "PARTICIPANT"
+
+    def test_register_as_trainer_refused_postgres(self):
+        """Public registration cannot create a TRAINER row in Postgres."""
+        resp = self.client.post(
+            "/v1/api/auth/register",
+            json={"email": "pg_wannabe@example.com", "password": "Pass123!", "role": "TRAINER"},
+        )
+        assert resp.status_code == 403
+        db = self.factory()
+        try:
+            assert db.query(User).filter(User.email == "pg_wannabe@example.com").first() is None
+        finally:
+            db.close()
