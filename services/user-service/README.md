@@ -35,8 +35,6 @@ Every `/users/*` route resolves the caller from the signed Bearer JWT, not from 
 
 No one can change an account's email, role or active status through the API. test-management-service calls these routes with the caller's own forwarded token, so the same rules apply to it.
 
-These rules, and participant-only registration, are implemented in [#173](https://github.com/RevatureFDEPEP/rev-eval/pull/173); merge it before this README.
-
 ## Run and test
 
 It starts with the rest of the stack from the repository root (`docker compose up --build`); see the [root README](../../README.md). Configuration is read from environment variables: `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET` (must match the gateway's), `JWT_ALGORITHM`, `JWT_EXPIRY_MINUTES` and `ALLOW_ORIGINS`.
