@@ -19,6 +19,7 @@ It also exposes `GET /health`.
 - **Tokens:** register and login return an HS256 JWT carrying the user's id (`sub`), email and role, valid for `JWT_EXPIRY_MINUTES` (60 by default).
 - **Current user:** `/auth/me` and `/users/me` read the Bearer token, verify it and return the user; an invalid or expired token, or an inactive user, gets 401.
 - **Invitations** create an inactive user with no password; login is refused for that account.
+- **Registration is participant-only.** `/auth/register` always stores a `PARTICIPANT`; a request for any other role gets 403 and creates nothing. Trainer accounts are provisioned through a trusted path (`seed_db.py` in test-management, or a direct database insert).
 
 ## Who can call what
 
@@ -33,6 +34,8 @@ Every `/users/*` route resolves the caller from the signed Bearer JWT, not from 
 | `PATCH /users/{user_id}` | own first and last name only | own first and last name only |
 
 No one can change an account's email, role or active status through the API. test-management-service calls these routes with the caller's own forwarded token, so the same rules apply to it.
+
+These rules, and participant-only registration, are implemented in [#173](https://github.com/RevatureFDEPEP/rev-eval/pull/173); merge it before this README.
 
 ## Run and test
 
