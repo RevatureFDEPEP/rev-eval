@@ -143,4 +143,4 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build   # or
 - [Architecture](docs/ARCHITECTURE.md): request flow, routing table, data ownership, scoring and design decisions
 - [Security](docs/SECURITY.md): trust boundaries, controls and known limits
 - [ADR 0001: reporting data access](services/reporting-and-analytics-service/adr/0001-direct-db-read.md)
-- Service READMEs: [overview](services/README.md), [API gateway](services/api-gateway-service/README.md), [test management](services/test-management-service/README.md), [question management](services/question-management-service/README.md), [reporting and analytics](services/reporting-and-analytics-service/README.md), [frontend](frontend/README.md)
+- Service READMEs: [overview](services/README.md), [API gateway](services/api-gateway-service/README.md), [user](services/user-service/README.md), [test management](services/test-management-service/README.md), [question management](services/question-management-service/README.md), [reporting and analytics](services/reporting-and-analytics-service/README.md), [frontend](frontend/README.md)
