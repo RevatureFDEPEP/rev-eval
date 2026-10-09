@@ -15,7 +15,7 @@ Questions also carry skills, tags, difficulty and an optional answer explanation
 
 ## Endpoints
 
-Under `/v1/api/questions`, reached through the API gateway. Every route requires a Bearer JWT; create, update, delete and the image upload URL require the `TRAINER` role. Read routes return the answer fields (`correct_answers`, `sample_answer`, `answer_explanation`) only to trainers and to test-management-service, which identifies itself with the shared `INTERNAL_SERVICE_TOKEN` to score submissions; participants get questions without them.
+Under `/v1/api/questions`, reached through the API gateway. The question bank is trainer-only: every read route and the image download URL require a `TRAINER` JWT or test-management-service's shared `INTERNAL_SERVICE_TOKEN`, which it uses to score submissions; any other caller, a participant included, gets `403`. Create, update, delete and the image upload URL require the `TRAINER` role. Participants receive their quiz questions from test-management-service, without answer keys.
 
 - CRUD: `POST /`, `GET /`, `GET /{id}`, `PUT /{id}`, `DELETE /{id}`
 - Filtering: `GET /filter` (combined criteria), `/by-type/{type}`, `/by-skill/{skill}`, `/by-difficulty/{difficulty}`, `/by-tags`
@@ -28,7 +28,7 @@ Under `/v1/api/questions`, reached through the API gateway. Every route requires
 
 ## Run and test
 
-It starts with the rest of the stack from the repository root (`docker compose up --build`); see the [root README](../../README.md). Configuration comes from environment variables (`MONGO_URI`, `MONGO_DB`, `S3_*`, `JWT_SECRET`, `INTERNAL_SERVICE_TOKEN`, `PORT`).
+It starts with the rest of the stack from the repository root (`docker compose up --build`); see the [root README](../../README.md). Configuration comes from environment variables (`MONGO_URI`, `MONGO_DB`, `S3_*`, `JWT_SECRET`, `INTERNAL_SERVICE_TOKEN`, `APP_ENV`, `PORT`). The development placeholder internal token is accepted only with `APP_ENV=development`; otherwise the service refuses to start with it.
 
 ```bash
 cd services/question-management-service

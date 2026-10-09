@@ -3,13 +3,16 @@ FastAPI JWT auth dependencies for question-management-service.
 
 verify_jwt   — decodes Bearer token directly (defense-in-depth).
 require_role — factory that composes verify_jwt + role check.
-get_caller   — resolves who is calling a read endpoint: test-management-service
-               (shared internal token) or a user (verified Bearer JWT).
+get_caller   — resolves who is calling: test-management-service (shared
+               internal token) or a user (verified Bearer JWT).
+require_question_bank_reader — the one rule for every read of the question
+               bank: a trainer, or test-management-service.
 
 Every endpoint requires a caller. Write endpoints and image upload require the
-TRAINER role. Read endpoints accept any authenticated user, but answer keys are
-returned only to trainers and to test-management-service, which needs them for
-scoring; participants receive questions without them.
+TRAINER role. Reads of the question bank, including image download URLs, are
+for trainers and for test-management-service, which needs the answer keys for
+scoring. Participants have no direct access: they receive the questions of
+their own quiz session from test-management-service, without answer keys.
 """
 import hmac
 import time
@@ -82,7 +85,7 @@ class Caller:
 
 
 def _is_internal(token: Optional[str]) -> bool:
-    expected = settings.INTERNAL_SERVICE_TOKEN
+    expected = settings.internal_service_token
     if not expected or not token:
         return False
     return hmac.compare_digest(token.encode(), expected.encode())
@@ -98,3 +101,14 @@ def get_caller(
         return Caller(role="SERVICE", internal=True)
     payload = verify_jwt(credentials)
     return Caller(role=(payload.get("role") or "").upper())
+
+
+def require_question_bank_reader(caller: Caller = Depends(get_caller)) -> Caller:
+    """Trainers and test-management-service may read the question bank; any
+    other authenticated caller, a participant included, gets 403."""
+    if not caller.can_see_answers:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The question bank is available to trainers only",
+        )
+    return caller

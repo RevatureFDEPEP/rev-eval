@@ -1,11 +1,13 @@
 """
 tests/test_question_service_client.py
 
-question-management-service returns answer keys only to trainers and to this
-service (identified by its internal token). These tests cover this side of that
-contract: the token goes to question-management and nowhere else, scoring works
-from the keys it returns, participants never see them, and a response without
-keys fails closed instead of scoring every answer as wrong.
+question-management-service serves the question bank, answer keys included,
+only to trainers and to this service (identified by its internal token). These
+tests cover this side of that contract: the token goes to question-management
+and nowhere else, the development placeholder is never sent outside
+APP_ENV=development, scoring works from the keys it returns, participants never
+see them, and a refused or key-less response fails closed instead of scoring
+every answer as wrong.
 """
 import asyncio
 import os
@@ -25,7 +27,9 @@ from unittest.mock import patch  # noqa: E402
 import pytest  # noqa: E402
 from fastapi import HTTPException  # noqa: E402
 
-from src.config.settings import settings  # noqa: E402
+from pydantic import ValidationError  # noqa: E402
+
+from src.config.settings import DEV_INTERNAL_SERVICE_TOKEN, Settings, settings  # noqa: E402
 from src.services.quiz_session_service import (  # noqa: E402
     _normalize_question,
     _safe_question_out,
@@ -51,8 +55,8 @@ _WITH_KEYS = [
 
 
 class _Resp:
-    def __init__(self, data):
-        self.status_code = 200
+    def __init__(self, data, status_code=200):
+        self.status_code = status_code
         self._data = data
         self.text = ""
 
@@ -60,7 +64,7 @@ class _Resp:
         return self._data
 
 
-def _recording_client(data):
+def _recording_client(data, status_code=200):
     seen = []
 
     class _Client:
@@ -75,7 +79,7 @@ def _recording_client(data):
 
         async def get(self, url, headers=None, **k):
             seen.append((url, dict(headers or {})))
-            return _Resp(data)
+            return _Resp(data, status_code)
 
     return _Client, seen
 
@@ -95,9 +99,28 @@ class TestInternalTokenToQuestionService:
         assert url.startswith(f"{QS_URL}/v1/api/questions/")
         assert headers == {"X-Internal-Service-Token": TOKEN}
 
-    def test_no_internal_header_when_token_not_configured(self):
-        with patch.object(settings, "INTERNAL_SERVICE_TOKEN", None):
+    @pytest.mark.parametrize("configured", [None, "", "   "])
+    def test_no_internal_header_when_token_not_configured(self, configured):
+        with patch.object(settings, "INTERNAL_SERVICE_TOKEN", configured):
             assert question_service_headers() == {}
+
+    def test_placeholder_never_sent_outside_development(self):
+        with patch.object(settings, "INTERNAL_SERVICE_TOKEN", DEV_INTERNAL_SERVICE_TOKEN), \
+                patch.object(settings, "APP_ENV", "production"):
+            assert question_service_headers() == {}
+
+    def test_placeholder_sent_in_development(self):
+        with patch.object(settings, "INTERNAL_SERVICE_TOKEN", DEV_INTERNAL_SERVICE_TOKEN), \
+                patch.object(settings, "APP_ENV", "development"):
+            assert question_service_headers() == {"X-Internal-Service-Token": DEV_INTERNAL_SERVICE_TOKEN}
+
+    @pytest.mark.parametrize("status_code", [401, 403])
+    def test_refused_question_fetch_fails_closed(self, status_code):
+        client, _ = _recording_client({"detail": "refused"}, status_code)
+        with patch.object(settings, "INTERNAL_SERVICE_TOKEN", None), patch("httpx.AsyncClient", client):
+            with pytest.raises(HTTPException) as exc:
+                asyncio.run(fetch_questions_for_part(QS_URL, 1, {"easy": 3}, []))
+        assert exc.value.status_code == 503
 
     def test_internal_token_is_never_sent_to_user_service(self):
         with patch.object(settings, "INTERNAL_SERVICE_TOKEN", TOKEN):
@@ -137,3 +160,17 @@ class TestScoringWithAnswerKeys:
         with pytest.raises(HTTPException) as exc:
             _fetch(without_keys)
         assert exc.value.status_code == 503
+
+
+class TestPlaceholderTokenAtStartup:
+    def test_service_refuses_to_start_with_placeholder_outside_development(self):
+        with pytest.raises(ValidationError, match="development placeholder"):
+            Settings(INTERNAL_SERVICE_TOKEN=DEV_INTERNAL_SERVICE_TOKEN, APP_ENV="production")
+
+    def test_service_starts_with_placeholder_in_development(self):
+        configured = Settings(INTERNAL_SERVICE_TOKEN=DEV_INTERNAL_SERVICE_TOKEN, APP_ENV="development")
+        assert configured.internal_service_token == DEV_INTERNAL_SERVICE_TOKEN
+
+    def test_real_token_is_used_in_any_environment(self):
+        configured = Settings(INTERNAL_SERVICE_TOKEN="a-long-random-value", APP_ENV="production")
+        assert configured.internal_service_token == "a-long-random-value"

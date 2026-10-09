@@ -4,7 +4,7 @@ from pydantic import ValidationError
 from typing import Dict, List, Optional
 from src.schemas.question import QuestionCreate, QuestionUpdate, QuestionResponse
 from src.services.question_service import QuestionService
-from src.utils.dependencies import Caller, get_caller, require_role, verify_jwt
+from src.utils.dependencies import Caller, require_question_bank_reader, require_role
 from src.utils.s3_client import generate_presigned_get_url, generate_presigned_put_url, ensure_bucket
 from src.config.settings import settings
 
@@ -16,8 +16,8 @@ ANSWER_FIELDS = ("correct_answers", "sample_answer", "answer_explanation")
 
 # Read endpoints build their JSON per caller, so the schema is documented here
 # rather than enforced through response_model (which would re-add the fields as null).
-_ONE = {200: {"model": QuestionResponse, "description": "Answer fields only for trainers and test-management-service"}}
-_MANY = {200: {"model": List[QuestionResponse], "description": "Answer fields only for trainers and test-management-service"}}
+_ONE = {200: {"model": QuestionResponse, "description": "Trainers and test-management-service only; answer fields included"}}
+_MANY = {200: {"model": List[QuestionResponse], "description": "Trainers and test-management-service only; answer fields included"}}
 
 
 def _question_out(question, caller: Caller) -> dict:
@@ -81,7 +81,7 @@ async def create_question(
     summary="Get all questions",
     description="Retrieve all questions from the database."
 )
-async def get_all_questions(caller: Caller = Depends(get_caller)):
+async def get_all_questions(caller: Caller = Depends(require_question_bank_reader)):
     """Retrieve all questions."""
     try:
         questions = await QuestionService.get_all_questions()
@@ -111,7 +111,7 @@ async def get_all_questions(caller: Caller = Depends(get_caller)):
 async def get_questions_by_tags(
     tags: List[str] = Query(..., description="List of tags to filter by"),
     limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
-    caller: Caller = Depends(get_caller),
+    caller: Caller = Depends(require_question_bank_reader),
 ):
     """Get questions filtered by tags."""
     try:
@@ -153,7 +153,7 @@ async def filter_questions(
     difficulty: Optional[str] = Query(None, description="Difficulty filter"),
     tags: Optional[List[str]] = Query(None, description="Tags filter (OR condition)"),
     limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
-    caller: Caller = Depends(get_caller),
+    caller: Caller = Depends(require_question_bank_reader),
 ):
     """
     Filter questions using multiple criteria with AND conditions.
@@ -186,7 +186,7 @@ async def filter_questions(
     summary="Get question by ID",
     description="Retrieve a specific question by its MongoDB _id."
 )
-async def get_question_by_id(id: str, caller: Caller = Depends(get_caller)):
+async def get_question_by_id(id: str, caller: Caller = Depends(require_question_bank_reader)):
     """Retrieve a specific question by ID."""
     try:
         question = await QuestionService.get_question_by_id(id)
@@ -299,7 +299,7 @@ class PresignedUrlResponse(BaseModel):
     summary="Get pre-signed download URL for question image",
     description="Returns a time-limited GET URL to download the question's image directly from MinIO/S3.",
 )
-async def get_image_download_url(id: str, _: Dict = Depends(verify_jwt)):
+async def get_image_download_url(id: str, _: Caller = Depends(require_question_bank_reader)):
     question = await QuestionService.get_question_by_id(id)
     if not question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Question '{id}' not found")
@@ -362,7 +362,7 @@ async def get_image_upload_url(
 async def get_questions_by_type(
     question_type: str,
     limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
-    caller: Caller = Depends(get_caller),
+    caller: Caller = Depends(require_question_bank_reader),
 ):
     """Get questions filtered by type."""
     try:
@@ -387,7 +387,7 @@ async def get_questions_by_type(
 async def get_questions_by_skill(
     skill: str,
     limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
-    caller: Caller = Depends(get_caller),
+    caller: Caller = Depends(require_question_bank_reader),
 ):
     """Get questions filtered by skill."""
     try:
@@ -419,7 +419,7 @@ async def get_questions_by_skill(
 async def get_questions_by_difficulty(
     difficulty: str,
     limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
-    caller: Caller = Depends(get_caller),
+    caller: Caller = Depends(require_question_bank_reader),
 ):
     """Get questions filtered by difficulty."""
     try:
