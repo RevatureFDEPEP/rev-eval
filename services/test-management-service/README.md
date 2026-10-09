@@ -26,6 +26,7 @@ Rules live in `src/utils/authorization.py`; `tests/test_authorization.py` covers
 ## How scoring and submission behave
 
 - **Scoring:** single-answer questions are exact match; multi-select questions earn partial credit using Jaccard similarity.
+- **Answer keys:** questions for a quiz part are fetched from question-management with `INTERNAL_SERVICE_TOKEN`, which is the only way besides a trainer token to receive answer keys. They are stored for scoring and never returned to the participant.
 - **Idempotent submits:** a submit that carries an `Idempotency-Key` header is stored as a SHA-256 hash per part, and repeating the same key replays the original result instead of scoring again.
 - **Locking:** the session row is read with `SELECT ... FOR UPDATE` when a submit finalizes it, so concurrent submits for one session cannot both score it.
 

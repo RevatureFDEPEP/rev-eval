@@ -65,15 +65,17 @@ class TestQuestionCrudMongo:
 
     @classmethod
     def setup_class(cls):
-        from src.utils.dependencies import verify_jwt
+        from src.utils.dependencies import Caller, get_caller, verify_jwt
         app.dependency_overrides[verify_jwt] = lambda: {"sub": "1", "role": "TRAINER", "email": "trainer@ci.test"}
+        app.dependency_overrides[get_caller] = lambda: Caller(role="TRAINER")
         cls._tc = TestClient(app)
         cls.client = cls._tc.__enter__()
 
     @classmethod
     def teardown_class(cls):
-        from src.utils.dependencies import verify_jwt
+        from src.utils.dependencies import get_caller, verify_jwt
         app.dependency_overrides.pop(verify_jwt, None)
+        app.dependency_overrides.pop(get_caller, None)
         cls._tc.__exit__(None, None, None)
         asyncio.run(_drop_test_db())
 
@@ -292,3 +294,58 @@ class TestQuestionCrudMongo:
         assert resp.status_code == 200
         gone = self.client.get(f"/v1/api/questions/{self.mcq_id}")
         assert gone.status_code == 404
+
+
+class TestAnswerVisibilityMongo:
+    """Real tokens, no dependency overrides: a participant reading a stored
+    question gets it without the answer key; a trainer and test-management's
+    internal token get the key."""
+
+    INTERNAL = "ci-internal-token"
+
+    @classmethod
+    def setup_class(cls):
+        import src.utils.dependencies as deps
+        cls._deps = deps
+        cls._saved = deps.settings.INTERNAL_SERVICE_TOKEN
+        deps.settings.INTERNAL_SERVICE_TOKEN = cls.INTERNAL
+        cls._tc = TestClient(app)
+        cls.client = cls._tc.__enter__()
+
+    @classmethod
+    def teardown_class(cls):
+        cls._deps.settings.INTERNAL_SERVICE_TOKEN = cls._saved
+        cls._tc.__exit__(None, None, None)
+        asyncio.run(_drop_test_db())
+
+    @classmethod
+    def _headers(cls, role):
+        import time
+        import jwt
+        token = jwt.encode(
+            {"sub": "9", "role": role, "exp": int(time.time()) + 3600},
+            cls._deps.settings.JWT_SECRET,
+            algorithm="HS256",
+        )
+        return {"Authorization": f"Bearer {token}"}
+
+    def test_answer_keys_follow_the_caller(self):
+        created = self.client.post("/v1/api/questions/", json=_MCQ_PAYLOAD, headers=self._headers("TRAINER"))
+        assert created.status_code == 201
+        qid = created.json()["id"]
+
+        assert self.client.get(f"/v1/api/questions/{qid}").status_code == 401
+
+        participant = self.client.get(f"/v1/api/questions/{qid}", headers=self._headers("PARTICIPANT"))
+        assert participant.status_code == 200
+        assert "correct_answers" not in participant.json()
+        assert len(participant.json()["options"]) == 4
+
+        trainer = self.client.get(f"/v1/api/questions/{qid}", headers=self._headers("TRAINER"))
+        assert trainer.json()["correct_answers"] == [2]
+
+        internal = self.client.get("/v1/api/questions/", headers={"X-Internal-Service-Token": self.INTERNAL})
+        assert any(q.get("correct_answers") == [2] for q in internal.json())
+
+        listed = self.client.get("/v1/api/questions/by-skill/Python", headers=self._headers("PARTICIPANT"))
+        assert listed.json() and all("correct_answers" not in q for q in listed.json())

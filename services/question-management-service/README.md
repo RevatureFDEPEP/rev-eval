@@ -15,7 +15,7 @@ Questions also carry skills, tags, difficulty and an optional answer explanation
 
 ## Endpoints
 
-Under `/v1/api/questions`, reached through the API gateway. Create, update and delete require the `TRAINER` role.
+Under `/v1/api/questions`, reached through the API gateway. Every route requires a Bearer JWT; create, update, delete and the image upload URL require the `TRAINER` role. Read routes return the answer fields (`correct_answers`, `sample_answer`, `answer_explanation`) only to trainers and to test-management-service, which identifies itself with the shared `INTERNAL_SERVICE_TOKEN` to score submissions; participants get questions without them.
 
 - CRUD: `POST /`, `GET /`, `GET /{id}`, `PUT /{id}`, `DELETE /{id}`
 - Filtering: `GET /filter` (combined criteria), `/by-type/{type}`, `/by-skill/{skill}`, `/by-difficulty/{difficulty}`, `/by-tags`
@@ -28,7 +28,7 @@ Under `/v1/api/questions`, reached through the API gateway. Create, update and d
 
 ## Run and test
 
-It starts with the rest of the stack from the repository root (`docker compose up --build`); see the [root README](../../README.md). Configuration comes from environment variables (`MONGO_URI`, `MONGO_DB`, `S3_*`, `JWT_SECRET`, `PORT`).
+It starts with the rest of the stack from the repository root (`docker compose up --build`); see the [root README](../../README.md). Configuration comes from environment variables (`MONGO_URI`, `MONGO_DB`, `S3_*`, `JWT_SECRET`, `INTERNAL_SERVICE_TOKEN`, `PORT`).
 
 ```bash
 cd services/question-management-service

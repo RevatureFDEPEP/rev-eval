@@ -20,6 +20,7 @@ import httpx
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config.settings import settings
 from src.models.quiz_session import QuizSession, SessionStatus
 from src.models.test_submission import TestSubmission, SubmissionStatus
 from src.repositories.quiz_session_repository import QuizSessionRepository
@@ -124,6 +125,13 @@ def score_part(stored_questions: list, answers: list) -> tuple:
 # Section B -- Question-fetching helper
 # ---------------------------------------------------------------------------
 
+def question_service_headers() -> dict:
+    """Headers for calls to question-management-service: this service's
+    internal token, when configured. Sent to no other service."""
+    token = settings.INTERNAL_SERVICE_TOKEN
+    return {"X-Internal-Service-Token": token} if token else {}
+
+
 async def fetch_questions_for_part(
     question_service_url: str,
     test_id: int,
@@ -133,7 +141,9 @@ async def fetch_questions_for_part(
     """
     Fetch questions from question-management-service and sample by difficulty.
 
-    Calls GET {question_service_url}/v1/api/questions/?limit=200
+    Calls GET {question_service_url}/v1/api/questions/?limit=200 with this
+    service's internal token, so the response includes the answer keys scoring
+    needs. Participants never receive them: see _safe_question_out.
     Filters by difficulty, excludes already-seen question IDs, samples randomly.
     Raises HTTPException 503 if service is unreachable or questions lack answer fields.
     """
@@ -145,6 +155,7 @@ async def fetch_questions_for_part(
             response = await client.get(
                 f"{question_service_url}/v1/api/questions/",
                 params={"limit": 200},
+                headers=question_service_headers(),
             )
     except httpx.RequestError as exc:
         logger.error("Question service unreachable: %s", exc)

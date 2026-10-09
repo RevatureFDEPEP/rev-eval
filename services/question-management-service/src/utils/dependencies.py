@@ -1,22 +1,30 @@
 """
 FastAPI JWT auth dependencies for question-management-service.
 
-verify_jwt  — decodes Bearer token directly (defense-in-depth).
+verify_jwt   — decodes Bearer token directly (defense-in-depth).
 require_role — factory that composes verify_jwt + role check.
+get_caller   — resolves who is calling a read endpoint: test-management-service
+               (shared internal token) or a user (verified Bearer JWT).
 
-Write endpoints (create / update / delete) require TRAINER role.
-Read endpoints remain open (any authenticated call via the gateway).
+Every endpoint requires a caller. Write endpoints and image upload require the
+TRAINER role. Read endpoints accept any authenticated user, but answer keys are
+returned only to trainers and to test-management-service, which needs them for
+scoring; participants receive questions without them.
 """
+import hmac
 import time
-from typing import Any, Callable, Dict
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Optional
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from src.config.settings import settings
 
 _bearer = HTTPBearer(auto_error=False)
+
+INTERNAL_TOKEN_HEADER = "X-Internal-Service-Token"
 
 
 def verify_jwt(
@@ -60,3 +68,33 @@ def require_role(role: str) -> Callable:
             )
         return payload
     return _dependency
+
+
+@dataclass(frozen=True)
+class Caller:
+    """Who is calling a read endpoint."""
+    role: str
+    internal: bool = False
+
+    @property
+    def can_see_answers(self) -> bool:
+        return self.internal or self.role.upper() == "TRAINER"
+
+
+def _is_internal(token: Optional[str]) -> bool:
+    expected = settings.INTERNAL_SERVICE_TOKEN
+    if not expected or not token:
+        return False
+    return hmac.compare_digest(token.encode(), expected.encode())
+
+
+def get_caller(
+    internal_token: Optional[str] = Header(None, alias=INTERNAL_TOKEN_HEADER),
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+) -> Caller:
+    """Resolve the caller. A wrong or missing internal token is ignored, and the
+    request is then authenticated as a user like any other."""
+    if _is_internal(internal_token):
+        return Caller(role="SERVICE", internal=True)
+    payload = verify_jwt(credentials)
+    return Caller(role=(payload.get("role") or "").upper())

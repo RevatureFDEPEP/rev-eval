@@ -125,6 +125,7 @@ services:
       SERVICE_NAME: question-management-service
       PORT: 8003
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me-internal-service-token}
       S3_ENDPOINT_URL: http://minio:9000
       # Browser-facing origin for presigned image URLs; Nginx proxies
       # /question-images/ on this origin to MinIO.
@@ -163,6 +164,7 @@ services:
       PORT: 8001
       SERVICE_HOSTNAME: test-management-service
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me-internal-service-token}
       USER_SERVICE_URL: http://user-service:8002
       ALLOW_ORIGINS: http://localhost:3000
     networks:

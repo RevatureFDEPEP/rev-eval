@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     USER_SERVICE_URL: str = "http://localhost:8003"
     INTERVIEW_SERVICE_URL: Optional[str] = None
     QUESTION_SERVICE_URL: Optional[str] = "http://question-management-service:8003"
+    # Sent only to question-management-service, which returns answer keys for
+    # scoring to this service and to trainers, never to participants.
+    INTERNAL_SERVICE_TOKEN: Optional[str] = None
 
     @property
     def SQLALCHEMY_DATABASE_URL(self) -> str:

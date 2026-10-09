@@ -4,11 +4,28 @@ from pydantic import ValidationError
 from typing import Dict, List, Optional
 from src.schemas.question import QuestionCreate, QuestionUpdate, QuestionResponse
 from src.services.question_service import QuestionService
-from src.utils.dependencies import require_role
+from src.utils.dependencies import Caller, get_caller, require_role, verify_jwt
 from src.utils.s3_client import generate_presigned_get_url, generate_presigned_put_url, ensure_bucket
 from src.config.settings import settings
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
+
+# Fields that give away the answer. Only trainers and test-management-service
+# (which scores submissions) receive them; participants get the question without.
+ANSWER_FIELDS = ("correct_answers", "sample_answer", "answer_explanation")
+
+# Read endpoints build their JSON per caller, so the schema is documented here
+# rather than enforced through response_model (which would re-add the fields as null).
+_ONE = {200: {"model": QuestionResponse, "description": "Answer fields only for trainers and test-management-service"}}
+_MANY = {200: {"model": List[QuestionResponse], "description": "Answer fields only for trainers and test-management-service"}}
+
+
+def _question_out(question, caller: Caller) -> dict:
+    data = QuestionResponse(**question.model_dump(by_alias=True, mode="json")).model_dump(by_alias=True, mode="json")
+    if not caller.can_see_answers:
+        for field in ANSWER_FIELDS:
+            data.pop(field, None)
+    return data
 
 
 @router.post(
@@ -59,16 +76,17 @@ async def create_question(
 
 @router.get(
     "/",
-    response_model=list[QuestionResponse],
+    response_model=None,
+    responses=_MANY,
     summary="Get all questions",
     description="Retrieve all questions from the database."
 )
-async def get_all_questions():
+async def get_all_questions(caller: Caller = Depends(get_caller)):
     """Retrieve all questions."""
     try:
         questions = await QuestionService.get_all_questions()
         # Convert Beanie documents to response schema (mode='json' converts ObjectId to string)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return [_question_out(q, caller) for q in questions]
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -78,7 +96,8 @@ async def get_all_questions():
 
 @router.get(
     "/by-tags",
-    response_model=List[QuestionResponse],
+    response_model=None,
+    responses=_MANY,
     summary="Get questions by tags",
     description="""
     Retrieve questions that have any of the specified tags.
@@ -91,12 +110,13 @@ async def get_all_questions():
 )
 async def get_questions_by_tags(
     tags: List[str] = Query(..., description="List of tags to filter by"),
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    caller: Caller = Depends(get_caller),
 ):
     """Get questions filtered by tags."""
     try:
         questions = await QuestionService.find_by_tags(tags, limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return [_question_out(q, caller) for q in questions]
     except HTTPException:
         raise
     except Exception as e:  # pragma: no cover
@@ -108,7 +128,8 @@ async def get_questions_by_tags(
 
 @router.get(
     "/filter",
-    response_model=List[QuestionResponse],
+    response_model=None,
+    responses=_MANY,
     summary="Filter questions by multiple criteria",
     description="""
     Advanced filtering endpoint that supports multiple criteria simultaneously.
@@ -131,7 +152,8 @@ async def filter_questions(
     skill: Optional[str] = Query(None, description="Skill filter"),
     difficulty: Optional[str] = Query(None, description="Difficulty filter"),
     tags: Optional[List[str]] = Query(None, description="Tags filter (OR condition)"),
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    caller: Caller = Depends(get_caller),
 ):
     """
     Filter questions using multiple criteria with AND conditions.
@@ -147,7 +169,7 @@ async def filter_questions(
             tags=tags,
             limit=limit
         )
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return [_question_out(q, caller) for q in questions]
     except HTTPException:
         raise
     except Exception as e:  # pragma: no cover
@@ -159,11 +181,12 @@ async def filter_questions(
 
 @router.get(
     "/{id}",
-    response_model=QuestionResponse,
+    response_model=None,
+    responses=_ONE,
     summary="Get question by ID",
     description="Retrieve a specific question by its MongoDB _id."
 )
-async def get_question_by_id(id: str):
+async def get_question_by_id(id: str, caller: Caller = Depends(get_caller)):
     """Retrieve a specific question by ID."""
     try:
         question = await QuestionService.get_question_by_id(id)
@@ -173,7 +196,7 @@ async def get_question_by_id(id: str):
                 detail=f"Question with ID '{id}' not found"
             )
         # Convert Beanie document to response schema (mode='json' converts ObjectId to string)
-        return QuestionResponse(**question.model_dump(by_alias=True, mode='json'))
+        return _question_out(question, caller)
     except HTTPException:
         raise
     except Exception as e:
@@ -276,7 +299,7 @@ class PresignedUrlResponse(BaseModel):
     summary="Get pre-signed download URL for question image",
     description="Returns a time-limited GET URL to download the question's image directly from MinIO/S3.",
 )
-async def get_image_download_url(id: str):
+async def get_image_download_url(id: str, _: Dict = Depends(verify_jwt)):
     question = await QuestionService.get_question_by_id(id)
     if not question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Question '{id}' not found")
@@ -302,6 +325,7 @@ async def get_image_download_url(id: str):
 async def get_image_upload_url(
     id: str,
     content_type: str = Query("image/jpeg", description="MIME type of the file being uploaded"),
+    _: Dict = Depends(require_role("TRAINER")),
 ):
     question = await QuestionService.get_question_by_id(id)
     if not question:
@@ -322,7 +346,8 @@ async def get_image_upload_url(
 
 @router.get(
     "/by-type/{question_type}",
-    response_model=List[QuestionResponse],
+    response_model=None,
+    responses=_MANY,
     summary="Get questions by type",
     description="""
     Retrieve questions filtered by type.
@@ -336,12 +361,13 @@ async def get_image_upload_url(
 )
 async def get_questions_by_type(
     question_type: str,
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    caller: Caller = Depends(get_caller),
 ):
     """Get questions filtered by type."""
     try:
         questions = await QuestionService.find_by_type(question_type, limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return [_question_out(q, caller) for q in questions]
     except HTTPException:
         raise
     except Exception as e:
@@ -353,18 +379,20 @@ async def get_questions_by_type(
 
 @router.get(
     "/by-skill/{skill}",
-    response_model=List[QuestionResponse],
+    response_model=None,
+    responses=_MANY,
     summary="Get questions by skill",
     description="Retrieve questions that include the specified skill."
 )
 async def get_questions_by_skill(
     skill: str,
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    caller: Caller = Depends(get_caller),
 ):
     """Get questions filtered by skill."""
     try:
         questions = await QuestionService.find_by_skill(skill, limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return [_question_out(q, caller) for q in questions]
     except HTTPException:
         raise
     except Exception as e:
@@ -376,7 +404,8 @@ async def get_questions_by_skill(
 
 @router.get(
     "/by-difficulty/{difficulty}",
-    response_model=List[QuestionResponse],
+    response_model=None,
+    responses=_MANY,
     summary="Get questions by difficulty",
     description="""
     Retrieve questions filtered by difficulty level.
@@ -389,12 +418,13 @@ async def get_questions_by_skill(
 )
 async def get_questions_by_difficulty(
     difficulty: str,
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return")
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of questions to return"),
+    caller: Caller = Depends(get_caller),
 ):
     """Get questions filtered by difficulty."""
     try:
         questions = await QuestionService.find_by_difficulty(difficulty, limit)
-        return [QuestionResponse(**q.model_dump(by_alias=True, mode='json')) for q in questions]
+        return [_question_out(q, caller) for q in questions]
     except HTTPException:
         raise
     except Exception as e:
