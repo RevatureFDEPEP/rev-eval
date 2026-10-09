@@ -68,7 +68,7 @@ The system is grouped into four zones: **public** (browsers), the **Nginx edge**
 - **TLS at the edge**: Nginx terminates TLS 1.2/1.3, redirects HTTP to HTTPS, and is the only container publishing host ports in the base stack.
 - **JWT verification in depth**: the gateway verifies every token except on login and registration; the Next.js middleware verifies the session JWT before serving protected pages; question-management and reporting verify it again.
 - **httpOnly cookie through a BFF**: the token lives in an httpOnly cookie and is attached server-side as a Bearer header.
-- **Service-level RBAC**: `TRAINER` / `PARTICIPANT` role and ownership checks run inside the services, not only at the gateway.
+- **Service-level authorization**: `TRAINER` / `PARTICIPANT` role and ownership checks are enforced in the domain services rather than relying only on frontend routing; the gateway verifies the JWT and forwards the verified identity.
 - **Trusted identity forwarding**: the gateway drops client-supplied `X-User-*` headers, sets them from the verified token, and adds an `X-Request-Id`.
 - **Edge hardening**: rate limiting on `/v1/api/`, plus HSTS, `X-Frame-Options`, `X-Content-Type-Options` and `Referrer-Policy` headers.
 - **Supply-chain checks**: a Trivy scan of every service in CI and build-provenance attestation for the frontend.
