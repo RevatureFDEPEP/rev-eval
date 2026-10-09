@@ -66,9 +66,9 @@ Nginx              TLS 1.2/1.3 · HTTP→HTTPS redirect · rate limit on /v1/api
 The system is grouped into four zones: **public** (browsers), the **Nginx edge**, the **private Docker network** (frontend, gateway, services) and the **data layer**. Current controls:
 
 - **TLS at the edge**: Nginx terminates TLS 1.2/1.3, redirects HTTP to HTTPS, and is the only container publishing host ports in the base stack.
-- **JWT verification in depth**: the gateway verifies every token except on login and registration; the Next.js middleware verifies the session JWT before serving protected pages; user-service, test-management and reporting verify it again on every protected route, and question-management on its writes.
+- **JWT verification in depth**: the gateway verifies every token except on login and registration; the Next.js middleware verifies the session JWT before serving protected pages; user-service, test-management, reporting and question-management verify it again on every protected route.
 - **httpOnly cookie through a BFF**: the token lives in an httpOnly cookie and is attached server-side as a Bearer header.
-- **Service-level authorization**: user-service and test-management resolve the caller from their own verified JWT and enforce `TRAINER` / `PARTICIPANT` role and ownership rules: participants reach only their own account, submissions and quiz sessions, and trainers manage only the tests they created.
+- **Service-level authorization**: user-service and test-management resolve the caller from their own verified JWT and enforce `TRAINER` / `PARTICIPANT` role and ownership rules: participants reach only their own account, submissions and quiz sessions, and trainers manage only the tests they created. question-management returns answer keys only to trainers and to test-management's scoring calls; participants see questions without them.
 - **Participant-only sign-up**: public registration always creates a participant; trainer accounts are provisioned through the seed script, not the API.
 - **Trusted identity forwarding**: the gateway drops client-supplied `X-User-*` headers, sets them from the verified token, and adds an `X-Request-Id`.
 - **Edge hardening**: rate limiting on `/v1/api/`, plus HSTS, `X-Frame-Options`, `X-Content-Type-Options` and `Referrer-Policy` headers.

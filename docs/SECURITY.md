@@ -33,7 +33,7 @@ Traffic inside the Compose network (Nginx to frontend and gateway, gateway to se
 
 ### Authorization (inside the services)
 
-- **question-management-service**: create, update and delete re-verify the JWT and require `TRAINER`.
+- **question-management-service**: every route requires a verified JWT; read routes alternatively accept test-management's internal token (below). Create, update, delete and the image upload URL require `TRAINER`. Read routes return the answer fields (`correct_answers`, `sample_answer`, `answer_explanation`) only to trainers and to test-management-service; a participant gets the question and its options without them. test-management presents the shared `INTERNAL_SERVICE_TOKEN` in `X-Internal-Service-Token`, compared in constant time; a wrong or missing internal token is ignored and the request is authenticated as a user.
 - **reporting-and-analytics-service**: re-verifies the JWT on every report route; per-test, aggregate, per-question and ranking reports require `TRAINER`; a participant can read only their own summary and attempts.
 - **user-service**: every `/users/*` route resolves the caller from the signed Bearer JWT (not from `X-User-*` headers) and rejects inactive users with `401`. A participant can read only their own record (`/users/me`, their own id or email); listing users, reading others, inviting and patching other accounts require `TRAINER` or are refused with `403`. Trainers can read and list users and invite participant accounts only. `PATCH /users/{id}` changes only the caller's own name; nobody can change email, role or active status through the API.
 - **test-management-service** verifies the Bearer JWT itself and loads the token subject from user-service with the caller's own token; `X-User-*` headers are not used for identity. Rules (`src/utils/authorization.py`):
@@ -42,10 +42,11 @@ Traffic inside the Compose network (Nginx to frontend and gateway, gateway to se
   - **Submissions**: a participant lists and reads only their own, and asking for another `user_id` is refused. Creating, assigning (`bulk-assign`), updating, deleting, the review surfaces (`trainer/evaluated`, `trainer/all`, `graded`, `review-details`) and grading (`trainer-review`) require `TRAINER` and, for a specific test or submission, the trainer who manages that test.
   - **Quiz sessions**: a participant starts a session only for their own submission and its test; only the session's participant reads questions, autosaves and submits it; the trainer who manages the test can read it.
   - Every check runs before the route reads or writes the record. Its calls to user-service forward the caller's own Bearer token, so user-service applies its policy to them.
+  - Its question fetch for a quiz part sends `INTERNAL_SERVICE_TOKEN` to question-management only, stores the answer keys for scoring, and returns questions to the participant without them.
 
 ### Identity forwarding and tracing
 
-- The gateway drops any client-supplied `X-User-*` header (case-insensitively) and sets `X-User-Id`, `X-User-Email` and `X-User-Role` from the verified token, so a caller cannot assert another identity through the gateway (`tests/test_api_gateway.py::TestAddUserContextHeaders`).
+- The gateway drops any client-supplied `X-User-*` header (case-insensitively) and sets `X-User-Id`, `X-User-Email` and `X-User-Role` from the verified token, so a caller cannot assert another identity through the gateway (`tests/test_api_gateway.py::TestAddUserContextHeaders`). It also drops client-supplied `X-Internal-*` headers, so the internal token cannot be presented through it.
 - `X-Request-Id` is accepted from the caller or generated, forwarded to the service and returned on the response.
 
 ### Data handling
@@ -65,7 +66,7 @@ Traffic inside the Compose network (Nginx to frontend and gateway, gateway to se
 
 These are deliberate scope limits of a local stack, not hidden features:
 
-- **Question reads are gateway-protected only.** question-management requires `TRAINER` for create, update and delete, but its read routes (which return `correct_answers`) and the image upload-URL route accept any token the gateway accepts, so a signed-in participant can read the answer key. Restricting them needs a service credential for test-management's question fetch during scoring; it is not done yet. `docker-compose.dev.yml` also publishes service ports for local debugging, where those routes have no check at all.
+- **Static internal token.** test-management reads answer keys with one shared secret (`INTERNAL_SERVICE_TOKEN`) rather than per-service identity or mTLS, and the Compose default is a development value; set a long random value outside local development. `docker-compose.dev.yml` publishes service ports for local debugging, where a caller who knows that value is not subject to the gateway's header filtering.
 - **Trainer scope is broad for listings.** A trainer can list every submission (`GET /submissions/` without `user_id`), any user's submissions, and tests by any creator; changes and reviews are limited to the tests they manage.
 - **Legacy tests** with no recorded creator can be managed by any trainer.
 - **Shared HS256 secret.** The gateway, frontend and services verify tokens with the same `JWT_SECRET`; asymmetric signing would let services verify without holding a signing key.

@@ -79,8 +79,13 @@ def add_user_context_headers(headers: dict, user_context: Dict[str, str]) -> dic
 
     Any client-supplied X-User-* header is dropped first (header names are
     case-insensitive), so only the identity from the verified token is forwarded.
+    X-Internal-* headers are dropped too: they are for service-to-service calls
+    inside the network, never for requests arriving through the gateway.
     """
-    headers_copy = {k: v for k, v in headers.items() if not k.lower().startswith("x-user-")}
+    headers_copy = {
+        k: v for k, v in headers.items()
+        if not k.lower().startswith(("x-user-", "x-internal-"))
+    }
     headers_copy["X-User-Id"] = str(user_context.get("user_id") or "")
     headers_copy["X-User-Email"] = str(user_context.get("email") or "")
     headers_copy["X-User-Role"] = str(user_context.get("role") or "")

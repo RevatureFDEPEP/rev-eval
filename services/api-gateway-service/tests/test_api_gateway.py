@@ -63,6 +63,14 @@ class TestAddUserContextHeaders:
         assert result["X-User-Role"] == "TRAINER"
         assert result["content-type"] == "application/json"
 
+    def test_drops_client_supplied_internal_headers(self):
+        result = add_user_context_headers(
+            {"X-Internal-Service-Token": "guess", "x-internal-anything": "x", "accept": "*/*"},
+            {"user_id": "7", "email": "p@test.com", "role": "PARTICIPANT"},
+        )
+        assert not any(k.lower().startswith("x-internal-") for k in result)
+        assert result["accept"] == "*/*"
+
     def test_does_not_mutate_original_dict(self):
         original = {"a": "1"}
         add_user_context_headers(original, {"user_id": "1", "email": "", "role": ""})

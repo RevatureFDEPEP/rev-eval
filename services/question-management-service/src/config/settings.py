@@ -22,6 +22,10 @@ class Settings(BaseSettings):
 
     JWT_SECRET: str = "change-me-in-production"
 
+    # Shared secret that test-management-service sends in X-Internal-Service-Token
+    # to read answer keys for scoring. Unset: no caller is treated as internal.
+    INTERNAL_SERVICE_TOKEN: Optional[str] = None
+
     # Service Configuration
     ALLOW_ORIGINS: str = "*"
     SERVICE_NAME: str
