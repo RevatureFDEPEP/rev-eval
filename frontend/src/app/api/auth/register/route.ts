@@ -5,7 +5,7 @@ import { AUTH_COOKIE } from '@/lib/session';
 const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://api-gateway:8000';
 
 export async function POST(request: NextRequest) {
-  let body: { email?: string; password?: string; full_name?: string; role?: string };
+  let body: { email?: string; password?: string; full_name?: string };
   try {
     body = await request.json();
   } catch {
@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
     body: JSON.stringify({
       email: body.email,
       password: body.password,
+      // No role: public registration always creates a participant.
       full_name: body.full_name,
-      role: body.role,
     }),
   });
 

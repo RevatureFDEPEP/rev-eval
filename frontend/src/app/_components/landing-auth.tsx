@@ -12,7 +12,6 @@ export function LandingAuth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState<'PARTICIPANT' | 'TRAINER'>('PARTICIPANT');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,7 +23,7 @@ export function LandingAuth() {
       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
       const body = mode === 'login'
         ? { email, password }
-        : { email, password, full_name: fullName || undefined, role };
+        : { email, password, full_name: fullName || undefined };
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -105,18 +104,9 @@ export function LandingAuth() {
             )}
           </div>
           {mode === 'register' && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="role">Role</label>
-              <select
-                id="role"
-                value={role}
-                onChange={(e) => setRole(e.target.value as 'PARTICIPANT' | 'TRAINER')}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              >
-                <option value="PARTICIPANT">Participant</option>
-                <option value="TRAINER">Trainer</option>
-              </select>
-            </div>
+            <p className="text-xs text-gray-500">
+              New accounts are participant accounts. Trainer accounts are set up by your program team.
+            </p>
           )}
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button type="submit" className="w-full" disabled={submitting}>

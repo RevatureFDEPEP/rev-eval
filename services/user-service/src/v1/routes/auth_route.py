@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.db.session import get_db
-from src.models.user import User
+from src.models.user import User, UserRole
 from src.schemas.auth_schema import (
     AuthResponse,
     LoginRequest,
@@ -27,6 +27,14 @@ def _issue_token(user: User) -> str:
 
 @router.post("/auth/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 def register(request: RegisterRequest, db: Session = Depends(get_db)):
+    # Self-registration is unauthenticated, so it can never grant privilege:
+    # it always creates a PARTICIPANT. Trainer accounts are provisioned through
+    # a trusted path (the seed script or a direct database insert).
+    if request.role is not None and request.role != UserRole.PARTICIPANT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Public registration creates participant accounts only",
+        )
     if AuthService.get_user_by_email(db, request.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -38,7 +46,7 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
         email=request.email,
         password=request.password,
         full_name=request.full_name,
-        role=request.role,
+        role=UserRole.PARTICIPANT,
     )
     return AuthResponse(
         access_token=_issue_token(user),

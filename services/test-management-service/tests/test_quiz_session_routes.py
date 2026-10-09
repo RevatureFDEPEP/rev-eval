@@ -22,6 +22,8 @@ os.environ.setdefault("SERVICE_HOSTNAME", "test-management-service")
 import asyncio
 from unittest.mock import patch, AsyncMock
 
+import pytest
+
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -33,7 +35,7 @@ from src.models.skill import Skill  # noqa: F401
 from src.models.test_skill import TestSkill  # noqa: F401
 from src.models.test_submission import TestSubmission  # noqa: F401
 from src.models.quiz_session import QuizSession  # noqa: F401 — must import before create_all
-from src.utils.dependencies import get_current_user_from_headers
+from src.utils.dependencies import get_current_user
 
 TestingAsyncSession = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
@@ -54,15 +56,54 @@ async def override_get_db():
 
 FAKE_TRAINER = {"id": 1, "email": "qs-trainer@test.com", "role": "TRAINER"}
 
+# The authenticated caller for the request being made. Tests switch it with
+# _act_as so the trainer sets up tests and submissions and the participant who
+# owns a submission takes the quiz, as in the real workflow.
+_CALLER = {"user": FAKE_TRAINER}
+
 
 async def override_get_current_user():
-    return FAKE_TRAINER
+    return _CALLER["user"]
+
+
+def _act_as(user):
+    _CALLER["user"] = user
+
+
+def _participant(user_id):
+    return {"id": user_id, "email": f"p{user_id}@test.com", "role": "PARTICIPANT"}
 
 
 app.dependency_overrides[get_db] = override_get_db
-app.dependency_overrides[get_current_user_from_headers] = override_get_current_user
+app.dependency_overrides[get_current_user] = override_get_current_user
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _identity(request):
+    """Install this module's overrides for each test and start as the class's
+    session owner (or the trainer when the class has none)."""
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
+    owner = getattr(request.cls, "owner", None)
+    _act_as(_participant(owner) if owner else FAKE_TRAINER)
+    yield
+
+
+def _new_session(user_id, **extra):
+    """Assign TEST_ID to user_id as the trainer, then start the quiz as that
+    participant. Leaves the caller set to the participant."""
+    app.dependency_overrides[get_current_user] = override_get_current_user
+    _act_as(FAKE_TRAINER)
+    sub = client.post("/v1/api/submissions/", json={"test_id": TEST_ID, "user_id": user_id})
+    assert sub.status_code == 201, sub.text
+    _act_as(_participant(user_id))
+    resp = client.post("/v1/api/test-sessions/", json={
+        "test_id": TEST_ID, "submission_id": sub.json()["id"], "user_id": user_id, **extra,
+    })
+    assert resp.status_code == 201, resp.text
+    return resp.json()
 
 # ---------------------------------------------------------------------------
 # Fixture helpers
@@ -121,29 +162,16 @@ TEST_ID = _test_resp.json()["id"]
 
 class TestQuizSessionCreate:
     def test_create_session_returns_201(self):
-        resp = client.post("/v1/api/test-sessions/", json={
-            "test_id": TEST_ID,
-            "submission_id": 1001,
-            "user_id": 42,
-        })
-        assert resp.status_code == 201
-        body = resp.json()
+        body = _new_session(42)
         assert body["test_id"] == TEST_ID
-        assert body["submission_id"] == 1001
+        assert body["submission_id"] is not None
         assert body["user_id"] == 42
         assert body["status"] == "STARTED"
         assert "id" in body
 
     def test_create_session_with_custom_config(self):
-        resp = client.post("/v1/api/test-sessions/", json={
-            "test_id": TEST_ID,
-            "submission_id": 1002,
-            "user_id": 43,
-            "total_questions": 15,
-            "part_a_config": {"easy": 5, "medium": 5, "hard": 5},
-        })
-        assert resp.status_code == 201
-        assert resp.json()["total_questions"] == 15
+        body = _new_session(43, total_questions=15, part_a_config={"easy": 5, "medium": 5, "hard": 5})
+        assert body["total_questions"] == 15
 
 
 # ---------------------------------------------------------------------------
@@ -151,16 +179,13 @@ class TestQuizSessionCreate:
 # ---------------------------------------------------------------------------
 
 class TestQuizSessionGet:
+    owner = 50
 
     @classmethod
     def setup_class(cls):
-        resp = client.post("/v1/api/test-sessions/", json={
-            "test_id": TEST_ID,
-            "submission_id": 2001,
-            "user_id": 50,
-        })
-        assert resp.status_code == 201
-        cls.session_id = resp.json()["id"]
+        session = _new_session(cls.owner)
+        cls.session_id = session["id"]
+        cls.submission_id = session["submission_id"]
 
     def test_get_session_by_id(self):
         resp = client.get(f"/v1/api/test-sessions/{self.session_id}")
@@ -174,9 +199,9 @@ class TestQuizSessionGet:
         assert resp.status_code == 404
 
     def test_get_session_by_submission(self):
-        resp = client.get("/v1/api/test-sessions/by-submission/2001")
+        resp = client.get(f"/v1/api/test-sessions/by-submission/{self.submission_id}")
         assert resp.status_code == 200
-        assert resp.json()["submission_id"] == 2001
+        assert resp.json()["submission_id"] == self.submission_id
 
     def test_get_session_by_submission_not_found(self):
         resp = client.get("/v1/api/test-sessions/by-submission/99999")
@@ -200,16 +225,11 @@ class TestQuizSessionGet:
 # ---------------------------------------------------------------------------
 
 class TestQuizSessionPartA:
+    owner = 60
 
     @classmethod
     def setup_class(cls):
-        resp = client.post("/v1/api/test-sessions/", json={
-            "test_id": TEST_ID,
-            "submission_id": 3001,
-            "user_id": 60,
-        })
-        assert resp.status_code == 201
-        cls.session_id = resp.json()["id"]
+        cls.session_id = _new_session(cls.owner)["id"]
 
     def test_get_part_a_questions(self):
         with patch(
@@ -282,12 +302,7 @@ class TestQuizSessionPartA:
     def test_submit_part_a_idempotency_replay(self):
         """Same Idempotency-Key on a fresh session returns cached response."""
         # Create new session for this test
-        s_resp = client.post("/v1/api/test-sessions/", json={
-            "test_id": TEST_ID,
-            "submission_id": 3002,
-            "user_id": 61,
-        })
-        sid = s_resp.json()["id"]
+        sid = _new_session(61)["id"]
 
         with patch(
             "src.services.quiz_session_service.fetch_questions_for_part",
@@ -323,17 +338,12 @@ class TestQuizSessionPartA:
 # ---------------------------------------------------------------------------
 
 class TestQuizSessionPartB:
+    owner = 70
 
     @classmethod
     def setup_class(cls):
         # Create session + complete part A
-        s_resp = client.post("/v1/api/test-sessions/", json={
-            "test_id": TEST_ID,
-            "submission_id": 4001,
-            "user_id": 70,
-        })
-        assert s_resp.status_code == 201
-        cls.session_id = s_resp.json()["id"]
+        cls.session_id = _new_session(cls.owner)["id"]
 
         with patch(
             "src.services.quiz_session_service.fetch_questions_for_part",
@@ -373,12 +383,7 @@ class TestQuizSessionPartB:
 
     def test_get_part_b_questions_not_available_before_part_a_complete(self):
         """Accessing Part B questions on a new (STARTED) session returns 409."""
-        s_resp = client.post("/v1/api/test-sessions/", json={
-            "test_id": TEST_ID,
-            "submission_id": 4002,
-            "user_id": 71,
-        })
-        sid = s_resp.json()["id"]
+        sid = _new_session(71)["id"]
         resp = client.get(f"/v1/api/test-sessions/{sid}/part-b/questions")
         assert resp.status_code == 409
 
@@ -412,12 +417,7 @@ class TestQuizSessionPartB:
     def test_submit_part_b_idempotency_replay(self):
         """Same Idempotency-Key on completed Part B returns cached response."""
         # Create a new session and advance to part B
-        s_resp = client.post("/v1/api/test-sessions/", json={
-            "test_id": TEST_ID,
-            "submission_id": 4003,
-            "user_id": 72,
-        })
-        sid = s_resp.json()["id"]
+        sid = _new_session(72)["id"]
 
         with patch(
             "src.services.quiz_session_service.fetch_questions_for_part",
@@ -463,12 +463,7 @@ class TestQuizSessionPartB:
 class TestQuizSessionEdgeCases:
 
     def test_submit_part_a_without_fetching_questions_returns_409(self):
-        s_resp = client.post("/v1/api/test-sessions/", json={
-            "test_id": TEST_ID,
-            "submission_id": 5001,
-            "user_id": 80,
-        })
-        sid = s_resp.json()["id"]
+        sid = _new_session(80)["id"]
 
         # Manually advance status to PART_A_IN_PROGRESS by calling get_part_a_questions
         # but DON'T store questions — simulate the guard by calling submit directly on STARTED
