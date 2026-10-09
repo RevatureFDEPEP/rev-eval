@@ -20,6 +20,20 @@ It also exposes `GET /health`.
 - **Current user:** `/auth/me` and `/users/me` read the Bearer token, verify it and return the user; an invalid or expired token, or an inactive user, gets 401.
 - **Invitations** create an inactive user with no password; login is refused for that account.
 
+## Who can call what
+
+Every `/users/*` route resolves the caller from the signed Bearer JWT, not from forwarded `X-User-*` headers. A missing or invalid token, or an inactive account, gets 401; a forbidden request gets 403 and changes nothing.
+
+| Route | Participant | Trainer |
+|-------|-------------|---------|
+| `GET /users/me` | own record | own record |
+| `GET /users/{user_id}`, `GET /users/by-email/{email}` | own record only | any user |
+| `GET /users/` | 403 | allowed |
+| `POST /users/invite` | 403 | participant accounts only |
+| `PATCH /users/{user_id}` | own first and last name only | own first and last name only |
+
+No one can change an account's email, role or active status through the API. test-management-service calls these routes with the caller's own forwarded token, so the same rules apply to it.
+
 ## Run and test
 
 It starts with the rest of the stack from the repository root (`docker compose up --build`); see the [root README](../../README.md). Configuration is read from environment variables: `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET` (must match the gateway's), `JWT_ALGORITHM`, `JWT_EXPIRY_MINUTES` and `ALLOW_ORIGINS`.
