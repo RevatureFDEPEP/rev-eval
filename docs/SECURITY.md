@@ -28,7 +28,7 @@ Traffic inside the Compose network (Nginx to frontend and gateway, gateway to se
 - **user-service** hashes passwords with bcrypt and issues HS256 JWTs (`sub`, `email`, `role`, `exp`; lifetime `JWT_EXPIRY_MINUTES`, default 60).
 - **httpOnly cookie via the BFF.** The Next.js login route stores the token in an httpOnly, `SameSite=Lax` cookie (`Secure` when `NODE_ENV=production`). The BFF proxy reads it server-side and sends `Authorization: Bearer`; browser JavaScript never sees the token.
 - **Frontend middleware** (`frontend/src/middleware.ts`) verifies the cookie's JWT signature with `jose` before serving protected pages and routes by role (`/trainer/*`, `/participant/*`).
-- **API gateway** (`services/api-gateway-service/src/middleware/auth.py`) verifies the JWT signature and expiry on every request except `/v1/api/auth/login` and `/v1/api/auth/register`, and rejects missing, malformed or expired tokens with `401`.
+- **API gateway** (`services/api-gateway-service/src/middleware/auth.py`) verifies the JWT signature and expiry on every request except `/v1/api/auth/login` and `/v1/api/auth/register`, and rejects missing, malformed or expired tokens with `401`. It forwards the verified identity but applies no role policy itself; role and ownership rules are enforced in the services below.
 - **Registration** (`/v1/api/auth/register`) is public, so it never grants privilege: it always stores a `PARTICIPANT`, and a request for any other role is refused with `403` and creates nothing. Trainer accounts are provisioned through a trusted path (`seed_db.py`, or a direct database insert).
 
 ### Authorization (inside the services)
