@@ -8,7 +8,8 @@ from sqlalchemy.pool import StaticPool
 from main import app
 from src.db.session import get_db
 from src.db.init_db import Base
-from src.models.user import User  # noqa: F401 — registers User table with Base so create_all knows about it
+from src.models.user import User, UserRole  # registers User table with Base so create_all knows about it
+from src.services.auth_service import AuthService
 
 # Route handlers use sync Session (db.query/db.add/db.commit), so we must keep a sync
 # engine here. sqlite+aiosqlite requires AsyncSession which is incompatible with those
@@ -56,13 +57,50 @@ class TestAuth:
         # so email lives one level deeper inside "user"
         assert response.json()["user"]["email"] == "test@example.com"
 
+    async def test_register_without_role_stores_participant(self, client):
+        response = await client.post("/v1/api/auth/register", json={
+            "email": "norole@example.com",
+            "password": "SecurePass123!",
+        })
+        assert response.status_code == 201
+        assert response.json()["user"]["role"] == "PARTICIPANT"
+        assert _stored_role("norole@example.com") == "PARTICIPANT"
+
+    async def test_register_as_trainer_is_refused_and_creates_nothing(self, client):
+        before = _count_users()
+        response = await client.post("/v1/api/auth/register", json={
+            "email": "wannabe-trainer@example.com",
+            "password": "SecurePass123!",
+            "role": "TRAINER",
+        })
+        assert response.status_code == 403
+        assert "participant" in response.json()["detail"].lower()
+        assert _count_users() == before
+        assert _stored_role("wannabe-trainer@example.com") is None
+
+    async def test_register_trainer_attempt_cannot_be_used_to_log_in_as_trainer(self, client):
+        await client.post("/v1/api/auth/register", json={
+            "email": "sneaky@example.com", "password": "SecurePass123!", "role": "TRAINER",
+        })
+        login = await client.post("/v1/api/auth/login", json={
+            "email": "sneaky@example.com", "password": "SecurePass123!",
+        })
+        assert login.status_code == 401
+
+    async def test_register_with_unknown_role_is_422(self, client):
+        response = await client.post("/v1/api/auth/register", json={
+            "email": "badrole@example.com", "password": "SecurePass123!", "role": "ADMIN",
+        })
+        assert response.status_code == 422
+        assert _stored_role("badrole@example.com") is None
+
     async def test_register_duplicate_email(self, client):
         # First registration succeeds
         await client.post("/v1/api/auth/register", json={
             "email": "dup@example.com",
             "password": "Pass123!",
             "full_name": "User 1",
-            "role": "TRAINER"
+            "role": "PARTICIPANT"
         })
         # Same email again must be rejected with 400
         response = await client.post("/v1/api/auth/register", json={
@@ -107,17 +145,44 @@ class TestAuth:
         assert "incorrect" in response.json()["detail"].lower()
 
 
+def _provision_trainer(email):
+    """Create a trainer the trusted way (a direct insert, as the seed script
+    does) and return (id, auth headers). Public registration cannot make one."""
+    db = TestingSessionLocal()
+    try:
+        user = AuthService.create_user(
+            db, email=email, password="Pass123!", full_name="Test Trainer", role=UserRole.TRAINER
+        )
+        token = AuthService.create_access_token(
+            data={"sub": str(user.id), "email": user.email, "role": user.role.value}
+        )
+        return user.id, {"Authorization": f"Bearer {token}"}
+    finally:
+        db.close()
+
+
 async def _register(client, email, role="PARTICIPANT"):
-    """Register a user and return (id, auth headers carrying their own token)."""
+    """Return (id, auth headers carrying the user's own token). Participants
+    sign up through public registration; trainers are provisioned directly."""
+    if role == "TRAINER":
+        return _provision_trainer(email)
     resp = await client.post("/v1/api/auth/register", json={
         "email": email,
         "password": "Pass123!",
         "full_name": "Test User",
-        "role": role,
     })
     assert resp.status_code in (200, 201), resp.text
     body = resp.json()
     return body["user"]["id"], {"Authorization": f"Bearer {body['access_token']}"}
+
+
+def _stored_role(email):
+    db = TestingSessionLocal()
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        return user.role.value if user else None
+    finally:
+        db.close()
 
 
 def _snapshot(user_id):

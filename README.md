@@ -10,7 +10,7 @@ The `kalabek` integration branch contains Kalabe Kebede's implemented Rev-Eval c
 
 - **Microservices behind one edge**: Nginx terminates TLS in front of a Next.js BFF and a FastAPI API gateway that routes to four domain services
 - **Correct scoring under retries and races**: row-level locking (`SELECT ... FOR UPDATE`) plus SHA-256-hashed idempotency keys, tested against real PostgreSQL
-- **Layered authentication and authorization**: JWT in an httpOnly cookie, verified in the Next.js middleware and at the gateway, with role and ownership checks inside the services
+- **Layered authentication and authorization**: JWT in an httpOnly cookie, verified in the Next.js middleware and at the gateway; user-service and test-management verify it again and enforce role and ownership rules from it
 - **Polyglot persistence**: PostgreSQL for users, tests and sessions; MongoDB for the question bank; MinIO object storage through presigned URLs
 - **Reporting and analytics**: per-test reports, aggregates, per-question statistics, rankings and attempt history from a dedicated service
 - **CI/CD quality gates**: per-service lint, tests and an 80 % diff-coverage gate, Trivy scans, a zero-warning frontend build and build-provenance attestation
@@ -68,7 +68,8 @@ The system is grouped into four zones: **public** (browsers), the **Nginx edge**
 - **TLS at the edge**: Nginx terminates TLS 1.2/1.3, redirects HTTP to HTTPS, and is the only container publishing host ports in the base stack.
 - **JWT verification in depth**: the gateway verifies every token except on login and registration; the Next.js middleware verifies the session JWT before serving protected pages; question-management and reporting verify it again.
 - **httpOnly cookie through a BFF**: the token lives in an httpOnly cookie and is attached server-side as a Bearer header.
-- **Service-level RBAC**: `TRAINER` / `PARTICIPANT` role and ownership checks run inside the services, not only at the gateway.
+- **Service-level authorization**: user-service and test-management resolve the caller from their own verified JWT and enforce `TRAINER` / `PARTICIPANT` role and ownership rules: participants reach only their own account, submissions and quiz sessions, and trainers manage only the tests they created.
+- **Participant-only sign-up**: public registration always creates a participant; trainer accounts are provisioned through the seed script, not the API.
 - **Trusted identity forwarding**: the gateway drops client-supplied `X-User-*` headers, sets them from the verified token, and adds an `X-Request-Id`.
 - **Edge hardening**: rate limiting on `/v1/api/`, plus HSTS, `X-Frame-Options`, `X-Content-Type-Options` and `Referrer-Policy` headers.
 - **Supply-chain checks**: a Trivy scan of every service in CI and build-provenance attestation for the frontend.

@@ -13,7 +13,10 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)
     full_name: Optional[str] = None
-    role: Optional[UserRole] = UserRole.PARTICIPANT
+    # Public registration only creates participants. The field is accepted so a
+    # client that sends PARTICIPANT keeps working; any other value is refused
+    # in the route rather than silently ignored.
+    role: Optional[UserRole] = None
 
 
 class UserResponse(BaseModel):

@@ -10,7 +10,18 @@ A FastAPI service on port **8001** and the core of the assessment workflow: test
 | Skills | `/skills` |
 | Assignment and review | `/submissions` (bulk assign, graded, evaluated, trainer review) |
 | Timed sessions | `/test-sessions` (create, status, Part A and Part B questions, draft autosave, submit) |
-| Dashboards | `/dashboard/trainer/*`, `/dashboard/participant/*` |
+
+`src/v1/routes/dashboard_route.py` is not mounted (its handlers are commented out), so `/dashboard/*` returns `404`.
+
+## Who can call what
+
+Every route needs the caller's own Bearer JWT, which this service verifies and resolves through user-service; `X-User-*` headers are not used for identity.
+
+- **Trainers** create tests and manage (update, delete, assign, review, grade) the tests they created.
+- **Participants** read only the tests assigned to them and their own submissions, and start, answer, autosave and submit only their own quiz sessions.
+- The skill catalogue is readable by any signed-in user and changed only by trainers.
+
+Rules live in `src/utils/authorization.py`; `tests/test_authorization.py` covers them, including that refused writes leave the database unchanged. Details: [SECURITY.md](../../docs/SECURITY.md).
 
 ## How scoring and submission behave
 

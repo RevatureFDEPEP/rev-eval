@@ -23,14 +23,13 @@ const PARTICIPANT = {
   email: `e2e_participant_${Date.now()}@test.com`,
   password: "E2eTestPass123!",
   full_name: "E2E Participant",
-  role: "PARTICIPANT",
 };
 
+// Public registration only creates participants, so the trainer is a seeded
+// account (test-management's seed_db.py inserts it directly at startup).
 const TRAINER = {
-  email: `e2e_trainer_${Date.now()}@test.com`,
-  password: "E2eTrainerPass123!",
-  full_name: "E2E Trainer",
-  role: "TRAINER",
+  email: process.env.E2E_TRAINER_EMAIL || "trainer1@revature.com",
+  password: process.env.E2E_TRAINER_PASSWORD || "password123",
 };
 
 let trainerToken: string;
@@ -38,7 +37,7 @@ let testId: number;
 let submissionId: number;
 
 // ---------------------------------------------------------------------------
-// Setup: register users + create + assign a test via API
+// Setup: register the participant, sign in the seeded trainer, create + assign a test via API
 // ---------------------------------------------------------------------------
 
 test.beforeAll(async () => {
@@ -50,8 +49,11 @@ test.beforeAll(async () => {
     throw new Error(`Participant register failed: ${await pResp.text()}`);
   }
 
-  // Register trainer and get token
-  const tResp = await api.post("/v1/api/auth/register", { data: TRAINER });
+  // Sign in as the seeded trainer
+  const tResp = await api.post("/v1/api/auth/login", { data: TRAINER });
+  if (tResp.status() !== 200) {
+    throw new Error(`Trainer login failed: ${await tResp.text()}`);
+  }
   const tBody = await tResp.json();
   trainerToken = tBody.access_token;
 

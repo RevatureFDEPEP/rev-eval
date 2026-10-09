@@ -1,15 +1,17 @@
 """
 FastAPI dependencies for test-management-service.
 
-Two auth layers:
-  1. verify_jwt / require_role  — service-level JWT decode (defense-in-depth;
-     catches requests that bypass the gateway entirely).
-  2. get_current_user_from_headers — gateway-injected X-User-* header lookup
-     used when a full user record is needed (e.g. DB cross-reference).
+Identity comes only from the caller's own Bearer JWT:
+  1. verify_jwt checks the signature and expiry here, so a request that skips
+     the gateway (for example on a published development port) is still
+     authenticated.
+  2. get_current_user loads the token subject's record from user-service,
+     forwarding the same token, so the role is the stored one and inactive
+     users are refused. X-User-* headers are never trusted for identity.
 
-user-service authorizes every /users/* call from the caller's own signed
-Bearer JWT, so calls to it forward the Authorization header this service
-received (user_service_headers) instead of calling anonymously.
+get_current_trainer / get_current_participant add the role requirement.
+Record-level rules (which test, submission or session) live in
+src/utils/authorization.py.
 """
 import os
 import time
@@ -75,30 +77,19 @@ def user_service_headers(authorization: Optional[str]) -> Dict[str, str]:
     return {}
 
 
-async def get_current_user_from_headers(
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
-    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
-    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+async def get_current_user(
+    payload: Dict[str, Any] = Depends(verify_jwt),
     authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> Dict[str, Any]:
     """
-    Resolve the authenticated user from gateway-supplied headers.
+    Resolve the caller from their verified Bearer JWT.
 
-    Prefers X-User-Id (database PK) for lookup; falls back to X-User-Email
-    when only the email header is present.
+    The token subject is looked up in user-service with the caller's own token,
+    which user-service verifies again; a missing or inactive user is a 401.
     """
-    if not x_user_id and not x_user_email:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing authentication headers (X-User-Id or X-User-Email)",
-        )
-
+    subject = str(payload["sub"])
     user_service_url = os.getenv("USER_SERVICE_URL", "http://user-service:8002")
-
-    if x_user_id:
-        endpoint = f"{user_service_url}/v1/api/users/{x_user_id}"
-    else:
-        endpoint = f"{user_service_url}/v1/api/users/by-email/{x_user_email}"
+    endpoint = f"{user_service_url}/v1/api/users/{subject}"
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -110,7 +101,13 @@ async def get_current_user_from_headers(
         )
 
     if response.status_code == 200:
-        return response.json()
+        user = response.json()
+        if str(user.get("id")) != subject:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="user-service returned a different user than the token subject",
+            )
+        return user
     if response.status_code == 404:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -128,7 +125,7 @@ async def get_current_user_from_headers(
 
 
 async def get_current_trainer(
-    current_user: Dict = Depends(get_current_user_from_headers),
+    current_user: Dict = Depends(get_current_user),
 ) -> Dict:
     """Require the current user to have TRAINER role."""
     if (current_user.get("role") or "").upper() != "TRAINER":
@@ -140,7 +137,7 @@ async def get_current_trainer(
 
 
 async def get_current_participant(
-    current_user: Dict = Depends(get_current_user_from_headers),
+    current_user: Dict = Depends(get_current_user),
 ) -> Dict:
     """Require the current user to have PARTICIPANT role."""
     if (current_user.get("role") or "").upper() != "PARTICIPANT":

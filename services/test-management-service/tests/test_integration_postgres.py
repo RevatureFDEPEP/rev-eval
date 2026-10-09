@@ -47,7 +47,7 @@ from src.models.skill import Skill  # noqa: E402, F401
 from src.models.test_skill import TestSkill  # noqa: E402, F401
 from src.models.test_submission import TestSubmission  # noqa: E402, F401
 from src.models.quiz_session import QuizSession, SessionStatus  # noqa: E402, F401
-from src.utils.dependencies import get_current_user_from_headers  # noqa: E402
+from src.utils.dependencies import get_current_user  # noqa: E402
 
 _PG_URL = "postgresql+asyncpg://test:test@localhost:5432/test"
 
@@ -87,8 +87,13 @@ async def _pg_get_db():
         yield db
 
 
+# The trainer sets up the test and the assignment; participant 100 takes it.
+PARTICIPANT_100 = {"id": 100, "email": "pg-participant@test.com", "role": "PARTICIPANT"}
+_CALLER = {"user": FAKE_TRAINER}
+
+
 async def _fake_user():
-    return FAKE_TRAINER
+    return _CALLER["user"]
 
 
 class TestQuizSessionLifecyclePostgres:
@@ -111,10 +116,11 @@ class TestQuizSessionLifecyclePostgres:
 
         # Save current overrides so teardown_class can restore them.
         cls._prev_db = app.dependency_overrides.get(get_db)
-        cls._prev_user = app.dependency_overrides.get(get_current_user_from_headers)
+        cls._prev_user = app.dependency_overrides.get(get_current_user)
 
         app.dependency_overrides[get_db] = _pg_get_db
-        app.dependency_overrides[get_current_user_from_headers] = _fake_user
+        app.dependency_overrides[get_current_user] = _fake_user
+        _CALLER["user"] = FAKE_TRAINER
         cls.client = TestClient(app)
 
     @classmethod
@@ -133,9 +139,9 @@ class TestQuizSessionLifecyclePostgres:
             app.dependency_overrides.pop(get_db, None)
 
         if cls._prev_user is not None:
-            app.dependency_overrides[get_current_user_from_headers] = cls._prev_user
+            app.dependency_overrides[get_current_user] = cls._prev_user
         else:
-            app.dependency_overrides.pop(get_current_user_from_headers, None)
+            app.dependency_overrides.pop(get_current_user, None)
 
     # ------------------------------------------------------------------
     # Step 1: create test + submission
@@ -166,6 +172,19 @@ class TestQuizSessionLifecyclePostgres:
     # ------------------------------------------------------------------
 
     def test_03_create_session_status_started(self):
+        # Another participant cannot start a session on this submission, and
+        # the refusal writes nothing.
+        _CALLER["user"] = {"id": 101, "email": "other@test.com", "role": "PARTICIPANT"}
+        denied = self.client.post(
+            "/v1/api/test-sessions/",
+            json={"test_id": self.test_id, "submission_id": self.submission_id, "user_id": 101},
+        )
+        assert denied.status_code == 403, denied.text
+        _CALLER["user"] = PARTICIPANT_100
+        assert self.client.get(
+            f"/v1/api/test-sessions/by-submission/{self.submission_id}"
+        ).status_code == 404
+
         resp = self.client.post(
             "/v1/api/test-sessions/",
             json={
@@ -277,9 +296,10 @@ class TestCrudPostgres:
 
         asyncio.run(_bootstrap())
         cls._prev_db = app.dependency_overrides.get(get_db)
-        cls._prev_user = app.dependency_overrides.get(get_current_user_from_headers)
+        cls._prev_user = app.dependency_overrides.get(get_current_user)
         app.dependency_overrides[get_db] = _pg_get_db
-        app.dependency_overrides[get_current_user_from_headers] = _fake_user
+        app.dependency_overrides[get_current_user] = _fake_user
+        _CALLER["user"] = FAKE_TRAINER
         cls.client = TestClient(app)
 
     @classmethod
@@ -289,9 +309,9 @@ class TestCrudPostgres:
         else:
             app.dependency_overrides.pop(get_db, None)
         if cls._prev_user is not None:
-            app.dependency_overrides[get_current_user_from_headers] = cls._prev_user
+            app.dependency_overrides[get_current_user] = cls._prev_user
         else:
-            app.dependency_overrides.pop(get_current_user_from_headers, None)
+            app.dependency_overrides.pop(get_current_user, None)
 
     def test_skill_crud_postgres(self):
         resp = self.client.post(

@@ -1,0 +1,4 @@
+[run]
+# Async SQLAlchemy resumes route code inside greenlets; without this,
+# coverage misses every line that runs after an awaited database call.
+concurrency = greenlet, thread
