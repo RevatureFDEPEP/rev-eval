@@ -6,6 +6,10 @@ Two auth layers:
      catches requests that bypass the gateway entirely).
   2. get_current_user_from_headers — gateway-injected X-User-* header lookup
      used when a full user record is needed (e.g. DB cross-reference).
+
+user-service authorizes every /users/* call from the caller's own signed
+Bearer JWT, so calls to it forward the Authorization header this service
+received (user_service_headers) instead of calling anonymously.
 """
 import os
 import time
@@ -64,10 +68,18 @@ def require_role(role: str) -> Callable:
     return _dependency
 
 
+def user_service_headers(authorization: Optional[str]) -> Dict[str, str]:
+    """Headers that carry the caller's own Bearer token to user-service."""
+    if isinstance(authorization, str) and authorization.lower().startswith("bearer "):
+        return {"Authorization": authorization}
+    return {}
+
+
 async def get_current_user_from_headers(
     x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
     x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
     x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> Dict[str, Any]:
     """
     Resolve the authenticated user from gateway-supplied headers.
@@ -90,7 +102,7 @@ async def get_current_user_from_headers(
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(endpoint)
+            response = await client.get(endpoint, headers=user_service_headers(authorization))
     except httpx.RequestError as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -103,6 +115,11 @@ async def get_current_user_from_headers(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authenticated user not found in user-service",
+        )
+    if response.status_code in (401, 403):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="user-service did not accept the caller's credentials",
         )
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

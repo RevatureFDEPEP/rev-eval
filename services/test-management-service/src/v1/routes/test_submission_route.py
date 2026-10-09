@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from typing import List, Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.services.test_submission_service import TestSubmissionService
@@ -74,7 +74,8 @@ async def delete_submission(submission_id: int, db: AsyncSession = Depends(get_d
 async def bulk_assign_test(
     request: BulkAssignRequest,
     current_user: Dict = Depends(get_current_user_from_headers),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
 ):
     """
     Bulk assign a test to multiple participants by email.
@@ -82,7 +83,7 @@ async def bulk_assign_test(
     The assigned_by_id is automatically extracted from gateway headers and resolved via user-service.
     """
     try:
-        return await TestSubmissionService.bulk_assign_test(db, request, current_user)
+        return await TestSubmissionService.bulk_assign_test(db, request, current_user, auth_header=authorization)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -90,7 +91,8 @@ async def bulk_assign_test(
 @router.get("/trainer/evaluated", response_model=List[TestSubmissionOut])
 async def get_evaluated_submissions_for_trainer(
     current_user: Dict = Depends(get_current_user_from_headers),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
 ):
     """
     Get list of EVALUATED submissions for tests created by this trainer.
@@ -107,13 +109,14 @@ async def get_evaluated_submissions_for_trainer(
     if not trainer_id:
         raise HTTPException(status_code=401, detail="Invalid user")
 
-    return await TestSubmissionService.get_evaluated_submissions_for_trainer(db, trainer_id)
+    return await TestSubmissionService.get_evaluated_submissions_for_trainer(db, trainer_id, auth_header=authorization)
 
 
 @router.get("/trainer/all", response_model=List[TestSubmissionOut])
 async def get_all_submissions_for_trainer(
     current_user: Dict = Depends(get_current_user_from_headers),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
 ):
     """
     Get ALL submissions for tests created by this trainer across all statuses.
@@ -131,7 +134,7 @@ async def get_all_submissions_for_trainer(
     if not trainer_id:
         raise HTTPException(status_code=401, detail="Invalid user")
 
-    return await TestSubmissionService.get_all_submissions_for_trainer(db, trainer_id)
+    return await TestSubmissionService.get_all_submissions_for_trainer(db, trainer_id, auth_header=authorization)
 
 
 @router.get("/graded")

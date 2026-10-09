@@ -34,8 +34,8 @@ Traffic inside the Compose network (Nginx to frontend and gateway, gateway to se
 
 - **question-management-service**: create, update and delete re-verify the JWT and require `TRAINER`.
 - **reporting-and-analytics-service**: re-verifies the JWT on every report route; per-test, aggregate, per-question and ranking reports require `TRAINER`; a participant can read only their own summary and attempts.
-- **user-service**: `/me` routes verify the token and reject inactive users.
-- **test-management-service**: resolves the caller from the gateway-forwarded identity headers and applies role and ownership checks on tests and submissions (for example, a participant reading another user's data gets `403`).
+- **user-service**: every `/users/*` route resolves the caller from the signed Bearer JWT (not from `X-User-*` headers) and rejects inactive users with `401`. A participant can read only their own record (`/users/me`, their own id or email); listing users, reading others, inviting and patching other accounts require `TRAINER` or are refused with `403`. Trainers can read and list users and invite participant accounts only. `PATCH /users/{id}` changes only the caller's own name; nobody can change email, role or active status through the API.
+- **test-management-service**: resolves the caller from the gateway-forwarded identity headers and applies role and ownership checks on tests and submissions (for example, a participant reading another user's data gets `403`). Its calls to user-service forward the caller's own Bearer token, so user-service applies the same policy to them.
 
 ### Identity forwarding and tracing
 

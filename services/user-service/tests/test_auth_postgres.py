@@ -158,28 +158,39 @@ class TestAuthFlowPostgres:
         assert resp.status_code == 200, resp.text
         assert resp.json()["email"] == "pg_me@example.com"
 
-    def test_get_user_by_email_postgres(self):
-        self.client.post(
+    def _token(self, email: str, role: str) -> dict:
+        reg = self.client.post(
             "/v1/api/auth/register",
-            json={
-                "email": "pg_byemail@example.com",
-                "password": "Pass123!",
-                "full_name": "By Email PG",
-                "role": "PARTICIPANT",
-            },
+            json={"email": email, "password": "Pass123!", "full_name": "PG User", "role": role},
         )
-        resp = self.client.get("/v1/api/users/by-email/pg_byemail@example.com")
+        assert reg.status_code in (200, 201), reg.text
+        return {"Authorization": f"Bearer {reg.json()['access_token']}"}
+
+    def test_get_user_by_email_postgres(self):
+        me = self._token("pg_byemail@example.com", "PARTICIPANT")
+        resp = self.client.get("/v1/api/users/by-email/pg_byemail@example.com", headers=me)
         assert resp.status_code == 200
         assert resp.json()["email"] == "pg_byemail@example.com"
 
     def test_invite_then_login_fails_postgres(self):
         """Invited (inactive) users cannot log in — Postgres enforces same rules."""
-        self.client.post(
+        trainer = self._token("pg_trainer@example.com", "TRAINER")
+        invite = self.client.post(
             "/v1/api/users/invite",
             json={"email": "pg_invited@example.com"},
+            headers=trainer,
         )
+        assert invite.status_code == 201, invite.text
         resp = self.client.post(
             "/v1/api/auth/login",
             json={"email": "pg_invited@example.com", "password": "anypass"},
         )
         assert resp.status_code == 401
+
+    def test_participant_cannot_escalate_role_postgres(self):
+        """A denied self role change leaves the Postgres row unchanged."""
+        me = self._token("pg_escalate@example.com", "PARTICIPANT")
+        user_id = self.client.get("/v1/api/users/me", headers=me).json()["id"]
+        resp = self.client.patch(f"/v1/api/users/{user_id}", json={"role": "TRAINER"}, headers=me)
+        assert resp.status_code == 403
+        assert self.client.get("/v1/api/users/me", headers=me).json()["role"] == "PARTICIPANT"

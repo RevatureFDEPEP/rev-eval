@@ -472,6 +472,93 @@ class TestSubmissionsExtended:
 # Unit tests for src/utils/dependencies.py
 # ---------------------------------------------------------------------------
 
+def _recording_client(get_status=200, get_data=None, post_status=201, post_data=None):
+    """An httpx.AsyncClient stand-in that records the headers each call carries."""
+    seen = []
+
+    class _Client:
+        def __init__(self, **kwargs):
+            self._base = dict(kwargs.get("headers") or {})
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            pass
+
+        async def get(self, url, headers=None, **k):
+            seen.append(("GET", url, {**self._base, **(headers or {})}))
+            return _FakeResp(get_status, get_data or {})
+
+        async def post(self, url, headers=None, **k):
+            seen.append(("POST", url, {**self._base, **(headers or {})}))
+            return _FakeResp(post_status, post_data or {})
+
+    return _Client, seen
+
+
+class TestUserServiceTokenForwarding:
+    """user-service authorizes /users/* from the caller's own JWT, so every call
+    this service makes to it must carry the Authorization header it received."""
+
+    def test_user_service_headers_only_forwards_bearer(self):
+        from src.utils.dependencies import user_service_headers
+
+        assert user_service_headers("Bearer abc") == {"Authorization": "Bearer abc"}
+        assert user_service_headers(None) == {}
+        assert user_service_headers("Basic xyz") == {}
+
+    def test_identity_lookup_forwards_token(self):
+        from src.utils.dependencies import get_current_user_from_headers
+
+        Client, seen = _recording_client(get_data={"id": 1, "role": "PARTICIPANT"})
+
+        async def call():
+            with patch("httpx.AsyncClient", Client):
+                return await get_current_user_from_headers("1", None, None, "Bearer caller-token")
+
+        assert asyncio.run(call())["id"] == 1
+        assert seen and seen[0][2].get("Authorization") == "Bearer caller-token"
+
+    @pytest.mark.parametrize("status_code", [401, 403])
+    def test_identity_lookup_refused_by_user_service_is_401(self, status_code):
+        from fastapi import HTTPException
+        from src.utils.dependencies import get_current_user_from_headers
+
+        Client, _ = _recording_client(get_status=status_code)
+
+        async def call():
+            with patch("httpx.AsyncClient", Client):
+                return await get_current_user_from_headers("1", None, None, "Bearer t")
+
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(call())
+        assert exc.value.status_code == 401
+
+    def test_bulk_assign_forwards_token_to_lookup_and_invite(self):
+        test = client.post("/v1/api/tests/", json={"name": "FwdTest", "test_type": "QUIZ"}).json()
+        Client, seen = _recording_client(get_status=404, post_data={"id": 77, "email": "fwd@test.com"})
+        with patch("httpx.AsyncClient", Client):
+            resp = client.post(
+                "/v1/api/submissions/bulk-assign",
+                json={"test_id": test["id"], "participant_emails": ["fwd@test.com"]},
+                headers={"Authorization": "Bearer trainer-token"},
+            )
+        assert resp.status_code == 201
+        calls = [(m, u.split("/v1/api")[-1]) for m, u, _ in seen]
+        assert ("GET", "/users/by-email/fwd@test.com") in calls
+        assert ("POST", "/users/invite") in calls
+        assert all(h.get("Authorization") == "Bearer trainer-token" for _, _, h in seen)
+
+    def test_trainer_submission_lists_forward_token(self):
+        Client, seen = _recording_client(get_data={"id": 9, "first_name": "A", "last_name": "B", "email": "a@t.com"})
+        with patch("httpx.AsyncClient", Client):
+            for path in ("/v1/api/submissions/trainer/all", "/v1/api/submissions/trainer/evaluated"):
+                resp = client.get(path, headers={"Authorization": "Bearer trainer-token"})
+                assert resp.status_code == 200
+        assert all(h.get("Authorization") == "Bearer trainer-token" for _, _, h in seen)
+
+
 class TestDependencies:
     """Call dependency functions directly to cover auth/role logic."""
 
